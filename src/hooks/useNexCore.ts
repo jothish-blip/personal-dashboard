@@ -12,7 +12,7 @@ export function useNexCore() {
     meta: {
       currentMonth: new Date().toISOString().slice(0, 7),
       isFocus: false,
-      theme: 'light', // Light is the strict default here
+      theme: 'light',
     },
   });
   const [mounted, setMounted] = useState(false);
@@ -22,15 +22,18 @@ export function useNexCore() {
     const saved = localStorage.getItem(KEY);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        // Safety checks for older backups that might be missing the meta object entirely
+        // Explicitly cast the parsed JSON to NexState to satisfy TypeScript
+        const parsed = JSON.parse(saved) as NexState;
+        
         if (!parsed.meta) {
           parsed.meta = { currentMonth: new Date().toISOString().slice(0, 7), isFocus: false, theme: 'light' };
         }
-        // ONLY set to light if it's completely missing, otherwise respect user's saved choice
-        if (!parsed.meta.theme) {
+        
+        // Ensure the theme is strictly 'light' or 'dark'
+        if (parsed.meta.theme !== 'dark' && parsed.meta.theme !== 'light') {
           parsed.meta.theme = 'light';
         }
+        
         setState(parsed);
       } catch (e) {
         console.error("Failed to parse local storage", e);
@@ -39,7 +42,7 @@ export function useNexCore() {
     setMounted(true);
   }, []);
 
-  // 2. Sync Theme to the HTML Document (This is required for Tailwind dark mode)
+  // 2. Sync Theme to the HTML Document
   useEffect(() => {
     if (state.meta.theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -53,37 +56,34 @@ export function useNexCore() {
     localStorage.setItem(KEY, JSON.stringify(newState));
   };
 
-  const logAction = (action: string, name: string, detail: string, currentState: NexState) => {
-    // Restored: toLocaleString() captures exact date AND time
-    const newLog = { time: new Date().toLocaleString(), action, name, detail };
-    // Restored: Infinite history (removed the .slice(0, 50) limit)
+  const logAction = (action: string, name: string, detail: string, currentState: NexState): Log[] => {
+    const newLog: Log = { time: new Date().toLocaleString(), action, name, detail };
     const updatedLogs = [newLog, ...currentState.logs];
     return updatedLogs;
   };
 
   const setMonthYear = (month: string) => {
-    const newState = { ...state, meta: { ...state.meta, currentMonth: month } };
+    const newState: NexState = { ...state, meta: { ...state.meta, currentMonth: month } };
     saveState(newState);
   };
 
   const setFocus = (isFocus: boolean) => {
-    const newState = { ...state, meta: { ...state.meta, isFocus } };
+    const newState: NexState = { ...state, meta: { ...state.meta, isFocus } };
     saveState(newState);
   };
 
-  // Restored: The toggle logic so the button actually works
   const toggleTheme = () => {
     const newTheme = state.meta.theme === 'light' ? 'dark' : 'light';
-    const newState = { ...state, meta: { ...state.meta, theme: newTheme } };
+    const newState: NexState = { ...state, meta: { ...state.meta, theme: newTheme } };
     saveState(newState);
   };
 
   const addTask = (name: string, group: string) => {
     if (!name.trim()) return;
     const finalGroup = (group.trim() || "GENERAL").toUpperCase();
-    const newTask = { id: Date.now(), name: name.trim(), group: finalGroup, history: {} };
+    const newTask: Task = { id: Date.now(), name: name.trim(), group: finalGroup, history: {} };
     
-    const newState = { ...state, tasks: [...state.tasks, newTask] };
+    const newState: NexState = { ...state, tasks: [...state.tasks, newTask] };
     newState.logs = logAction("CREATE", newTask.name, finalGroup, newState);
     saveState(newState);
   };
@@ -93,13 +93,13 @@ export function useNexCore() {
     const task = state.tasks.find((t) => t.id === id);
     if (!task) return;
 
-    const newState = { ...state, tasks: state.tasks.filter((t) => t.id !== id) };
+    const newState: NexState = { ...state, tasks: state.tasks.filter((t) => t.id !== id) };
     newState.logs = logAction("DELETE", task.name, "Removed", newState);
     saveState(newState);
   };
 
   const toggleTask = (id: number, dateStr: string) => {
-    const newState = { ...state };
+    const newState: NexState = { ...state };
     const taskIndex = newState.tasks.findIndex((t) => t.id === id);
     if (taskIndex === -1) return;
 
@@ -117,7 +117,7 @@ export function useNexCore() {
 
   const clearLogs = () => {
     if (!window.confirm("Purge audit logs?")) return;
-    const newState = { ...state, logs: [] };
+    const newState: NexState = { ...state, logs: [] };
     saveState(newState);
   };
 
@@ -127,11 +127,15 @@ export function useNexCore() {
       try {
         const result = e.target?.result;
         if (typeof result === 'string') {
-          const data = JSON.parse(result);
+          // Explicitly cast to NexState here as well
+          const data = JSON.parse(result) as NexState;
           if (data.tasks) {
-            // Safety check for older imports
-            if (!data.meta) data.meta = { currentMonth: new Date().toISOString().slice(0, 7), isFocus: false, theme: 'light' };
-            if (!data.meta.theme) data.meta.theme = 'light';
+            if (!data.meta) {
+              data.meta = { currentMonth: new Date().toISOString().slice(0, 7), isFocus: false, theme: 'light' };
+            }
+            if (data.meta.theme !== 'dark' && data.meta.theme !== 'light') {
+              data.meta.theme = 'light';
+            }
             saveState(data);
           }
         }
