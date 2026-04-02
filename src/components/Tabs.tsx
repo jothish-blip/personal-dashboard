@@ -13,18 +13,34 @@ export default function Tabs({ activeTab, setActiveTab }: TabsProps) {
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-2 px-5 border-b border-gray-200 shrink-0 bg-white transition-colors">
+    <div className="
+      flex flex-wrap items-center gap-2 px-5 border-b border-gray-200 shrink-0 z-[90]
+      sticky top-[73px] md:top-[77px] 
+      bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/80
+      transition-all duration-300
+    ">
       {tabs.map(tab => (
         <button
           key={tab.id}
           onClick={() => setActiveTab(tab.id)}
-          className={`flex-1 min-w-[120px] text-center py-3 px-5 text-sm font-bold border-b-2 transition-colors ${
-            activeTab === tab.id 
-              ? 'text-blue-600 border-blue-600' 
-              : 'text-gray-500 border-transparent hover:text-gray-900'
-          }`}
+          className={`
+            relative flex-1 sm:flex-none min-w-[100px] text-center py-4 px-5 
+            text-[11px] font-black tracking-widest transition-all duration-200
+            ${
+              activeTab === tab.id 
+                ? 'text-blue-600' 
+                : 'text-gray-400 hover:text-slate-900'
+            }
+          `}
         >
           {tab.label}
+
+          {/* ACTIVE INDICATOR (Animated Underline) */}
+          {activeTab === tab.id && (
+            <div 
+              className="absolute bottom-0 left-0 right-0 h-[2px] bg-blue-600 animate-in fade-in slide-in-from-bottom-1 duration-300" 
+            />
+          )}
         </button>
       ))}
     </div>

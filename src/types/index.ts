@@ -6,6 +6,7 @@ export interface Task {
 }
 
 export interface Log {
+  id: string;
   time: string;
   action: string;
   name: string;
@@ -16,6 +17,8 @@ export interface Meta {
   currentMonth: string;
   isFocus: boolean;
   theme: 'light' | 'dark';
+  lockedDates: string[]; // ✅ New: Stores ISO date strings that are read-only
+  rollbackUsedDates: string[];
 }
 
 export interface NexState {
