@@ -5,6 +5,15 @@ import { Task, Log, Meta, NexState } from '../types';
 
 const KEY = 'NEXTASK_V12_PRO_FINAL';
 
+/**
+ * Helper: Reliable Local Date String (YYYY-MM-DD)
+ */
+const getTodayLocal = () => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().split('T')[0];
+};
+
 export function useNexCore() {
   const [state, setState] = useState<NexState>({
     tasks: [],
@@ -12,160 +21,207 @@ export function useNexCore() {
     meta: {
       currentMonth: new Date().toISOString().slice(0, 7),
       isFocus: false,
-      theme: 'light',
+      theme: 'dark', // Defaulting to dark as per preference
+      lockedDates: [],
+      rollbackUsedDates: [],
     },
   });
   const [mounted, setMounted] = useState(false);
 
-  // 1. Load initial data from LocalStorage
+  // 1. Initial Load with Data Sanitization
   useEffect(() => {
     const saved = localStorage.getItem(KEY);
     if (saved) {
       try {
-        // Explicitly cast the parsed JSON to NexState to satisfy TypeScript
         const parsed = JSON.parse(saved) as NexState;
         
-        if (!parsed.meta) {
-          parsed.meta = { currentMonth: new Date().toISOString().slice(0, 7), isFocus: false, theme: 'light' };
+        // --- DATA SANITIZATION ---
+        // 1. Guarantee Safe Meta
+        parsed.meta = {
+          currentMonth: parsed.meta?.currentMonth || getTodayLocal().slice(0, 7),
+          isFocus: parsed.meta?.isFocus ?? false,
+          theme: parsed.meta?.theme || 'dark',
+          lockedDates: parsed.meta?.lockedDates || [],
+          rollbackUsedDates: parsed.meta?.rollbackUsedDates || []
+        };
+
+        // 2. Fix Legacy Logs (Add IDs if missing or duplicate)
+        if (Array.isArray(parsed.logs)) {
+          parsed.logs = parsed.logs.map((log, i) => ({
+            ...log,
+            id: (log.id && log.id !== "") 
+              ? log.id 
+              : `${Date.now()}-legacy-${i}-${Math.random().toString(36).slice(2, 5)}`
+          }));
+        } else {
+          parsed.logs = [];
         }
-        
-        // Ensure the theme is strictly 'light' or 'dark'
-        if (parsed.meta.theme !== 'dark' && parsed.meta.theme !== 'light') {
-          parsed.meta.theme = 'light';
-        }
-        
+
         setState(parsed);
       } catch (e) {
-        console.error("Failed to parse local storage", e);
+        console.error("Storage corruption detected:", e);
       }
     }
     setMounted(true);
   }, []);
 
-  // 2. Sync Theme to the HTML Document
-  useEffect(() => {
-    if (state.meta.theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [state.meta.theme]);
-
-  const saveState = (newState: NexState) => {
-    setState(newState);
-    localStorage.setItem(KEY, JSON.stringify(newState));
+  // 2. Functional State Updater (Prevents stale closure bugs)
+  const saveState = (updater: (prev: NexState) => NexState) => {
+    setState(prev => {
+      const newState = updater(prev);
+      localStorage.setItem(KEY, JSON.stringify(newState));
+      return newState;
+    });
   };
 
+  /**
+   * FIXED: Strong Unique ID Generation
+   */
   const logAction = (action: string, name: string, detail: string, currentState: NexState): Log[] => {
-    const newLog: Log = { time: new Date().toLocaleString(), action, name, detail };
-    const updatedLogs = [newLog, ...currentState.logs];
-    return updatedLogs;
+    const newLog: Log = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, // Strong ID
+      time: new Date().toLocaleString(), 
+      action, 
+      name, 
+      detail
+    };
+    return [newLog, ...currentState.logs].slice(0, 100); // Increased log capacity slightly
   };
 
-  const setMonthYear = (month: string) => {
-    const newState: NexState = { ...state, meta: { ...state.meta, currentMonth: month } };
-    saveState(newState);
+  // --- ACTIONS ---
+
+  const lockToday = () => {
+    const today = getTodayLocal();
+    saveState(prev => {
+      if (prev.meta.lockedDates.includes(today)) return prev;
+
+      const updatedState: NexState = {
+        ...prev,
+        meta: {
+          ...prev.meta,
+          lockedDates: [...new Set([...prev.meta.lockedDates, today])]
+        }
+      };
+      updatedState.logs = logAction("LOCK", "User", `Locked ${today}`, updatedState);
+      return updatedState;
+    });
   };
 
-  const setFocus = (isFocus: boolean) => {
-    const newState: NexState = { ...state, meta: { ...state.meta, isFocus } };
-    saveState(newState);
+  const unlockDate = (dateStr: string) => {
+    const today = getTodayLocal();
+    saveState(prev => {
+      if (dateStr !== today) return prev;
+
+      const alreadyUsed = prev.meta.rollbackUsedDates || [];
+      const isLocked = prev.meta.lockedDates.includes(dateStr);
+
+      if (alreadyUsed.includes(dateStr) || !isLocked) return prev;
+
+      const updatedState: NexState = {
+        ...prev,
+        meta: {
+          ...prev.meta,
+          lockedDates: prev.meta.lockedDates.filter(d => d !== dateStr),
+          rollbackUsedDates: [...alreadyUsed, dateStr]
+        }
+      };
+
+      updatedState.logs = logAction("ROLLBACK", "User", `Unlocked ${dateStr}`, updatedState);
+      return updatedState;
+    });
   };
 
-  const toggleTheme = () => {
-    const newTheme = state.meta.theme === 'light' ? 'dark' : 'light';
-    const newState: NexState = { ...state, meta: { ...state.meta, theme: newTheme } };
-    saveState(newState);
+  const toggleTask = (id: number, dateStr: string) => {
+    saveState(prev => {
+      if (prev.meta.lockedDates.includes(dateStr)) return prev;
+
+      const targetTask = prev.tasks.find(t => t.id === id);
+      if (!targetTask) return prev;
+
+      const status = !targetTask.history[dateStr];
+      const updatedTasks = prev.tasks.map(task => {
+        if (task.id !== id) return task;
+        return {
+          ...task,
+          history: { ...task.history, [dateStr]: status }
+        };
+      });
+
+      const updatedState: NexState = { ...prev, tasks: updatedTasks };
+      updatedState.logs = logAction("TOGGLE", targetTask.name, status ? "DONE" : "OPEN", updatedState);
+      return updatedState;
+    });
   };
 
   const addTask = (name: string, group: string) => {
     if (!name.trim()) return;
-    const finalGroup = (group.trim() || "GENERAL").toUpperCase();
-    const newTask: Task = { id: Date.now(), name: name.trim(), group: finalGroup, history: {} };
-    
-    const newState: NexState = { ...state, tasks: [...state.tasks, newTask] };
-    newState.logs = logAction("CREATE", newTask.name, finalGroup, newState);
-    saveState(newState);
+    saveState(prev => {
+      const newTask: Task = { 
+        id: Date.now(), 
+        name: name.trim(), 
+        group: (group.trim() || "GENERAL").toUpperCase(), 
+        history: {} 
+      };
+      const updatedState = { ...prev, tasks: [...prev.tasks, newTask] };
+      updatedState.logs = logAction("CREATE", newTask.name, newTask.group, updatedState);
+      return updatedState;
+    });
   };
 
   const deleteTask = (id: number) => {
-    if (!window.confirm("Confirm deletion of task and all history?")) return;
-    const task = state.tasks.find((t) => t.id === id);
-    if (!task) return;
-
-    const newState: NexState = { ...state, tasks: state.tasks.filter((t) => t.id !== id) };
-    newState.logs = logAction("DELETE", task.name, "Removed", newState);
-    saveState(newState);
+    if (!window.confirm("Delete objective?")) return;
+    saveState(prev => {
+      const task = prev.tasks.find(t => t.id === id);
+      const updatedState = { ...prev, tasks: prev.tasks.filter(t => t.id !== id) };
+      if (task) updatedState.logs = logAction("DELETE", task.name, "Removed", updatedState);
+      return updatedState;
+    });
   };
 
-  const toggleTask = (id: number, dateStr: string) => {
-    const newState: NexState = { ...state };
-    const taskIndex = newState.tasks.findIndex((t) => t.id === id);
-    if (taskIndex === -1) return;
-
-    const task = newState.tasks[taskIndex];
-    const newStatus = !task.history[dateStr];
-    
-    newState.tasks[taskIndex] = {
-      ...task,
-      history: { ...task.history, [dateStr]: newStatus }
-    };
-    
-    newState.logs = logAction("TOGGLE", task.name, newStatus ? "COMPLETED" : "REOPENED", newState);
-    saveState(newState);
+  const addAuditLog = (detail: string) => {
+    saveState(prev => {
+      const updatedState = { ...prev };
+      updatedState.logs = logAction("USER_ACTION", "System", detail, updatedState);
+      return updatedState;
+    });
   };
 
-  const clearLogs = () => {
-    if (!window.confirm("Purge audit logs?")) return;
-    const newState: NexState = { ...state, logs: [] };
-    saveState(newState);
+  const setFocus = (value: boolean) => {
+    saveState(prev => ({
+      ...prev,
+      meta: { ...prev.meta, isFocus: value }
+    }));
   };
 
-  const importData = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const result = e.target?.result;
-        if (typeof result === 'string') {
-          // Explicitly cast to NexState here as well
-          const data = JSON.parse(result) as NexState;
-          if (data.tasks) {
-            if (!data.meta) {
-              data.meta = { currentMonth: new Date().toISOString().slice(0, 7), isFocus: false, theme: 'light' };
-            }
-            if (data.meta.theme !== 'dark' && data.meta.theme !== 'light') {
-              data.meta.theme = 'light';
-            }
-            saveState(data);
-          }
-        }
-      } catch (err) {
-        alert("Invalid File Format.");
-      }
-    };
-    reader.readAsText(file);
+  const setMonthYear = (value: string) => {
+    saveState(prev => ({
+      ...prev,
+      meta: { ...prev.meta, currentMonth: value }
+    }));
   };
 
   const exportData = () => {
-    const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
+    const payload = JSON.stringify(state, null, 2);
+    const blob = new Blob([payload], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `NexTask_Backup_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `nex-backup-${new Date().toISOString().slice(0,10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   return {
     state,
     mounted,
-    setMonthYear,
-    setFocus,
-    toggleTheme,
     addTask,
     deleteTask,
     toggleTask,
-    clearLogs,
-    importData,
-    exportData,
+    lockToday,
+    unlockDate,
+    addAuditLog,
+    setFocus,
+    setMonthYear,
+    exportData
   };
 }
