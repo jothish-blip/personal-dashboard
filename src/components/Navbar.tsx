@@ -2,7 +2,7 @@
 
 import React, { useRef, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Download, Upload, LayoutGrid, ListTodo } from "lucide-react";
+import { Download, Upload, LayoutGrid, ListTodo, BookOpen } from "lucide-react";
 import { Meta } from "../types";
 
 interface NavbarProps {
@@ -37,98 +37,124 @@ export default function Navbar({
   }, []);
 
   return (
-    <nav className="flex flex-col gap-4 p-4 border-b border-gray-200 bg-white sticky top-0 z-[100] md:flex-row md:items-center md:justify-between shadow-sm">
-      
-      {/* 1. BRAND */}
-      <div className="flex items-center gap-3">
-        <div className="font-black text-xl tracking-tighter text-slate-900">
-          NexTask <span className="text-blue-600">v12</span>
-        </div>
-        <div className="hidden md:block h-4 w-[1px] bg-gray-200" />
-        <div className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded border ${
-          mode === 'matrix' ? 'text-blue-600 bg-blue-50 border-blue-100' : 'text-purple-600 bg-purple-50 border-purple-100'
-        }`}>
-          {mode === 'matrix' ? 'Engine' : 'Nisc'}
-        </div>
-      </div>
-
-      {/* 2. WORKSPACE SWITCHER (Next.js SPA Navigation) */}
-      <div className="flex bg-gray-100 p-1 rounded-xl gap-1 border border-gray-200/50 w-full md:w-auto">
-        <button
-          onClick={() => router.push('/')}
-          className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2 ${
-            mode === 'matrix'
-              ? 'bg-white text-blue-600 shadow-sm border border-gray-100'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <LayoutGrid size={14} /> TASKS
-        </button>
-
-        <button
-          onClick={() => router.push('/mini-nisc')}
-          className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2 ${
-            mode === 'mini'
-              ? 'bg-white text-purple-600 shadow-sm border border-gray-100'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <ListTodo size={14} /> MINI NISC
-        </button>
-      </div>
-
-      {/* 3. DATE & DATA TOOLS */}
-      <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
-        <div className="flex gap-1">
-          <select 
-            value={y} 
-            onChange={(e) => setMonthYear(`${e.target.value}-${m}`)} 
-            className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-xs font-bold outline-none"
-          >
-            {years.map(year => <option key={year} value={year}>{year}</option>)}
-          </select>
-
-          <select 
-            value={m} 
-            onChange={(e) => setMonthYear(`${y}-${e.target.value}`)} 
-            className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-xs font-bold outline-none"
-          >
-            {Array.from({ length: 12 }, (_, i) => {
-              const val = String(i + 1).padStart(2, '0');
-              const name = new Date(2024, i).toLocaleString('default', { month: 'short' }).toUpperCase();
-              return <option key={val} value={val}>{name}</option>;
-            })}
-          </select>
-        </div>
+    <nav className="h-[64px] flex items-center px-4 border-b border-gray-200 bg-white sticky top-0 z-[100] shadow-sm">
+      <div className="w-full max-w-[1500px] mx-auto flex items-center justify-between gap-4">
         
-        <div className="flex gap-1 border-l border-gray-100 pl-3">
-          <button 
-            onClick={() => fileInputRef.current?.click()} 
-            className="bg-white border border-gray-200 w-9 h-9 flex items-center justify-center rounded-lg shadow-sm hover:bg-gray-50 active:scale-90 transition-all"
+        {/* 1. BRAND */}
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="text-lg font-semibold text-gray-800">
+            NexTask <span className="text-orange-500 font-bold">v12</span>
+          </div>
+          <div className="hidden md:block h-4 w-[1px] bg-gray-200" />
+          <div className="text-[10px] px-2 py-1 rounded border border-gray-200 text-gray-500 bg-gray-50 uppercase tracking-wide font-medium hidden sm:block">
+            {mode === 'matrix' ? 'Engine' : 'Nisc'}
+          </div>
+        </div>
+
+        {/* 2. WORKSPACE SWITCHER */}
+        <div className="flex bg-gray-100 p-1 rounded-lg gap-1 w-full md:w-auto overflow-x-auto custom-scrollbar">
+          <button
+            onClick={() => router.push('/')}
+            className={`px-4 py-1.5 rounded-md text-xs font-medium flex items-center justify-center gap-2 transition-colors whitespace-nowrap flex-1 md:flex-none ${
+              mode === 'matrix' && pathname !== '/diary'
+                ? 'bg-white text-orange-600 border border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
           >
-            <Download size={16} className="text-gray-600" />
+            <LayoutGrid size={14} /> Tasks
           </button>
-          <button 
-            onClick={exportData} 
-            className="bg-white border border-gray-200 w-9 h-9 flex items-center justify-center rounded-lg shadow-sm hover:bg-gray-50 active:scale-90 transition-all"
+
+          <button
+            onClick={() => router.push('/mini-nisc')}
+            className={`px-4 py-1.5 rounded-md text-xs font-medium flex items-center justify-center gap-2 transition-colors whitespace-nowrap flex-1 md:flex-none ${
+              mode === 'mini' && pathname !== '/diary'
+                ? 'bg-white text-orange-600 border border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
           >
-            <Upload size={16} className="text-gray-600" />
+            <ListTodo size={14} /> Mini
           </button>
         </div>
 
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="hidden" 
-          accept=".json"
-          onChange={(e) => {
-            if (e.target.files?.[0]) {
-              importData(e.target.files[0]);
-              e.target.value = ""; 
-            }
-          }} 
-        />
+        {/* 3. DATE, DIARY & DATA TOOLS */}
+        <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0">
+          
+          {/* DIARY BUTTON (Personal Layer) */}
+          <button
+            onClick={() => router.push('/diary')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              pathname === '/diary'
+                ? 'bg-white text-orange-600 border border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
+                : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'
+            }`}
+            title="Daily Reflection"
+          >
+            <BookOpen size={14} />
+            <span className="hidden sm:inline">Diary</span>
+            {/* Subtle indicator for active entry (can be driven by props later) */}
+            <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
+          </button>
+
+          <div className="hidden sm:flex gap-1 sm:border-l sm:border-gray-200 sm:pl-3">
+            <select 
+              value={y} 
+              onChange={(e) => setMonthYear(`${e.target.value}-${m}`)} 
+              className="bg-gray-50 border border-gray-200 rounded-md px-2 py-1.5 text-xs text-gray-700 outline-none hover:border-gray-300 transition-colors cursor-pointer"
+            >
+              {years.map(year => <option key={year} value={year}>{year}</option>)}
+            </select>
+
+            <select 
+              value={m} 
+              onChange={(e) => setMonthYear(`${y}-${e.target.value}`)} 
+              className="bg-gray-50 border border-gray-200 rounded-md px-2 py-1.5 text-xs text-gray-700 outline-none hover:border-gray-300 transition-colors cursor-pointer"
+            >
+              {Array.from({ length: 12 }, (_, i) => {
+                const val = String(i + 1).padStart(2, '0');
+                const name = new Date(2024, i).toLocaleString('default', { month: 'short' });
+                return <option key={val} value={val}>{name}</option>;
+              })}
+            </select>
+          </div>
+          
+          <div className="flex gap-1 border-l border-gray-200 pl-2 sm:pl-3">
+            <button 
+              onClick={() => fileInputRef.current?.click()} 
+              className="w-8 h-8 flex items-center justify-center rounded-md border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+              title="Import Data"
+            >
+              <Download size={14} className="text-orange-500" />
+            </button>
+            <button 
+              onClick={exportData} 
+              className="w-8 h-8 flex items-center justify-center rounded-md border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+              title="Export Data"
+            >
+              <Upload size={14} className="text-green-600" />
+            </button>
+          </div>
+
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept=".json"
+            onChange={(e) => {
+              if (e.target.files?.[0]) {
+                importData(e.target.files[0]);
+                e.target.value = ""; 
+              }
+            }} 
+          />
+        </div>
+
       </div>
+
+      {/* Hide scrollbar for the tiny switcher overflow on extreme mobile */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar { display: none; }
+        .custom-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
     </nav>
   );
 }

@@ -1,11 +1,15 @@
 "use client";
+
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import Navbar from "@/components/Navbar";
 import { useNexCore } from "@/hooks/useNexCore";
 import {
   Plus, Trash2, Bold, Italic, Underline, List, CheckSquare, Circle,
   Image as ImageIcon, Undo, Redo, Pin, FileText, Search, X, Clock, Tag,
-  BarChart3, Video, FolderOpen, Menu
+  BarChart3, Video, FolderOpen, Menu, CheckCircle2, Zap,
+  Activity,
+  Upload,
+  AlertTriangle
 } from "lucide-react";
 
 interface Folder {
@@ -37,11 +41,20 @@ interface Media {
   type: "image" | "video";
   url: string;
   name?: string;
-  folderId?: string;           
+  folderId?: string;          
   createdAt: number;
 }
 
 type View = "editor" | "analytics" | "history" | "media";
+
+// Helper for "Edited 2 min ago"
+function timeAgo(ts: number): string {
+  const diff = Math.floor((Date.now() - ts) / 60000);
+  if (diff < 1) return "Just now";
+  if (diff < 60) return `${diff} min ago`;
+  if (diff < 1440) return `${Math.floor(diff / 60)} hrs ago`;
+  return new Date(ts).toLocaleDateString();
+}
 
 export default function NexUpWorkspace() {
   const { state, setMonthYear } = useNexCore();
@@ -56,15 +69,28 @@ export default function NexUpWorkspace() {
   const [search, setSearch] = useState("");
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
-  const [lastSaved, setLastSaved] = useState<string | null>(null);
   
+  // Refined Save Status
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('saved');
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  
+  // Media Error State
+  const [mediaError, setMediaError] = useState("");
+
+  // Toolbar Active State
+  const [activeFormats, setActiveFormats] = useState<string[]>([]);
+
   // Mobile Sidebar State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const editorRef = useRef<HTMLDivElement>(null);
+  const saveTimeout = useRef<NodeJS.Timeout | null>(null);
+  const lastHistorySave = useRef<number>(0);
+  const formatTimeout = useRef<NodeJS.Timeout | null>(null);
+
   const activeDocument = documents.find(d => d.id === activeDocId);
 
-  // Media counts per folder (for sidebar)
+  // Media counts per folder
   const mediaCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     media.forEach(m => {
@@ -90,7 +116,7 @@ export default function NexUpWorkspace() {
         id: "welcome-doc",
         title: "Welcome to NexUp Workspace",
         content: "<p>This is your personal workspace with folder-based media.</p>",
-        tags: ["welcome", "tutorial"],
+        tags: ["welcome"],
         createdAt: Date.now(),
         updatedAt: Date.now(),
         history: [],
@@ -109,15 +135,27 @@ export default function NexUpWorkspace() {
     }
   }, []);
 
-  // Auto Save
+  // Auto Save Engine
   useEffect(() => {
+    if (documents.length === 0 && folders.length === 0) return;
+    setSaveState('saving');
     const timer = setTimeout(() => {
       localStorage.setItem("nexup-workspace-v6", JSON.stringify({ documents, folders }));
       localStorage.setItem("nexup-media-v6", JSON.stringify(media));
-      setLastSaved(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      setSaveState('saved');
     }, 800);
     return () => clearTimeout(timer);
   }, [documents, folders, media]);
+
+  // Handle Initial Document Content Injection (NO RE-RENDERS)
+  useEffect(() => {
+    if (editorRef.current && activeDocument) {
+      if (editorRef.current.innerHTML !== activeDocument.content) {
+        editorRef.current.innerHTML = activeDocument.content;
+      }
+    }
+  }, [activeDocId]); // ONLY run when switching documents
 
   // Global Search Hotkey
   useEffect(() => {
@@ -133,7 +171,7 @@ export default function NexUpWorkspace() {
     return () => window.removeEventListener("keydown", handler);
   }, [globalSearchOpen]);
 
-  // Quick Actions
+  // Quick Actions (Hotkeys)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
@@ -154,13 +192,14 @@ export default function NexUpWorkspace() {
   const highlightText = (html: string, term: string): string => {
     if (!term) return html;
     const regex = new RegExp(`(${term})`, "gi");
-    return html.replace(regex, `<mark class="bg-yellow-200 px-1 rounded">$1</mark>`);
+    return html.replace(regex, `<mark class="bg-green-200 text-green-900 px-1 rounded">$1</mark>`);
   };
 
   // Filtered Documents
   const visibleDocs = useMemo(() => {
     let docs = documents.filter(doc => {
-      const folderMatch = !activeFolderId || doc.folderId === activeFolderId;
+      // Safely handle folder activation state
+      const folderMatch = activeFolderId === null ? true : doc.folderId === activeFolderId;
       const tagMatch = !activeTag || doc.tags?.includes(activeTag);
       return folderMatch && tagMatch;
     });
@@ -214,7 +253,8 @@ export default function NexUpWorkspace() {
   // Add Media
   const addMedia = (file: File) => {
     if (!activeFolderId) {
-      alert("Please select a folder before uploading media");
+      setMediaError("Select a folder first");
+      setTimeout(() => setMediaError(""), 3000);
       return;
     }
 
@@ -242,8 +282,8 @@ export default function NexUpWorkspace() {
     if (!activeDocId || !editorRef.current) return;
 
     const html = mediaItem.type === "image"
-      ? `<img src="${mediaItem.url}" class="rounded-2xl my-6 max-w-full shadow-sm" alt="${mediaItem.name || 'image'}" />`
-      : `<video src="${mediaItem.url}" controls class="rounded-2xl my-6 max-w-full shadow-sm"></video>`;
+      ? `<img src="${mediaItem.url}" class="rounded-2xl my-6 max-w-full shadow-sm border border-gray-200" alt="${mediaItem.name || 'image'}" />`
+      : `<video src="${mediaItem.url}" controls class="rounded-2xl my-6 max-w-full shadow-sm border border-gray-200"></video>`;
 
     execCommand("insertHTML", html);
 
@@ -278,10 +318,10 @@ export default function NexUpWorkspace() {
       updatedAt: Date.now(),
       history: []
     };
-    setDocuments([newDoc, ...documents]);
+    setDocuments(prev => [newDoc, ...prev]); // Stable identity
     setActiveDocId(newDoc.id);
     setView("editor");
-    setIsSidebarOpen(false); // Close sidebar on mobile after creation
+    setIsSidebarOpen(false);
   };
 
   const addTag = (docId: string, tagName: string) => {
@@ -316,14 +356,23 @@ export default function NexUpWorkspace() {
     setDocuments(prev => prev.map(doc => {
       if (doc.id !== id) return doc;
       const shouldAutoTitle = doc.title === "Untitled Document" || doc.title.startsWith("Untitled");
-      const newHistory: HistoryEntry = { content: doc.content, timestamp: Date.now(), title: doc.title };
+      
+      const now = Date.now();
+      let newHistoryList = doc.history || [];
+
+      // Throttle history saves to 5 seconds
+      if (now - lastHistorySave.current > 5000) {
+        lastHistorySave.current = now;
+        const newHistory: HistoryEntry = { content, timestamp: now, title: doc.title };
+        newHistoryList = [...newHistoryList, newHistory].slice(-20);
+      }
 
       return {
         ...doc,
         content,
         title: shouldAutoTitle ? extractTitle(content) : doc.title,
-        updatedAt: Date.now(),
-        history: [...(doc.history || []), newHistory].slice(-20)
+        updatedAt: now,
+        history: newHistoryList
       };
     }));
   };
@@ -332,15 +381,21 @@ export default function NexUpWorkspace() {
     setDocuments(prev => prev.map(doc =>
       doc.id === docId ? { ...doc, content: historyEntry.content, updatedAt: Date.now() } : doc
     ));
+    if (editorRef.current) {
+      editorRef.current.innerHTML = historyEntry.content;
+    }
     setView("editor");
   };
 
   const deleteDocument = (id: string) => {
-    setDocuments(prev => prev.filter(doc => doc.id !== id));
-    if (activeDocId === id) {
-      const remaining = documents.filter(d => d.id !== id);
-      setActiveDocId(remaining.length > 0 ? remaining[0].id : null);
-    }
+    if (!confirm("Are you sure you want to delete this document?")) return;
+    setDocuments(prev => {
+      const updated = prev.filter(doc => doc.id !== id);
+      if (activeDocId === id) {
+        setActiveDocId(updated[0]?.id || null);
+      }
+      return updated;
+    });
   };
 
   const extractTitle = (html: string): string => {
@@ -348,57 +403,115 @@ export default function NexUpWorkspace() {
     return text.split("\n")[0].slice(0, 60) || "Untitled Document";
   };
 
+  const checkFormat = () => {
+    if (formatTimeout.current) clearTimeout(formatTimeout.current);
+
+    formatTimeout.current = setTimeout(() => {
+      const formats = [];
+      if (document.queryCommandState('bold')) formats.push('bold');
+      if (document.queryCommandState('italic')) formats.push('italic');
+      if (document.queryCommandState('underline')) formats.push('underline');
+      setActiveFormats(formats);
+    }, 100);
+  };
+
+  // Stable ExecCommand
   const execCommand = (command: string, value?: string) => {
     if (!editorRef.current) return;
+    
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
     editorRef.current.focus();
-    document.execCommand(command, false, value);
-    if (activeDocId) updateDocumentContent(activeDocId, editorRef.current.innerHTML);
+
+    setTimeout(() => {
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.execCommand(command, false, value);
+      checkFormat();
+      if (activeDocId) updateDocumentContent(activeDocId, editorRef.current!.innerHTML);
+    }, 0);
+  };
+
+  // Safe Input Handler (No loops)
+  const handleInput = () => {
+    if (!editorRef.current || !activeDocId) return;
+
+    const newContent = editorRef.current.innerHTML;
+    if (newContent === activeDocument?.content) return; // Prevent unnecessary updates
+
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+
+    saveTimeout.current = setTimeout(() => {
+      updateDocumentContent(activeDocId, newContent);
+    }, 500);
   };
 
   const insertCheckbox = () => {
     if (!editorRef.current) return;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
     editorRef.current.focus();
-    document.execCommand("insertHTML", false,
-      `<div class="task-item flex items-center gap-3 my-3"><input type="checkbox" class="w-5 h-5 accent-indigo-600" /> <span contenteditable="true" class="task-text">New task</span></div>`
-    );
-    if (activeDocId) updateDocumentContent(activeDocId, editorRef.current.innerHTML);
+
+    setTimeout(() => {
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.execCommand("insertHTML", false,
+        `<div class="task-item flex items-center gap-3 my-3"><input type="checkbox" class="w-5 h-5 accent-green-500 cursor-pointer" /> <span contenteditable="true" class="task-text">New task</span></div>`
+      );
+      if (activeDocId) updateDocumentContent(activeDocId, editorRef.current!.innerHTML);
+    }, 0);
   };
 
   const insertRadio = () => {
     if (!editorRef.current) return;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
     editorRef.current.focus();
-    document.execCommand("insertHTML", false,
-      `<div class="flex items-center gap-3 my-2"><input type="radio" name="radio-group" class="w-5 h-5 accent-indigo-600" /> <span contenteditable="true">Option</span></div>`
-    );
-    if (activeDocId) updateDocumentContent(activeDocId, editorRef.current.innerHTML);
+
+    setTimeout(() => {
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.execCommand("insertHTML", false,
+        `<div class="flex items-center gap-3 my-2"><input type="radio" name="radio-group" class="w-5 h-5 accent-green-500 cursor-pointer" /> <span contenteditable="true">Option</span></div>`
+      );
+      if (activeDocId) updateDocumentContent(activeDocId, editorRef.current!.innerHTML);
+    }, 0);
   };
 
   const insertHeading = (level: number) => {
     if (!editorRef.current || level === 0) return;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
     editorRef.current.focus();
-    document.execCommand("insertHTML", false, `<h${level} class="font-bold my-4 tracking-tight">Heading ${level}</h${level}>`);
-    if (activeDocId) updateDocumentContent(activeDocId, editorRef.current.innerHTML);
+
+    setTimeout(() => {
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.execCommand("insertHTML", false, `<h${level} class="font-bold my-4 text-gray-800">Heading ${level}</h${level}>`);
+      if (activeDocId) updateDocumentContent(activeDocId, editorRef.current!.innerHTML);
+    }, 0);
   };
 
   const handleEditorClick = (e: React.MouseEvent) => {
+    checkFormat();
     const target = e.target as HTMLInputElement;
     if (target.type === "checkbox") {
       const taskItem = target.closest(".task-item");
       const taskText = taskItem?.querySelector(".task-text") as HTMLElement;
       if (taskText) {
         target.checked
-          ? taskText.classList.add("line-through", "text-slate-400")
-          : taskText.classList.remove("line-through", "text-slate-400");
+          ? taskText.classList.add("line-through", "text-gray-400")
+          : taskText.classList.remove("line-through", "text-gray-400");
       }
       if (activeDocId && editorRef.current) {
         updateDocumentContent(activeDocId, editorRef.current.innerHTML);
       }
     }
-  };
-
-  const handleEditorBlur = () => {
-    if (!editorRef.current || !activeDocId) return;
-    updateDocumentContent(activeDocId, editorRef.current.innerHTML);
   };
 
   const words = activeDocument
@@ -408,54 +521,62 @@ export default function NexUpWorkspace() {
   const readTime = Math.ceil(words / 200);
 
   return (
-    <div className="min-h-screen bg-white text-slate-700 flex flex-col">
-      <Navbar meta={state.meta} setMonthYear={setMonthYear} exportData={() => {}} importData={() => {}} />
+    <div className="min-h-screen bg-white text-gray-700 flex flex-col">
+      <Navbar meta={state.meta} setMonthYear={setMonthYear} exportData={() => {}} importData={() => {}} mode="matrix" />
 
       <div className="flex flex-1 overflow-hidden relative">
         
         {/* Mobile Sidebar Overlay */}
         <div 
           onClick={() => setIsSidebarOpen(false)} 
-          className={`md:hidden fixed inset-0 bg-slate-900/50 z-40 transition-opacity duration-300 ${isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} 
+          className={`md:hidden fixed inset-0 bg-gray-900/50 z-40 transition-opacity duration-300 ${isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} 
         />
 
         {/* Sidebar */}
         <aside className={`
-          absolute md:relative inset-y-0 left-0 z-50 h-full w-72 bg-slate-50 border-r border-slate-200 flex flex-col overflow-y-auto shrink-0
+          absolute md:relative inset-y-0 left-0 z-50 h-full w-72 bg-gray-50 border-r border-gray-200 flex flex-col overflow-y-auto shrink-0
           transform transition-transform duration-300 ease-in-out md:translate-x-0
           ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}>
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h1 className="font-black text-2xl tracking-tight text-slate-700">NexUp</h1>
-              <button onClick={createFolder} className="text-xs font-bold text-indigo-600 hover:text-indigo-700">+ Folder</button>
+              <h1 className="font-bold text-2xl tracking-tight text-gray-800">NexUp</h1>
+              <button onClick={createFolder} className="text-xs font-semibold text-green-600 hover:text-green-700 transition-colors">+ Folder</button>
             </div>
 
-            <input
-              type="text"
-              placeholder="Search documents & media..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm mb-6 focus:outline-none focus:border-slate-300"
-            />
+            <div className="relative mb-6">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search docs..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-green-400 transition-colors shadow-sm"
+              />
+            </div>
 
-            {/* Folders + Media Count */}
+            {/* Folders */}
             <div className="mb-8">
-              <div className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3 px-2">Folders</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3 px-2">Folders</div>
               <div onClick={() => { setActiveFolderId(null); setActiveTag(null); setIsSidebarOpen(false); }}
-                className={`px-4 py-2.5 rounded-2xl cursor-pointer flex items-center gap-2 transition-colors ${!activeFolderId && !activeTag ? 'bg-white shadow border border-slate-200/60' : 'hover:bg-slate-200/50'}`}>
-                📁 All Documents
+                className={`px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-2 transition-colors relative overflow-hidden ${!activeFolderId && !activeTag ? 'bg-green-50 border border-green-200 text-green-700' : 'hover:bg-gray-100 text-gray-600 border border-transparent'}`}>
+                {!activeFolderId && !activeTag && <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500" />}
+                <FolderOpen size={16} className={!activeFolderId && !activeTag ? "text-green-600" : "text-gray-400"} /> 
+                <span className="font-medium text-sm">All Documents</span>
               </div>
               {folders.map(folder => {
                 const count = mediaCounts[folder.id] || 0;
+                const isActive = activeFolderId === folder.id;
                 return (
                   <div
                     key={folder.id}
                     onClick={() => { setActiveFolderId(folder.id); setActiveTag(null); setIsSidebarOpen(false); }}
-                    className={`px-4 py-2.5 rounded-2xl cursor-pointer flex items-center gap-2 mt-1 transition-colors ${activeFolderId === folder.id ? 'bg-white shadow border border-slate-200/60' : 'hover:bg-slate-200/50'}`}
+                    className={`px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-2 mt-1 transition-colors relative overflow-hidden ${isActive ? 'bg-green-50 border border-green-200 text-green-700' : 'hover:bg-gray-100 text-gray-600 border border-transparent'}`}
                   >
-                    📁 {folder.name}
-                    <span className="ml-auto text-xs text-slate-400 font-medium">({count})</span>
+                    {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500" />}
+                    <FolderOpen size={16} className={isActive ? "text-green-600" : "text-gray-400"} />
+                    <span className="font-medium text-sm">{folder.name}</span>
+                    <span className={`ml-auto text-xs font-semibold ${isActive ? 'text-green-500' : 'text-gray-400'}`}>({count})</span>
                   </div>
                 );
               })}
@@ -463,51 +584,62 @@ export default function NexUpWorkspace() {
 
             {/* Tags */}
             <div className="mb-8">
-              <div className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3 px-2">Tags</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3 px-2">Tags</div>
               <div className="flex flex-wrap gap-2">
-                {Array.from(new Set(documents.flatMap(d => d.tags || []))).map(tag => (
-                  <div
-                    key={tag}
-                    onClick={() => { setActiveTag(tag); setActiveFolderId(null); setIsSidebarOpen(false); }}
-                    className={`px-3 py-1.5 text-xs rounded-full cursor-pointer transition-all flex items-center gap-1 ${activeTag === tag ? 'bg-indigo-600 text-white' : 'bg-slate-200/60 hover:bg-slate-300/60 text-slate-600'}`}
-                  >
-                    <Tag size={12} /> #{tag}
-                  </div>
-                ))}
+                {Array.from(new Set(documents.flatMap(d => d.tags || []))).map(tag => {
+                  const isActive = activeTag === tag;
+                  return (
+                    <div
+                      key={tag}
+                      onClick={() => { setActiveTag(tag); setActiveFolderId(null); setIsSidebarOpen(false); }}
+                      className={`px-3 py-1.5 text-xs rounded-md cursor-pointer transition-colors flex items-center gap-1 font-semibold ${isActive ? 'bg-green-500 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    >
+                      <Tag size={12} /> #{tag}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
             {/* Documents List */}
             <div className="flex justify-between items-center mb-3 px-2">
-              <span className="text-xs font-black uppercase tracking-widest text-slate-400">Documents</span>
-              <button onClick={() => createDocument(activeFolderId || undefined)} className="text-indigo-600 hover:text-indigo-700">
-                <Plus size={18} />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Documents</span>
+              <button onClick={() => createDocument(activeFolderId || undefined)} className="text-green-600 hover:text-green-700 transition-colors">
+                <Plus size={16} />
               </button>
             </div>
 
             <div className="space-y-1">
-              {visibleDocs.map(doc => (
-                <div key={doc.id} onClick={() => { setActiveDocId(doc.id); setIsSidebarOpen(false); }}
-                  className={`group px-4 py-3 rounded-2xl cursor-pointer flex items-center gap-3 transition-all ${activeDocId === doc.id ? "bg-white shadow border border-slate-200/60" : "hover:bg-slate-200/50"}`}>
-                  <FileText size={18} className="text-slate-400 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{doc.title}</div>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {doc.tags?.slice(0, 2).map(tag => (
-                        <span key={tag} className="text-[10px] px-1.5 py-0.5 bg-slate-200/50 rounded text-slate-500 truncate max-w-[80px]">#{tag}</span>
-                      ))}
+              {visibleDocs.map(doc => {
+                const isActive = activeDocId === doc.id;
+                return (
+                  <div key={doc.id} onClick={() => { setActiveDocId(doc.id); setIsSidebarOpen(false); }}
+                    className={`group px-4 py-3 rounded-xl cursor-pointer flex items-center gap-3 transition-colors relative overflow-hidden ${isActive ? "bg-green-50 border border-green-200 text-green-700 shadow-md scale-[1.01]" : "hover:bg-gray-100 border border-transparent text-gray-600"}`}>
+                    {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500" />}
+                    <FileText size={16} className={isActive ? "text-green-600 shrink-0" : "text-gray-400 shrink-0"} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold truncate">{doc.title}</div>
+                      {doc.tags && doc.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {doc.tags.slice(0, 2).map(tag => (
+                            <span key={tag} className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded truncate max-w-[80px] ${isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>#{tag}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
+                    <button onClick={(e) => { e.stopPropagation(); togglePin(doc.id); }} className={`shrink-0 ${doc.pinned ? 'text-green-500' : 'text-gray-300 hover:text-green-600'}`}>
+                      <Pin size={14} className={doc.pinned ? "fill-current" : ""} />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); deleteDocument(doc.id); }} className="text-gray-400 hover:text-red-500 shrink-0 p-1 md:flex hidden transition-colors" title="Delete">
+                      <Trash2 size={16} />
+                    </button>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); togglePin(doc.id); }} className="text-amber-500 shrink-0">
-                    <Pin size={16} className={doc.pinned ? "fill-current" : ""} />
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); deleteDocument(doc.id); }} className="opacity-0 group-hover:opacity-100 text-rose-400 shrink-0 md:flex hidden">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
               {visibleDocs.length === 0 && (
-                <div className="px-4 py-8 text-center text-sm text-slate-400">No documents found.</div>
+                <div className="px-4 py-8 text-center text-sm font-medium text-gray-400">
+                  No documents in this folder.<br/>Create one to get started.
+                </div>
               )}
             </div>
           </div>
@@ -515,27 +647,27 @@ export default function NexUpWorkspace() {
 
         {/* Main Content Area */}
         <main className="flex-1 min-w-0 overflow-y-auto flex flex-col bg-white">
-          <div className="w-full max-w-5xl mx-auto p-4 md:p-10 flex-1">
+          <div className="w-full max-w-5xl mx-auto p-4 md:p-8 flex-1">
             
             {/* Mobile Header & View Tabs */}
-            <div className="flex items-center border-b border-slate-200 mb-6 md:mb-10">
-              <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-3 -ml-2 text-slate-600 active:bg-slate-100 rounded-xl mr-2">
-                <Menu size={24} />
+            <div className="flex items-center border-b border-gray-200 mb-6 md:mb-8">
+              <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg mr-2 transition-colors">
+                <Menu size={20} />
               </button>
               
-              <div className="flex overflow-x-auto no-scrollbar scroll-smooth w-full [&::-webkit-scrollbar]:hidden">
+              <div className="flex overflow-x-auto no-scrollbar w-full [&::-webkit-scrollbar]:hidden">
                 {(["editor", "analytics", "history", "media"] as const).map((v) => (
                   <button
                     key={v}
                     onClick={() => setView(v)}
-                    className={`px-4 md:px-8 py-3 md:py-4 font-bold text-xs md:text-sm uppercase tracking-widest border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${view === v ? "border-slate-700 text-slate-700" : "border-transparent text-slate-400 hover:text-slate-600"}`}
+                    className={`px-4 md:px-6 py-3 text-xs md:text-sm font-semibold uppercase tracking-wide border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${view === v ? "border-green-500 text-green-600" : "border-transparent text-gray-400 hover:text-gray-600"}`}
                   >
                     {v === "editor" && "Editor"}
                     {v === "analytics" && "Analytics"}
                     {v === "history" && "History"}
                     {v === "media" && (
                       <>
-                        <FolderOpen size={16} className="md:w-[18px] md:h-[18px]" /> Media
+                        <FolderOpen size={16} /> Media
                       </>
                     )}
                   </button>
@@ -543,9 +675,24 @@ export default function NexUpWorkspace() {
               </div>
             </div>
 
+            {/* Quick Action Bar */}
+            {view === "editor" && (
+              <div className="flex items-center gap-2 mb-6">
+                <button onClick={() => createDocument(activeFolderId || undefined)} className="text-xs font-semibold flex items-center gap-1.5 text-gray-500 hover:text-green-600 bg-gray-50 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-green-200 transition-colors shadow-sm">
+                  <Plus size={14}/> New Doc
+                </button>
+                <button onClick={() => setView("media")} className="text-xs font-semibold flex items-center gap-1.5 text-gray-500 hover:text-green-600 bg-gray-50 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-green-200 transition-colors shadow-sm">
+                  <ImageIcon size={14}/> Upload
+                </button>
+                <button onClick={() => document.getElementById('tag-input')?.focus()} className="text-xs font-semibold flex items-center gap-1.5 text-gray-500 hover:text-green-600 bg-gray-50 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-green-200 transition-colors shadow-sm">
+                  <Tag size={14}/> Tag
+                </button>
+              </div>
+            )}
+
             {/* EDITOR VIEW */}
-            {view === "editor" && activeDocument && (
-              <div className="space-y-6 md:space-y-8">
+            {view === "editor" && activeDocument ? (
+              <div className="space-y-6">
                 
                 {/* Title & Tags */}
                 <div className="flex flex-col md:flex-row md:items-center gap-4">
@@ -553,21 +700,22 @@ export default function NexUpWorkspace() {
                     type="text"
                     value={activeDocument.title}
                     onChange={(e) => updateDocumentTitle(activeDocId!, e.target.value)}
-                    className="flex-1 text-2xl md:text-4xl font-black tracking-tight bg-transparent outline-none border-b border-slate-200 pb-3 md:pb-4 text-slate-700"
+                    className="flex-1 text-3xl md:text-4xl font-bold tracking-tight bg-transparent outline-none border-b border-gray-200 pb-3 text-gray-800 focus:border-green-400 transition-colors"
                     placeholder="Document Title"
                   />
 
                   <div className="flex flex-wrap items-center gap-2">
                     {activeDocument.tags?.map(tag => (
-                      <span key={tag} className="px-3 py-1 bg-slate-100 border border-slate-200 text-xs rounded-full flex items-center gap-1">
+                      <span key={tag} className="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-600 text-xs font-semibold rounded-md flex items-center gap-1">
                         #{tag}
-                        <button onClick={() => removeTag(activeDocument.id, tag)} className="text-slate-400 hover:text-rose-500">×</button>
+                        <button onClick={() => removeTag(activeDocument.id, tag)} className="text-gray-400 hover:text-red-500 transition-colors">×</button>
                       </span>
                     ))}
                     <input
+                      id="tag-input"
                       type="text"
                       placeholder="+ tag"
-                      className="text-xs px-3 py-1.5 bg-transparent border border-dashed border-slate-300 rounded-full w-24 focus:outline-none focus:border-indigo-400"
+                      className="text-xs px-3 py-1.5 bg-transparent border border-dashed border-gray-300 rounded-md w-24 focus:outline-none focus:border-green-400 focus:bg-green-50 transition-colors font-medium"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           addTag(activeDocument.id, e.currentTarget.value);
@@ -579,71 +727,85 @@ export default function NexUpWorkspace() {
                 </div>
 
                 {/* Toolbar */}
-                <div className="flex flex-wrap gap-1 md:gap-2 bg-white border border-slate-200 rounded-2xl p-2 md:p-3 shadow-sm sticky top-0 z-10">
-                  <ToolbarButton onClick={() => execCommand("bold")} title="Bold"><Bold size={18} /></ToolbarButton>
-                  <ToolbarButton onClick={() => execCommand("italic")} title="Italic"><Italic size={18} /></ToolbarButton>
-                  <ToolbarButton onClick={() => execCommand("underline")} title="Underline"><Underline size={18} /></ToolbarButton>
+                <div className="flex flex-wrap gap-1 md:gap-2 bg-white border border-gray-200 rounded-xl p-2 shadow-sm sticky top-0 z-10">
+                  <ToolbarButton isActive={activeFormats.includes('bold')} onClick={() => execCommand("bold")} title="Bold"><Bold size={16} /></ToolbarButton>
+                  <ToolbarButton isActive={activeFormats.includes('italic')} onClick={() => execCommand("italic")} title="Italic"><Italic size={16} /></ToolbarButton>
+                  <ToolbarButton isActive={activeFormats.includes('underline')} onClick={() => execCommand("underline")} title="Underline"><Underline size={16} /></ToolbarButton>
                   
-                  <div className="hidden md:block w-px h-8 bg-slate-200 mx-2 self-center" />
+                  <div className="w-px h-6 bg-gray-200 mx-1 self-center" />
                   
-                  <ToolbarButton onClick={() => execCommand("undo")} title="Undo"><Undo size={18} /></ToolbarButton>
-                  <ToolbarButton onClick={() => execCommand("redo")} title="Redo"><Redo size={18} /></ToolbarButton>
+                  <ToolbarButton onClick={() => execCommand("undo")} title="Undo"><Undo size={16} /></ToolbarButton>
+                  <ToolbarButton onClick={() => execCommand("redo")} title="Redo"><Redo size={16} /></ToolbarButton>
                   
-                  <div className="w-px h-6 md:h-8 bg-slate-200 mx-1 md:mx-2 self-center" />
+                  <div className="w-px h-6 bg-gray-200 mx-1 self-center" />
                   
-                  <select onChange={(e) => insertHeading(Number(e.target.value))} className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 md:px-3 md:py-2 text-xs md:text-sm outline-none focus:border-indigo-400 max-w-[100px] md:max-w-none">
+                  <select onChange={(e) => insertHeading(Number(e.target.value))} className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-xs font-medium text-gray-600 outline-none hover:border-gray-300 cursor-pointer focus:border-green-400">
                     <option value="0">Normal</option>
                     <option value="1">H1</option>
                     <option value="2">H2</option>
                     <option value="3">H3</option>
                   </select>
 
-                  <ToolbarButton onClick={() => document.getElementById("media-upload")?.click()} title="Upload Image/Video">
-                    <ImageIcon size={18} />
-                  </ToolbarButton>
-
-                  <ToolbarButton onClick={insertCheckbox} title="Task"><CheckSquare size={18} /></ToolbarButton>
-                  <ToolbarButton onClick={insertRadio} title="Radio"><Circle size={18} /></ToolbarButton>
+                  <ToolbarButton onClick={() => document.getElementById("media-upload")?.click()} title="Upload Media"><ImageIcon size={16} /></ToolbarButton>
+                  <ToolbarButton onClick={insertCheckbox} title="Task"><CheckSquare size={16} /></ToolbarButton>
+                  <ToolbarButton onClick={insertRadio} title="Radio"><Circle size={16} /></ToolbarButton>
                 </div>
 
                 {/* Editor Content Area */}
-                <div
-                  ref={editorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onBlur={handleEditorBlur}
-                  onClick={handleEditorClick}
-                  className="min-h-[400px] md:min-h-[560px] p-5 md:p-10 bg-white border border-slate-200 rounded-2xl md:rounded-3xl text-slate-700 text-[16px] md:text-[17px] leading-relaxed outline-none focus:border-indigo-200 shadow-sm transition-colors prose prose-slate max-w-none"
-                  dangerouslySetInnerHTML={{ __html: highlightText(activeDocument.content, search) }}
-                />
+                <div className="relative">
+                  <div
+                    ref={editorRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onInput={handleInput}
+                    onClick={handleEditorClick}
+                    onKeyUp={checkFormat}
+                    onMouseUp={checkFormat}
+                    className="min-h-[400px] md:min-h-[500px] p-6 md:p-8 bg-white border border-gray-200 rounded-2xl text-gray-700 text-base leading-relaxed outline-none focus:border-green-400 focus:ring-4 ring-green-500/10 shadow-sm transition-all prose max-w-none"
+                  />
+                </div>
 
                 {/* Footer Stats */}
-                <div className="text-[10px] md:text-xs text-slate-400 font-medium flex flex-wrap justify-between items-center px-2 md:px-4 gap-2 pb-6">
+                <div className="text-xs text-gray-400 font-semibold flex flex-wrap justify-between items-center px-2 pb-6">
                   <span>{words} words • {readTime} min read</span>
-                  <span className="flex items-center gap-1.5"><Clock size={12}/> Last saved {lastSaved || "recently"}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="hidden sm:inline">Edited {timeAgo(activeDocument.updatedAt)}</span>
+                    <span className="sm:hidden text-gray-300">|</span>
+                    <span className={`flex items-center gap-1.5 px-2 py-1 rounded-md border ${saveState === 'saving' ? 'bg-green-50 border-green-200 text-green-600' : 'bg-green-50 border-green-200 text-green-600'}`}>
+                      {saveState === 'saving' ? <Zap size={12} className="animate-pulse" /> : <CheckCircle2 size={12} />}
+                      {saveState === 'saving' ? 'Saving...' : `Saved at ${lastSavedTime || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
+                    </span>
+                  </div>
                 </div>
               </div>
-            )}
+            ) : view === "editor" ? (
+               <div className="flex-1 flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-gray-200 rounded-2xl">
+                 <FileText size={48} className="text-gray-300 mb-4" />
+                 <p className="text-gray-500 font-semibold">No document selected</p>
+                 <button onClick={() => createDocument(activeFolderId || undefined)} className="mt-4 px-4 py-2 bg-green-500 text-white text-sm font-bold rounded-lg hover:bg-green-600 transition-colors shadow-sm">
+                   Create New Document
+                 </button>
+               </div>
+            ) : null}
 
             {/* MEDIA LIBRARY VIEW */}
             {view === "media" && (
-              <div className="bg-white border border-slate-200 rounded-2xl md:rounded-3xl p-6 md:p-10">
-                <div className="text-xs md:text-sm text-slate-400 mb-4 flex items-center gap-2 bg-slate-50 w-fit px-3 py-1.5 rounded-lg border border-slate-100">
-                  📁 <span className="hidden md:inline">Current Folder:</span>
-                  <span className="font-bold text-slate-700">
-                    {activeFolderId ? folders.find(f => f.id === activeFolderId)?.name : "All Media"}
-                  </span>
-                </div>
-
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
-                  <h2 className="text-2xl md:text-3xl font-bold flex items-center gap-3">
-                    <FolderOpen size={28} className="text-indigo-500" /> Library
-                  </h2>
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 md:p-8 shadow-sm">
+                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold flex items-center gap-3 text-gray-800">
+                      <FolderOpen size={24} className="text-green-500" /> Media Library
+                    </h2>
+                    <div className="text-xs font-medium text-gray-500 mt-2 flex items-center gap-2 bg-gray-50 w-fit px-3 py-1.5 rounded-md border border-gray-200">
+                      📁 Target Folder: <span className="font-bold text-gray-700">{activeFolderId ? folders.find(f => f.id === activeFolderId)?.name : "All Media"}</span>
+                    </div>
+                    {mediaError && <p className="text-red-500 text-xs mt-2 font-bold flex items-center gap-1"><AlertTriangle size={12}/> {mediaError}</p>}
+                  </div>
                   <button
                     onClick={() => document.getElementById("media-upload")?.click()}
-                    className="w-full md:w-auto px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-700 transition shadow-sm"
+                    className="w-full md:w-auto px-5 py-2.5 bg-green-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-green-600 transition-colors shadow-sm"
                   >
-                    <Plus size={20} /> <span className="hidden md:inline">Upload File</span><span className="md:hidden">Upload</span>
+                    <Upload size={18} /> Upload File
                   </button>
                 </div>
 
@@ -660,29 +822,29 @@ export default function NexUpWorkspace() {
                 />
 
                 {filteredMedia.length === 0 ? (
-                  <div className="text-center py-16 md:py-24 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 px-4">
-                    <ImageIcon size={48} className="mx-auto mb-4 text-slate-300" />
-                    <p className="font-medium text-slate-500 mb-1">No media found</p>
-                    <p className="text-sm">
+                  <div className="text-center py-16 md:py-20 border-2 border-dashed border-gray-200 rounded-2xl px-4">
+                    <ImageIcon size={40} className="mx-auto mb-3 text-gray-300" />
+                    <p className="font-bold text-gray-500 mb-1">No media found</p>
+                    <p className="text-xs text-gray-400 font-medium">
                       {activeFolderId
                         ? "Upload images or videos to this folder."
                         : "Select a folder from the sidebar to start uploading."}
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {filteredMedia.map(item => (
-                      <div key={item.id} className="group relative bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                        <div className="aspect-video bg-slate-100 flex items-center justify-center overflow-hidden">
+                      <div key={item.id} className="group relative bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:border-green-300 transition-all">
+                        <div className="aspect-video bg-gray-50 flex items-center justify-center overflow-hidden">
                           {item.type === "image" ? (
                             <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
                           ) : (
                             <video src={item.url} className="w-full h-full object-cover" />
                           )}
                         </div>
-                        <div className="p-4 bg-slate-50">
-                          <div className="text-sm font-bold text-slate-700 truncate">{item.name || `${item.type} file`}</div>
-                          <div className="text-[10px] uppercase font-bold text-slate-400 mt-1">
+                        <div className="p-3 border-t border-gray-100">
+                          <div className="text-xs font-bold text-gray-700 truncate">{item.name || `${item.type} file`}</div>
+                          <div className="text-[10px] font-semibold text-gray-400 mt-0.5 uppercase tracking-wide">
                             {new Date(item.createdAt).toLocaleDateString()}
                           </div>
                         </div>
@@ -691,17 +853,17 @@ export default function NexUpWorkspace() {
                         <div className="absolute top-2 right-2 flex flex-col gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => insertMedia(item)}
-                            className="bg-white/90 backdrop-blur text-indigo-600 p-2 rounded-xl shadow-sm hover:bg-white"
+                            className="bg-white/90 backdrop-blur text-green-600 p-2 rounded-lg shadow-sm hover:bg-green-50 border border-gray-200 transition-colors"
                             title="Insert into active document"
                           >
-                            <ImageIcon size={16} />
+                            <Plus size={14} />
                           </button>
                           <button
                             onClick={() => deleteMedia(item.id)}
-                            className="bg-white/90 backdrop-blur text-rose-500 p-2 rounded-xl shadow-sm hover:bg-white"
+                            className="bg-white/90 backdrop-blur text-red-500 p-2 rounded-lg shadow-sm hover:bg-red-50 border border-gray-200 transition-colors"
                             title="Delete"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </div>
@@ -713,22 +875,22 @@ export default function NexUpWorkspace() {
 
             {/* ANALYTICS VIEW */}
             {view === "analytics" && (
-              <div className="bg-white border border-slate-200 rounded-2xl md:rounded-3xl p-6 md:p-10">
-                <h2 className="text-2xl md:text-3xl font-bold mb-8 md:mb-10 flex items-center gap-3">
-                  <BarChart3 size={28} className="text-indigo-500" /> Analytics
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 md:p-10 shadow-sm">
+                <h2 className="text-2xl font-bold mb-8 flex items-center gap-3 text-gray-800">
+                  <BarChart3 size={24} className="text-green-500" /> Workspace Analytics
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
-                  <div className="bg-slate-50 border border-slate-100 p-6 md:p-8 rounded-2xl">
-                    <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Total Documents</h3>
-                    <p className="text-5xl md:text-6xl font-black text-slate-700">{documents.length}</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-gray-50 border border-gray-200 p-6 rounded-2xl text-center shadow-sm">
+                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Total Documents</h3>
+                    <p className="text-4xl font-black text-gray-800">{documents.length}</p>
                   </div>
-                  <div className="bg-slate-50 border border-slate-100 p-6 md:p-8 rounded-2xl">
-                    <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Total Media</h3>
-                    <p className="text-5xl md:text-6xl font-black text-slate-700">{media.length}</p>
+                  <div className="bg-gray-50 border border-gray-200 p-6 rounded-2xl text-center shadow-sm">
+                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Total Media</h3>
+                    <p className="text-4xl font-black text-gray-800">{media.length}</p>
                   </div>
-                  <div className="bg-indigo-50 border border-indigo-100 p-6 md:p-8 rounded-2xl flex flex-col justify-center items-center text-center">
-                    <div className="text-4xl md:text-5xl font-black text-indigo-600 mb-2">—</div>
-                    <p className="text-xs font-bold text-indigo-400 uppercase">Insights Engine Offline</p>
+                  <div className="bg-green-50 border border-green-200 p-6 rounded-2xl flex flex-col justify-center items-center text-center shadow-sm">
+                    <Activity size={32} className="text-green-500 mb-2" />
+                    <p className="text-xs font-bold text-green-700 uppercase tracking-wide">Insights Engine Active</p>
                   </div>
                 </div>
               </div>
@@ -736,37 +898,44 @@ export default function NexUpWorkspace() {
 
             {/* HISTORY VIEW */}
             {view === "history" && activeDocument && (
-              <div className="bg-white border border-slate-200 rounded-2xl md:rounded-3xl p-6 md:p-10">
-                <h2 className="text-2xl md:text-3xl font-bold mb-6 flex items-center gap-3">
-                  <Clock size={28} className="text-indigo-500" /> Version History
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 md:p-10 shadow-sm">
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-gray-800">
+                  <Clock size={24} className="text-green-500" /> Version History
                 </h2>
-                <p className="text-sm text-slate-500 mb-8 font-medium bg-slate-50 px-4 py-2 rounded-xl w-fit">
+                <p className="text-xs text-gray-500 font-semibold mb-8 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg w-fit">
                   Recent snapshots • Click to restore
                 </p>
-                <div className="space-y-3 md:space-y-4">
+                <div className="space-y-4">
                   {activeDocument.history && activeDocument.history.length > 0 ? (
                     activeDocument.history.slice().reverse().map((entry, index) => (
                       <div
                         key={index}
-                        onClick={() => restoreVersion(activeDocument.id, entry)}
-                        className="p-4 md:p-6 bg-white border border-slate-200 rounded-2xl hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all group flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4"
+                        className="p-5 bg-white border border-gray-200 rounded-xl hover:border-green-400 hover:shadow-md transition-all flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 group"
                       >
                         <div>
-                          <div className="font-bold text-slate-700 text-sm md:text-base">
+                          <div className="font-bold text-gray-800 text-sm">
                             {new Date(entry.timestamp).toLocaleDateString()} at {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
-                          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1.5">
+                          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
                             Version {activeDocument.history!.length - index}
                           </div>
                         </div>
-                        <button className="text-xs font-bold px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl sm:opacity-0 group-hover:opacity-100 transition-opacity w-full sm:w-auto">
+                        <button 
+                          onClick={() => {
+                            if (confirm("Restore this version? Unsaved changes will be lost.")) {
+                              restoreVersion(activeDocument.id, entry);
+                            }
+                          }}
+                          className="text-xs font-bold px-4 py-2 bg-green-50 text-green-600 border border-green-200 rounded-lg sm:opacity-0 group-hover:opacity-100 transition-all hover:bg-green-100 w-full sm:w-auto"
+                        >
                           Restore Backup
                         </button>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-16 text-slate-400 border-2 border-dashed border-slate-100 rounded-2xl">
-                      No history recorded yet.
+                    <div className="text-center py-16 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50">
+                      <p className="font-semibold">No history recorded yet.</p>
+                      <p className="text-xs mt-1">Auto-saves will appear here as you edit.</p>
                     </div>
                   )}
                 </div>
@@ -778,24 +947,24 @@ export default function NexUpWorkspace() {
 
       {/* Global Search Panel Modal */}
       {globalSearchOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-start justify-center pt-0 md:pt-24 z-[100] px-0 md:px-4">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-2xl md:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-            <div className="p-4 md:p-6 border-b border-slate-100 flex items-center gap-3 md:gap-4 bg-white">
-              <Search size={22} className="text-indigo-500 shrink-0" />
+        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-start justify-center pt-0 md:pt-24 z-[100] px-0 md:px-4 transition-all">
+          <div className="bg-white w-full h-full md:h-auto md:max-w-2xl md:rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
+            <div className="p-4 md:p-5 border-b border-gray-100 flex items-center gap-3 bg-white">
+              <Search size={20} className="text-green-500 shrink-0" />
               <input
                 type="text"
                 autoFocus
                 placeholder="Search documents, text, tags..."
                 value={globalSearchQuery}
                 onChange={(e) => setGlobalSearchQuery(e.target.value)}
-                className="flex-1 outline-none text-base md:text-lg placeholder:text-slate-300 font-medium"
+                className="flex-1 outline-none text-base font-semibold placeholder:text-gray-300 text-gray-800"
               />
-              <button onClick={() => setGlobalSearchOpen(false)} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-700 transition">
-                <X size={20} />
+              <button onClick={() => setGlobalSearchOpen(false)} className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
+                <X size={18} />
               </button>
             </div>
             
-            <div className="flex-1 md:max-h-[60vh] overflow-y-auto p-2 md:p-4 bg-slate-50/50">
+            <div className="flex-1 md:max-h-[60vh] overflow-y-auto p-2 bg-gray-50">
               {globalSearchResults.length > 0 ? (
                 globalSearchResults.map(doc => (
                   <div
@@ -806,14 +975,14 @@ export default function NexUpWorkspace() {
                       setGlobalSearchOpen(false);
                       setSearch("");
                     }}
-                    className="p-4 md:p-5 hover:bg-white hover:shadow-sm rounded-2xl cursor-pointer flex gap-4 items-start transition-all border border-transparent hover:border-slate-200"
+                    className="p-4 hover:bg-white hover:shadow-sm rounded-xl cursor-pointer flex gap-4 items-start transition-all border border-transparent hover:border-gray-200"
                   >
-                    <div className="p-2 bg-indigo-50 text-indigo-500 rounded-xl shrink-0">
-                       <FileText size={20} />
+                    <div className="p-2 bg-green-50 text-green-600 rounded-lg shrink-0 border border-green-100">
+                       <FileText size={18} />
                     </div>
                     <div className="min-w-0">
-                      <div className="font-bold text-slate-800 text-sm md:text-base truncate">{doc.title}</div>
-                      <div className="text-xs md:text-sm text-slate-500 line-clamp-2 mt-1 leading-relaxed"
+                      <div className="font-bold text-gray-800 text-sm truncate">{doc.title}</div>
+                      <div className="text-xs text-gray-500 line-clamp-2 mt-1 leading-relaxed font-medium"
                         dangerouslySetInnerHTML={{
                           __html: highlightText(
                             doc.content.replace(/<[^>]+>/g, "").slice(0, 150) + "...",
@@ -822,9 +991,9 @@ export default function NexUpWorkspace() {
                         }}
                       />
                       {doc.tags && doc.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-3">
+                        <div className="flex flex-wrap gap-1.5 mt-2">
                           {doc.tags.map(tag => (
-                            <span key={tag} className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md">#{tag}</span>
+                            <span key={tag} className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-gray-100 border border-gray-200 text-gray-500 rounded">#{tag}</span>
                           ))}
                         </div>
                       )}
@@ -832,13 +1001,13 @@ export default function NexUpWorkspace() {
                   </div>
                 ))
               ) : globalSearchQuery ? (
-                <div className="text-center py-20 text-slate-400 flex flex-col items-center">
-                  <Search size={32} className="text-slate-200 mb-3" />
-                  <span className="font-medium">No matches found for "{globalSearchQuery}"</span>
+                <div className="text-center py-16 text-gray-500 flex flex-col items-center">
+                  <Search size={28} className="text-gray-300 mb-3" />
+                  <span className="font-semibold text-sm">No matches found for "{globalSearchQuery}"</span>
                 </div>
               ) : (
-                <div className="text-center py-20 text-slate-400 text-sm">
-                  <span className="font-medium text-slate-500 mb-1 block">Quick Search Mode</span>
+                <div className="text-center py-16 text-gray-400 text-xs">
+                  <span className="font-bold text-gray-500 mb-1 block text-sm">Quick Search Mode</span>
                   Find anything across your workspace instantly.
                 </div>
               )}
@@ -850,13 +1019,17 @@ export default function NexUpWorkspace() {
   );
 }
 
-// Sub-component for Toolbar
-function ToolbarButton({ children, onClick, title }: { children: React.ReactNode; onClick: () => void; title?: string }) {
+// Refined Sub-component for Toolbar
+function ToolbarButton({ children, onClick, title, isActive }: { children: React.ReactNode; onClick: () => void; title?: string; isActive?: boolean }) {
   return (
     <button
       onClick={onClick}
       title={title}
-      className="p-2 md:px-3 md:py-2.5 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition-all active:bg-slate-200 flex items-center justify-center"
+      className={`p-1.5 md:p-2 rounded-lg flex items-center justify-center transition-colors font-medium border ${
+        isActive 
+          ? "bg-green-50 text-green-600 border-green-200 shadow-sm" 
+          : "bg-transparent text-gray-500 border-transparent hover:bg-gray-100 hover:text-gray-800"
+      }`}
     >
       {children}
     </button>
