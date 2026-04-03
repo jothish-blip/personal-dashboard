@@ -484,9 +484,11 @@ export default function DiaryPage() {
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-gray-900 font-sans pb-24">
       <Navbar
-        meta={{ currentMonth: selectedDate.slice(0,7), isFocus: false, theme: 'light', lockedDates: [], rollbackUsedDates: [] }}
-        setMonthYear={() => {}} exportData={() => {}} importData={() => {}} mode="mini"
-      />
+  meta={{ currentMonth: selectedDate.slice(0,7), isFocus: false, theme: 'light', lockedDates: [], rollbackUsedDates: [] }}
+  setMonthYear={() => {}}
+  exportData={() => {}}
+  importData={() => {}}
+/>
 
       <div className="p-4 md:p-8 max-w-[1100px] mx-auto w-full flex flex-col gap-6 pt-8">
 
