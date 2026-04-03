@@ -522,7 +522,12 @@ export default function NexUpWorkspace() {
 
   return (
     <div className="min-h-screen bg-white text-gray-700 flex flex-col">
-      <Navbar meta={state.meta} setMonthYear={setMonthYear} exportData={() => {}} importData={() => {}} mode="matrix" />
+      <Navbar 
+  meta={state.meta} 
+  setMonthYear={setMonthYear} 
+  exportData={() => {}} 
+  importData={() => {}} 
+/>
 
       <div className="flex flex-1 overflow-hidden relative">
         
