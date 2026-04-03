@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   Save, Plus, X, Lock, ChevronLeft, ChevronRight, BarChart2, 
   CalendarDays, ArrowUpRight, ArrowDownRight, Minus, Activity,
-  Target, AlertTriangle, Flame, Zap
+  Target, AlertTriangle, Flame, Zap, Star
 } from 'lucide-react';
 import { Task, Meta } from '../types';
 
@@ -19,15 +19,25 @@ interface MatrixProps {
   addAuditLog: (detail: string) => void;
 }
 
+// --- SECURE TIMEZONE ENGINE ---
 const getLocalDate = (date: Date) => {
-  const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60000);
-  return local.toISOString().split('T')[0];
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
 };
 
 const getISODay = (date: Date) => {
   const day = date.getDay();
   return day === 0 ? 7 : day; 
+};
+
+// Safe local parser to prevent UTC midnight jumps
+const parseLocalDate = (dateStr: string) => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
 };
 
 // --- STREAK ENGINE ---
@@ -61,14 +71,24 @@ export default function MatrixView({
   const [taskName, setTaskName] = useState('');
   const [taskGroup, setTaskGroup] = useState('');
   const [error, setError] = useState('');
-  const [today] = useState(actualToday); 
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+  const today = actualToday; 
   const [weekOffset, setWeekOffset] = useState(0); 
   const todayRef = useRef<HTMLTableCellElement | null>(null);
 
+  // Swipe & Drag States
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragAction, setDragAction] = useState<boolean | null>(null);
+
+  const showError = useCallback((msg: string) => { 
+    setError(msg); 
+    setTimeout(() => setError(''), 3000); 
+  }, []);
+
   // --- 1. DATA ENGINE ---
   const { todayData, yesterdayData } = useMemo(() => {
-    const d = new Date(today);
+    const d = parseLocalDate(today);
     d.setDate(d.getDate() - 1);
     const yesterday = getLocalDate(d);
 
@@ -80,7 +100,18 @@ export default function MatrixView({
 
   const [year, month] = meta.currentMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
-  const groups = [...new Set(tasks.map(t => t.group))].sort();
+
+  // Performance: Memoized Group Mapping
+  const groupedTasks = useMemo(() => {
+    const map: Record<string, Task[]> = {};
+    tasks.forEach(t => {
+      if (!map[t.group]) map[t.group] = [];
+      map[t.group].push(t);
+    });
+    return map;
+  }, [tasks]);
+
+  const groups = Object.keys(groupedTasks).sort();
 
   // --- 2. SMART WEEK ALIGNMENT ---
   const weeksInMonth = useMemo(() => {
@@ -110,9 +141,35 @@ export default function MatrixView({
     return weeks;
   }, [daysInMonth, year, month]);
 
+  // INITIALIZE ACTIVE WEEK SMARTLY
+  const activeWeekIndex = useMemo(() => {
+    return weeksInMonth.findIndex(week =>
+      week.days.some(d => d && `${meta.currentMonth}-${d}` === actualToday)
+    );
+  }, [weeksInMonth, actualToday, meta.currentMonth]);
+
+  const [selectedWeek, setSelectedWeek] = useState<number>(0);
+
+  // FIX 1: Initial Week Bug - Set week safely after initial render
+  useEffect(() => {
+    if (activeWeekIndex !== -1) {
+      setSelectedWeek(activeWeekIndex);
+    }
+  }, [activeWeekIndex]);
+
+  // Global Mouse Up for drag-to-check
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      setIsDragging(false);
+      setDragAction(null);
+    };
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    return () => window.removeEventListener('pointerup', handleGlobalPointerUp);
+  }, []);
+
   // --- 3. WEEKLY COMPARISON ENGINE ---
   const { compareCurrentWeek, comparePrevWeek } = useMemo(() => {
-    const baseDate = new Date(actualToday);
+    const baseDate = parseLocalDate(actualToday);
     const dayOfWeek = baseDate.getDay() || 7;
     baseDate.setDate(baseDate.getDate() - dayOfWeek + 1 + (weekOffset * 7));
 
@@ -129,7 +186,7 @@ export default function MatrixView({
     });
 
     const prevWk = currentWk.map(day => {
-      const d = new Date(day.date);
+      const d = parseLocalDate(day.date);
       d.setDate(d.getDate() - 7);
       const prevDateStr = getLocalDate(d);
       return {
@@ -147,7 +204,7 @@ export default function MatrixView({
     let prev = 0;
     let possible = 0;
     
-    const valid = compareCurrentWeek.filter(day => day.date <= actualToday);
+    const valid = compareCurrentWeek.filter(day => parseLocalDate(day.date) <= parseLocalDate(actualToday));
 
     valid.forEach((day, i) => {
       curr += day.count;
@@ -188,7 +245,7 @@ export default function MatrixView({
         if (t.history![d]) {
           if (!lastDate) currentStreak = 1;
           else {
-            const diff = Math.round((new Date(d).getTime() - new Date(lastDate).getTime()) / 86400000);
+            const diff = Math.round((parseLocalDate(d).getTime() - parseLocalDate(lastDate).getTime()) / 86400000);
             if (diff === 1) currentStreak++;
             else currentStreak = 1;
           }
@@ -206,7 +263,7 @@ export default function MatrixView({
     
     for (let i = 1; i <= daysInMonth; i++) {
       const dateStr = `${meta.currentMonth}-${String(i).padStart(2, '0')}`;
-      if (dateStr > actualToday) break; 
+      if (parseLocalDate(dateStr) > parseLocalDate(actualToday)) break; 
 
       const isoDay = getISODay(new Date(year, month - 1, i)) - 1; 
       tasks.forEach(t => {
@@ -231,21 +288,6 @@ export default function MatrixView({
     return "Momentum is stable across the board. Keep the chain.";
   }, [tasks, daysInMonth, actualToday, meta.currentMonth, year, month]);
 
-  // --- 5. SYNC LOGIC & UI DATA ---
-  const activeWeekIndex = useMemo(() => {
-    return weeksInMonth.findIndex(week =>
-      week.days.some(d => {
-        if (!d) return false;
-        const dateStr = `${meta.currentMonth}-${d}`;
-        return compareCurrentWeek.some(c => c.date === dateStr);
-      })
-    );
-  }, [compareCurrentWeek, weeksInMonth, meta.currentMonth]);
-
-  useEffect(() => {
-    if (activeWeekIndex !== -1) setSelectedWeek(activeWeekIndex);
-  }, [activeWeekIndex]);
-
   const globalWeekStats = useMemo(() => {
     if (tasks.length === 0) return { best: null, worst: null };
     const stats = weeksInMonth.map(week => {
@@ -261,27 +303,73 @@ export default function MatrixView({
     };
   }, [weeksInMonth, tasks, meta.currentMonth]);
 
-  const visibleDays = selectedWeek !== null ? weeksInMonth[selectedWeek].days : weeksInMonth.flatMap(w => w.days);
-  const visibleWeeks = selectedWeek !== null ? [weeksInMonth[selectedWeek]] : weeksInMonth;
+  const visibleDays = weeksInMonth.flatMap(w => w.days);
 
-  useEffect(() => {
-    if (todayRef.current && selectedWeek === null) {
-      todayRef.current.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  // FIX 3: Safe toggle wrapper (Prevents extreme re-renders on drag)
+  const handleToggleSafe = useCallback((task: Task, dateStr: string) => {
+    const selected = parseLocalDate(dateStr);
+    const todayDate = parseLocalDate(actualToday);
+  
+    if (selected > todayDate) return showError(`Can't edit the future`);
+    if (selected < todayDate) return showError(`Past days are locked`);
+    if (meta.lockedDates?.includes(dateStr)) return showError(`Date is locked`);
+    
+    // Premium App Feel: Haptic Feedback
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(15);
     }
-  }, [today, selectedWeek]);
-
-  const showError = (msg: string) => { setError(msg); setTimeout(() => setError(''), 3000); };
-
-  const handleToggle = (task: Task, dateStr: string) => {
-    if (dateStr > actualToday) return showError(`Can't edit the future (${dateStr})`);
-    if (meta.lockedDates.includes(dateStr)) return showError(`Date ${dateStr} is locked.`);
+  
     toggleTask(task.id, dateStr);
+  }, [actualToday, meta.lockedDates, showError, toggleTask]);
+
+  // --- DRAG TO CHECK HANDLERS ---
+  const handlePointerDown = (e: React.PointerEvent, task: Task, dateStr: string, isDone: boolean, isDisabled: boolean) => {
+    if (isDisabled) return;
+    setIsDragging(true);
+    setDragAction(!isDone);
+    handleToggleSafe(task, dateStr);
+    e.preventDefault(); // Prevents selection
+  };
+
+  const handlePointerEnter = (task: Task, dateStr: string, isDone: boolean, isDisabled: boolean) => {
+    if (!isDragging || dragAction === null || isDisabled) return;
+    if (isDone !== dragAction) handleToggleSafe(task, dateStr);
+  };
+
+  // --- SWIPE LOGIC ---
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (isDragging) return; // FIX 5: Prevent conflict with drag-to-check
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const threshold = 30; // FIX 2: Better sensitivity
+    
+    const isLeftSwipe = distance > threshold;
+    const isRightSwipe = distance < -threshold;
+
+    if (isLeftSwipe && selectedWeek < weeksInMonth.length - 1) {
+      setSelectedWeek(selectedWeek + 1);
+    }
+    if (isRightSwipe && selectedWeek > 0) {
+      setSelectedWeek(selectedWeek - 1);
+    }
+    setTouchStart(null);
+    setTouchEnd(null);
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-[#F9FAFB] pb-24 relative">
+    <div className="flex-1 flex flex-col min-h-screen bg-[#F9FAFB] text-gray-800 pb-24 relative pt-[120px] md:pt-[0px] touch-pan-y">
       
-      {/* ERROR TOAST (Refined) */}
+      {/* ERROR TOAST */}
       {error && (
         <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-white border border-red-200 text-red-600 px-6 py-3 rounded-[20px] shadow-lg z-[100] text-sm font-bold flex items-center gap-3 animate-in slide-in-from-bottom-5 fade-in">
           <AlertTriangle size={16} /> {error}
@@ -341,18 +429,18 @@ export default function MatrixView({
       </div>
 
       {/* --- SHARED CONTROL BAR --- */}
-      <div className="p-4 sticky top-[168px] md:top-[176px] z-[70] bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
+      <div className="p-4 sticky top-0 md:top-[176px] z-[70] bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
         <div className="max-w-[1500px] mx-auto flex flex-col md:flex-row items-center gap-3">
           <div className="flex-1 flex flex-col w-full">
             <div className="flex gap-2">
-              <input type="text" value={taskName} onChange={(e) => setTaskName(e.target.value)} placeholder="New performance objective..." className="flex-1 p-3 rounded-xl border border-gray-200 outline-none focus:border-orange-400 text-sm font-semibold placeholder:text-gray-400" />
+              <input type="text" value={taskName} onChange={(e) => setTaskName(e.target.value)} placeholder="New performance objective..." className="flex-1 p-3 rounded-xl border border-gray-200 outline-none focus:border-orange-400 bg-white text-gray-800 text-sm font-semibold placeholder:text-gray-400" />
               <input type="text" value={taskGroup} onChange={(e) => setTaskGroup(e.target.value)} placeholder="GROUP" className="w-24 md:w-36 p-3 rounded-xl border border-gray-200 outline-none font-bold text-[10px] uppercase tracking-widest bg-gray-50 text-gray-600" />
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
             <button onClick={() => { if(!taskName.trim()) return showError("Objective required"); addTask(taskName, taskGroup || 'General'); setTaskName(''); }} className="flex-1 md:flex-none bg-white border border-gray-200 text-gray-800 px-6 py-3 rounded-xl font-bold text-xs tracking-widest hover:bg-gray-50 transition-colors">ADD</button>
-            <button onClick={() => { if(meta.lockedDates.includes(today) || tasks.length === 0) return; if(window.confirm(`Lock results for ${today}? This cannot be undone.`)) lockToday(); }} className={`flex-1 md:flex-none px-6 py-3 rounded-xl font-bold text-xs tracking-widest flex items-center justify-center gap-2 transition-colors border ${meta.lockedDates.includes(today) ? 'bg-gray-50 text-green-600 border-green-200' : 'bg-orange-500 text-white border-orange-500 hover:bg-orange-600'}`}>
-              {meta.lockedDates.includes(today) ? <Lock size={14} /> : <Save size={14} />} {meta.lockedDates.includes(today) ? 'LOCKED' : 'SAVE DAY'}
+            <button onClick={() => { if(meta.lockedDates?.includes(today) || tasks.length === 0) return; if(window.confirm(`Lock results for ${today}? This cannot be undone.`)) lockToday(); }} className={`flex-1 md:flex-none px-6 py-3 rounded-xl font-bold text-xs tracking-widest flex items-center justify-center gap-2 transition-colors border ${meta.lockedDates?.includes(today) ? 'bg-gray-50 text-green-600 border-green-200' : 'bg-orange-500 text-white border-orange-500 hover:bg-orange-600'}`}>
+              {meta.lockedDates?.includes(today) ? <Lock size={14} /> : <Save size={14} />} {meta.lockedDates?.includes(today) ? 'LOCKED' : 'SAVE DAY'}
             </button>
           </div>
         </div>
@@ -366,7 +454,6 @@ export default function MatrixView({
           
           {/* 🔥 DECISION LAYER */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            
             {/* Efficiency Signal */}
             <div className="bg-white border border-gray-200 rounded-[20px] p-5 flex items-center justify-between">
               <div className="flex flex-col">
@@ -385,10 +472,10 @@ export default function MatrixView({
               </div>
             </div>
 
-            {/* Focus Recommendation (Refined) */}
+            {/* Focus Recommendation */}
             <div className="bg-white border border-gray-200 rounded-[20px] p-5 flex flex-col justify-center">
               <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-1.5"><Target size={12} /> Priority</span>
-              <div className="mt-2 text-sm font-semibold text-gray-700">
+              <div className="mt-2 text-sm font-semibold text-gray-800">
                 {tasks.length === 0 ? "Initialize objectives." :
                  todayData.length === 0 ? "Start execution. Momentum is zero." :
                  todayData.length < tasks.length / 2 ? "Below threshold. Push now." :
@@ -403,216 +490,309 @@ export default function MatrixView({
                 <Zap size={12} className={momentumScore > 0 ? 'text-green-500' : momentumScore < 0 ? 'text-red-500' : 'text-orange-500'} /> 
                 {momentumScore !== 0 ? 'Momentum Trend' : 'Pattern Insight'}
               </span>
-              <div className="mt-2 text-sm font-semibold text-gray-700">
+              <div className="mt-2 text-sm font-semibold text-gray-800">
                 {momentumScore > 0 ? "Upward trend detected. Maintain intensity." : 
                  momentumScore < 0 ? "Declining trend. Intervene immediately." : 
                  patternInsight}
               </div>
             </div>
-
           </div>
 
-          {/* MAIN MATRIX TABLE */}
-          <div className="bg-white border border-gray-200 rounded-[20px] overflow-hidden hidden md:block">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="sticky left-0 z-50 bg-gray-50 border-r border-gray-200 p-2 text-center align-middle">
-                      {selectedWeek !== null && (
-                        <button onClick={() => setSelectedWeek(null)} className="text-[9px] font-bold text-gray-500 uppercase hover:text-gray-800 flex items-center justify-center w-full gap-1 transition-colors">
-                          <ChevronLeft size={12} /> Full Month
-                        </button>
-                      )}
-                    </th>
-                    {visibleWeeks.map((week) => {
-                      const actualIndex = weeksInMonth.indexOf(week);
-                      return (
-                        <th key={week.weekLabel} colSpan={7} onClick={() => setSelectedWeek(selectedWeek === actualIndex ? null : actualIndex)} className={`cursor-pointer text-center text-[10px] font-bold uppercase tracking-widest border-r p-2 transition-colors ${selectedWeek === actualIndex ? 'bg-orange-50 text-orange-600 border-orange-200' : 'border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
-                          {week.weekLabel}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                  <tr className="bg-white">
-                    <th className="sticky left-0 z-50 bg-white border-b border-r border-gray-200 p-2 min-w-[340px]"></th>
-                    {visibleDays.map((_, i) => (
-                      <th key={`dayname-${i}`} className="border-b border-r border-gray-100 p-2 text-[9px] font-bold text-gray-400 text-center uppercase tracking-widest">
-                        {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i % 7]}
-                      </th>
-                    ))}
-                  </tr>
-                  <tr className="bg-white">
-                    <th className="sticky left-0 z-50 bg-white border-b border-r border-gray-200 p-6 min-w-[340px]">
-                      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Objective Stream</span>
-                    </th>
-                    {visibleDays.map((day, i) => {
-                      if (!day) return <th key={`pad-${i}`} className="border-b border-r border-gray-100 bg-gray-50/50"></th>;
-                      const dateStr = `${meta.currentMonth}-${day}`;
-                      const isTodayCol = dateStr === actualToday;
-                      return (
-                        <th key={day} ref={isTodayCol ? todayRef : null} className={`border-b border-r border-gray-100 p-3 text-[10px] font-bold text-center min-w-[50px] ${isTodayCol ? 'bg-orange-500 text-white z-10' : 'text-gray-500'}`}>
-                          {parseInt(day)}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {groups.map(group => (
-                    <React.Fragment key={group}>
-                      <tr className="bg-gray-50">
-                        <td className="sticky left-0 z-40 px-6 py-2 border-b border-r border-gray-200 bg-gray-50 font-bold text-[9px] text-gray-500 uppercase tracking-widest">{group}</td>
-                        <td colSpan={visibleDays.length} className="border-b border-gray-100"></td>
+          {/* FIX 7: Empty State Handling */}
+          {tasks.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-12 bg-white border border-gray-200 rounded-[20px] text-gray-400">
+              <Target size={48} className="mb-4 opacity-30" />
+              <p className="font-bold text-lg text-gray-600">No objectives set</p>
+              <p className="text-sm">Add a new performance objective above to begin tracking.</p>
+            </div>
+          ) : (
+            <>
+              {/* MAIN MATRIX TABLE (DESKTOP) */}
+              <div className="bg-white border border-gray-200 rounded-[20px] overflow-hidden hidden md:block">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="sticky left-0 z-50 bg-gray-50 border-r border-gray-200 p-2 text-center align-middle"></th>
+                        {weeksInMonth.map((week) => (
+                          <th key={week.weekLabel} colSpan={7} className="text-center text-[10px] font-bold uppercase tracking-widest border-r border-gray-200 p-2 text-gray-500">
+                            {week.weekLabel}
+                          </th>
+                        ))}
                       </tr>
-                      {tasks.filter(t => t.group === group).map(task => {
-                        const currentStreak = calculateCurrentStreak(task.history, actualToday);
-                        const isElite = currentStreak >= 7;
-                        const isGood = currentStreak >= 3 && currentStreak < 7;
-                        const isAtRisk = !task.history?.[actualToday] && currentStreak > 0;
-                        
-                        const validPastDays = visibleDays.filter(d => d && `${meta.currentMonth}-${d}` <= actualToday);
-                        const donePastDays = validPastDays.filter(d => task.history?.[`${meta.currentMonth}-${d}`]);
-                        const isPerfectWeek = validPastDays.length > 0 && donePastDays.length === validPastDays.length;
+                      <tr className="bg-white">
+                        <th className="sticky left-0 z-50 bg-white border-b border-r border-gray-200 p-2 min-w-[340px]"></th>
+                        {visibleDays.map((_, i) => (
+                          <th key={`dayname-${i}`} className="border-b border-r border-gray-200 p-2 text-[9px] font-bold text-gray-500 text-center uppercase tracking-widest">
+                            {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i % 7]}
+                          </th>
+                        ))}
+                      </tr>
+                      <tr className="bg-white">
+                        <th className="sticky left-0 z-50 bg-white border-b border-r border-gray-200 p-6 min-w-[340px]">
+                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Objective Stream</span>
+                        </th>
+                        {visibleDays.map((day, i) => {
+                          if (!day) return <th key={`pad-${i}`} className="border-b border-r border-gray-100 bg-gray-50/50"></th>;
+                          const dateStr = `${meta.currentMonth}-${day}`;
+                          const isTodayCol = dateStr === actualToday;
+                          return (
+                            <th key={day} ref={isTodayCol ? todayRef : null} className={`border-b border-r border-gray-100 p-3 text-[10px] font-bold text-center min-w-[50px] ${isTodayCol ? 'bg-orange-500 text-white z-10' : 'text-gray-400'}`}>
+                              {parseInt(day)}
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groups.map(group => {
+                        const groupTasks = groupedTasks[group];
+                        if (!groupTasks || groupTasks.length === 0) return null;
 
                         return (
-                          <tr key={task.id} className="group hover:bg-gray-50 transition-colors">
-                            <td className="sticky left-0 z-40 bg-white border-b border-r border-gray-200 p-4">
-                              <div className="flex justify-between items-start gap-4">
-                                <div className="flex flex-col gap-2">
-                                  
-                                  {/* --- REFINED STREAK UI --- */}
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-bold text-gray-800 text-sm">
-                                      {task.name}
-                                    </span>
+                          <React.Fragment key={group}>
+                            <tr className="bg-gray-50">
+                              <td className="sticky left-0 z-40 px-6 py-2 border-b border-r border-gray-200 bg-gray-50 font-bold text-[9px] text-gray-500 uppercase tracking-widest">{group}</td>
+                              <td colSpan={visibleDays.length} className="border-b border-gray-200"></td>
+                            </tr>
+                            {groupTasks.map(task => {
+                              const currentStreak = calculateCurrentStreak(task.history, actualToday);
+                              const isElite = currentStreak >= 7;
+                              const isGood = currentStreak >= 3 && currentStreak < 7;
+                              const isAtRisk = !task.history?.[actualToday] && currentStreak > 0;
+                              
+                              const validPastDays = visibleDays.filter(d => d && parseLocalDate(`${meta.currentMonth}-${d}`) <= parseLocalDate(actualToday));
+                              const donePastDays = validPastDays.filter(d => task.history?.[`${meta.currentMonth}-${d}`]);
+                              const isPerfectWeek = validPastDays.length > 0 && donePastDays.length === validPastDays.length;
 
-                                    {currentStreak > 0 && (
-                                      <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${isElite ? 'bg-orange-500 text-white' : isGood ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                                        <Flame size={10} />
-                                        <span>{currentStreak}d</span>
+                              return (
+                                <tr key={task.id} className="group hover:bg-gray-50 transition-colors">
+                                  <td className="sticky left-0 z-40 bg-white border-b border-r border-gray-200 p-4">
+                                    <div className="flex justify-between items-start gap-4">
+                                      <div className="flex flex-col gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="font-bold text-gray-800 text-sm">{task.name}</span>
+                                          {currentStreak > 0 && (
+                                            <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${isElite ? 'bg-orange-500 text-white shadow-[0_0_8px_rgba(249,115,22,0.5)]' : isGood ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                              <Flame size={10} />
+                                              <span>{currentStreak}d</span>
+                                            </div>
+                                          )}
+                                          {isAtRisk && <span className="text-[9px] text-red-500 font-bold uppercase tracking-widest">risk</span>}
+                                          {isPerfectWeek && <Zap size={12} className="text-green-500" fill="currentColor" />}
+                                        </div>
+                                        <div className="flex gap-1.5 flex-wrap">
+                                          {weeksInMonth.map((week, i) => {
+                                            let doneCount = 0, validD = 0;
+                                            week.days.forEach(day => {
+                                              if (!day) return;
+                                              validD++;
+                                              if (task.history?.[`${meta.currentMonth}-${day}`]) doneCount++;
+                                            });
+                                            const isPerfect = doneCount === validD && validD > 0;
+                                            return (
+                                              <div key={i} className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 border ${isPerfect ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                                                {week.weekLabel}: {doneCount}/{validD}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
                                       </div>
-                                    )}
+                                      <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 p-1 transition-opacity"><X size={16}/></button>
+                                    </div>
+                                  </td>
+                                  {visibleDays.map((day, i) => {
+                                    if (!day) return <td key={`pad-box-${i}`} className="border-b border-r border-gray-50 bg-gray-50/50" />;
+                                    const dateStr = `${meta.currentMonth}-${day}`;
+                                    const isDone = !!task.history?.[dateStr];
+                                    const isFuture = parseLocalDate(dateStr) > parseLocalDate(actualToday);
+                                    const isPast = parseLocalDate(dateStr) < parseLocalDate(actualToday);
+                                    const isLocked = meta.lockedDates?.includes(dateStr);
+                                    const isDisabled = isFuture || isPast || isLocked;
+                                    
+                                    const tooltipMsg = isFuture ? "Future date locked" : isPast ? "Past date locked" : isLocked ? "Day is saved & locked" : "";
 
-                                    {isAtRisk && (
-                                      <span className="text-[9px] text-red-500 font-bold uppercase tracking-widest">
-                                        risk
-                                      </span>
-                                    )}
+                                    return (
+                                      <td key={day} className={`text-center border-b border-r border-gray-50 p-0 ${dateStr === actualToday ? 'bg-orange-50/30' : ''}`} title={tooltipMsg}>
+                                        <div 
+                                          className="h-14 flex items-center justify-center touch-none cursor-pointer"
+                                          onPointerDown={(e) => handlePointerDown(e, task, dateStr, isDone, isDisabled)}
+                                          onPointerEnter={() => handlePointerEnter(task, dateStr, isDone, isDisabled)}
+                                          onClick={() => { if (!isDisabled && !isDragging) handleToggleSafe(task, dateStr); }} // FIX 6: Fallback
+                                        >
+                                          <input 
+                                            type="checkbox" 
+                                            checked={isDone} 
+                                            onChange={() => {}} // Handled by pointer/click events
+                                            className={`w-5 h-5 rounded border-gray-300 transition-all pointer-events-none accent-green-600 ${isDone ? 'opacity-80' : 'hover:scale-110'} ${isDisabled ? 'opacity-30 grayscale' : ''} ${isElite && isDone ? 'shadow-[0_0_10px_rgba(249,115,22,0.4)]' : ''}`} 
+                                          />
+                                        </div>
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              {/* MOBILE GROUP → WEEK → TASK STRUCTURE */}
+              <div 
+                className="md:hidden space-y-6 overflow-hidden"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                {groups.map(group => {
+                  const groupTasks = groupedTasks[group];
+                  if (!groupTasks || groupTasks.length === 0) return null;
 
-                                    {isPerfectWeek && (
-                                      <Zap size={12} className="text-green-500" fill="currentColor" />
-                                    )}
+                  return (
+                    <div key={group} className="space-y-4">
+                      {/* GROUP TITLE */}
+                      <div className="text-[11px] font-bold text-gray-500 uppercase tracking-widest px-2">
+                        {group}
+                      </div>
+
+                      {/* WEEKS */}
+                      {weeksInMonth.map((week, wIndex) => {
+                        const isActiveWeek = selectedWeek === wIndex;
+                        if (!isActiveWeek) return null;
+
+                        // Weekly Progress Bar logic
+                        const weekValidDays = week.days.filter(Boolean).length;
+                        const totalWeekTasks = groupTasks.length * weekValidDays;
+                        let completedWeekTasks = 0;
+                        groupTasks.forEach(t => {
+                          week.days.forEach(d => {
+                            if (d && t.history?.[`${meta.currentMonth}-${d}`]) completedWeekTasks++;
+                          });
+                        });
+                        const progressPct = totalWeekTasks === 0 ? 0 : (completedWeekTasks / totalWeekTasks) * 100;
+                        const isPerfectGroupWeek = progressPct === 100 && totalWeekTasks > 0;
+
+                        return (
+                          // FIX 8: Animated properly only on key change (week swap)
+                          <div key={`${week.weekLabel}-${selectedWeek}`} className="bg-white border border-gray-200 rounded-xl p-3 space-y-4 shadow-sm relative animate-in slide-in-from-right-4 fade-in duration-300">
+                            
+                            {/* WEEK HEADER */}
+                            <div>
+                              <div className="flex justify-between items-end mb-1">
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-orange-500 uppercase tracking-widest">
+                                  {week.weekLabel}
+                                  {isPerfectGroupWeek && (
+                                    <span className="flex items-center gap-1 text-[9px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full border border-green-200 animate-in zoom-in">
+                                      <Star size={10} fill="currentColor" /> Perfect
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] font-bold text-gray-400">
+                                  {progressPct.toFixed(0)}%
+                                </div>
+                              </div>
+                              {/* Weekly Progress Bar */}
+                              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div className={`h-full transition-all duration-500 ${isPerfectGroupWeek ? 'bg-green-500' : 'bg-orange-400'}`} style={{ width: `${progressPct}%` }} />
+                              </div>
+                            </div>
+
+                            {/* TASKS IN THIS GROUP */}
+                            {groupTasks.map(task => {
+                              return (
+                                <div key={task.id} className="space-y-2 pb-2">
+                                  {/* TASK NAME & DELETE */}
+                                  <div className="flex justify-between items-center">
+                                    <div className="text-sm font-semibold text-gray-800">
+                                      {task.name}
+                                    </div>
+                                    <button onClick={() => deleteTask(task.id)} className="p-1 text-gray-300 hover:text-red-500"><X size={14}/></button>
                                   </div>
 
-                                  <div className="flex gap-1.5 flex-wrap">
-                                    {weeksInMonth.map((week, i) => {
-                                      let doneCount = 0, validD = 0;
-                                      week.days.forEach(day => {
-                                        if (!day) return;
-                                        validD++;
-                                        if (task.history?.[`${meta.currentMonth}-${day}`]) doneCount++;
-                                      });
-                                      const isPerfect = doneCount === validD && validD > 0;
+                                  {/* CHECKBOX 7-DAY GRID */}
+                                  <div className="grid grid-cols-7 gap-1 relative">
+                                    {week.days.map((day, i) => {
+                                      if (!day) return <div key={i} className="flex-shrink-0" />;
+
+                                      const dateStr = `${meta.currentMonth}-${day}`;
+                                      const isDone = !!task.history?.[dateStr];
+
+                                      const selected = parseLocalDate(dateStr);
+                                      const todayDate = parseLocalDate(actualToday);
+
+                                      const isFuture = selected > todayDate;
+                                      const isPast = selected < todayDate;
+                                      const isLocked = meta.lockedDates?.includes(dateStr);
+                                      const isDisabled = isFuture || isPast || isLocked;
+                                      const isToday = dateStr === actualToday;
+
+                                      const tooltipMsg = isFuture ? "Future locked" : isPast ? "Past locked" : isLocked ? "Saved" : "";
+
+                                      // FIX 4: Perfect Streak Line Logic
+                                      const prevDayStr = i > 0 && week.days[i-1] ? `${meta.currentMonth}-${week.days[i-1]}` : null;
+                                      const isPrevDone = prevDayStr && !!task.history?.[prevDayStr];
+
+                                      // Heatmap Dynamic Colors
+                                      const cStreak = calculateCurrentStreak(task.history, dateStr);
+                                      const isEliteStreak = cStreak >= 7;
+                                      const heatmapAccent = isEliteStreak ? 'accent-orange-500' : 'accent-green-500';
+                                      const heatmapBg = isDone ? (isEliteStreak ? 'bg-orange-50' : 'bg-green-50') : 'bg-transparent';
+                                      const glowClass = isDone && isEliteStreak ? 'shadow-[0_0_8px_rgba(249,115,22,0.6)] animate-pulse' : '';
+
                                       return (
-                                        <div key={i} className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 border ${selectedWeek === i ? 'border-orange-300 bg-orange-50 text-orange-700' : ''} ${isPerfect && selectedWeek !== i ? 'bg-green-50 border-green-200 text-green-700' : selectedWeek !== i ? 'bg-gray-50 border-gray-200 text-gray-500' : ''}`}>
-                                          {week.weekLabel}: {doneCount}/{validD}
+                                        <div 
+                                          key={day} 
+                                          className={`relative flex flex-col items-center justify-center gap-1.5 py-1.5 rounded-lg flex-shrink-0 touch-none cursor-pointer ${heatmapBg} ${isToday ? "bg-orange-100 border border-orange-300" : "border border-transparent"}`}
+                                          title={tooltipMsg}
+                                          onPointerDown={(e) => handlePointerDown(e, task, dateStr, isDone, isDisabled)}
+                                          onPointerEnter={() => handlePointerEnter(task, dateStr, isDone, isDisabled)}
+                                          onClick={() => { if (!isDisabled && !isDragging) handleToggleSafe(task, dateStr); }} // FIX 6: Fallback
+                                        >
+                                          {/* FIX 4: Streak Connecting Line (Connects to previous box center seamlessly) */}
+                                          {isDone && isPrevDone && (
+                                            <div className={`absolute top-[50%] left-[-50%] w-[100%] h-[2px] z-0 pointer-events-none ${isEliteStreak ? 'bg-orange-300' : 'bg-green-300'}`} />
+                                          )}
+
+                                          {/* DAY LABEL */}
+                                          <span className={`text-[9px] font-bold z-10 pointer-events-none ${isToday ? "text-orange-600" : isDone ? "text-gray-600" : "text-gray-400"}`}>
+                                            {['M','T','W','T','F','S','S'][i]}
+                                          </span>
+
+                                          {/* CHECKBOX */}
+                                          <input
+                                            type="checkbox"
+                                            checked={isDone}
+                                            onChange={() => {}} // Handled by pointer/click events
+                                            className={`w-5 h-5 rounded z-10 pointer-events-none ${heatmapAccent} ${glowClass} ${
+                                              isDisabled ? "opacity-30 grayscale" : "transition-transform"
+                                            }`}
+                                          />
                                         </div>
                                       );
                                     })}
                                   </div>
                                 </div>
-                                <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 p-1 transition-opacity"><X size={16}/></button>
-                              </div>
-                            </td>
-                            {visibleDays.map((day, i) => {
-                              if (!day) return <td key={`pad-box-${i}`} className="border-b border-r border-gray-50 bg-gray-50/50" />;
-                              const dateStr = `${meta.currentMonth}-${day}`;
-                              const isDone = !!task.history?.[dateStr];
-                              const isFuture = dateStr > actualToday;
-                              const isLocked = meta.lockedDates.includes(dateStr);
-                              
-                              return (
-                                <td key={day} className={`text-center border-b border-r border-gray-50 p-0 ${dateStr === actualToday ? 'bg-orange-50/30' : ''}`}>
-                                  <div className="h-14 flex items-center justify-center">
-                                    <input type="checkbox" checked={isDone} onChange={() => handleToggle(task, dateStr)} className={`w-5 h-5 rounded border-gray-300 transition-all cursor-pointer accent-green-600 ${isDone ? 'opacity-40' : 'hover:scale-110'} ${isFuture || isLocked ? 'opacity-30 cursor-not-allowed grayscale' : ''}`} />
-                                  </div>
-                                </td>
                               );
                             })}
-                          </tr>
+                          </div>
                         );
                       })}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          
-          {/* MOBILE TASK LIST */}
-          <div className="md:hidden space-y-8 mt-2">
-            {groups.map(group => (
-              <div key={group} className="space-y-3">
-                <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-gray-300" /> {group}</h3>
-                <div className="space-y-2">
-                  {tasks.filter(t => t.group === group).map(task => {
-                    const isDone = !!task.history?.[today];
-                    const currentStreak = calculateCurrentStreak(task.history, actualToday);
-                    const isElite = currentStreak >= 7;
-                    const isGood = currentStreak >= 3 && currentStreak < 7;
-                    const isAtRisk = !task.history?.[actualToday] && currentStreak > 0;
-                    
-                    const validPastDays = visibleDays.filter(d => d && `${meta.currentMonth}-${d}` <= actualToday);
-                    const donePastDays = validPastDays.filter(d => task.history?.[`${meta.currentMonth}-${d}`]);
-                    const isPerfectWeek = validPastDays.length > 0 && donePastDays.length === validPastDays.length;
-
-                    return (
-                      <div key={task.id} className={`flex flex-col p-4 bg-white border rounded-[16px] transition-all shadow-sm ${isDone ? 'border-gray-100 opacity-60' : 'border-gray-200'}`}>
-                        <div className="flex items-center justify-between">
-                          
-                          {/* --- MOBILE STREAK UI --- */}
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-sm font-bold ${isDone ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
-                              {task.name}
-                            </span>
-                            
-                            {currentStreak > 0 && (
-                              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${isElite ? 'bg-orange-500 text-white' : isGood ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                                <Flame size={10} />
-                                <span>{currentStreak}d</span>
-                              </div>
-                            )}
-
-                            {isAtRisk && (
-                              <span className="text-[9px] text-red-500 font-bold uppercase tracking-widest">
-                                risk
-                              </span>
-                            )}
-
-                            {isPerfectWeek && (
-                              <Zap size={12} className="text-green-500" fill="currentColor" />
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            <button onClick={() => deleteTask(task.id)} className="p-2 text-gray-300 hover:text-red-500"><X size={18}/></button>
-                            <input type="checkbox" checked={isDone} onChange={() => handleToggle(task, today)} className={`w-7 h-7 rounded-lg accent-green-600 transition-transform ${today > actualToday ? 'opacity-30 grayscale' : ''}`} />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
 
         {/* --- RIGHT PANEL (Analytics & Trends) --- */}
         <div className="w-full xl:w-[340px] flex-shrink-0 flex flex-col gap-6">
           
-          {/* ANALYTICS HUD (Refined) */}
+          {/* ANALYTICS HUD */}
           <div className="bg-white border border-gray-200 rounded-[20px] p-6 flex flex-col gap-6">
             <div className="flex justify-between items-start">
               <div className="flex flex-col gap-1.5">
@@ -622,7 +802,7 @@ export default function MatrixView({
                 </span>
               </div>
               <div className="flex flex-col items-center">
-                <div className="w-12 h-12 rounded-full border-[3px] border-green-500 flex items-center justify-center bg-white">
+                <div className="w-12 h-12 rounded-full border-[3px] border-green-500 flex items-center justify-center bg-white shadow-sm">
                   <span className="text-sm font-bold text-gray-800">{consistencyScore}%</span>
                 </div>
                 <span className="text-[8px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Consistency</span>
@@ -652,7 +832,7 @@ export default function MatrixView({
               {bestGlobalStreak > 1 && (
                 <div className="bg-white rounded-xl p-3 border border-gray-200 flex items-center justify-between">
                   <span className="text-xs font-bold text-gray-600">All-Time Peak Streak</span>
-                  <div className="flex items-center gap-1 text-orange-500 bg-orange-50 px-2 py-1 rounded-md text-xs font-bold border border-orange-100">
+                  <div className="flex items-center gap-1 text-orange-500 bg-orange-50 px-2 py-1 rounded-md text-xs font-bold border border-orange-100 shadow-[0_0_8px_rgba(249,115,22,0.2)]">
                     <Flame size={14} /> {bestGlobalStreak} Days
                   </div>
                 </div>
@@ -680,7 +860,7 @@ export default function MatrixView({
             <div className="space-y-3">
               {compareCurrentWeek.map((day, i) => {
                 const prevCount = comparePrevWeek[i].count;
-                const isFuture = day.date > actualToday;
+                const isFuture = parseLocalDate(day.date) > parseLocalDate(actualToday);
                 const diff = isFuture ? null : day.count - prevCount;
                 const isToday = day.date === actualToday;
                 
