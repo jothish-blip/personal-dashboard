@@ -20,7 +20,7 @@ export default function Navbar({
 }: NavbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = usePathname() || ""; // Safe fallback for SSR
   
   // --- STRICT PATHNAME ROUTING (Single Source of Truth) ---
   const isTasksActive = pathname === "/";
