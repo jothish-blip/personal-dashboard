@@ -1,198 +1,494 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Task, Meta } from "../types";
+import React, { useState, useMemo } from 'react';
+import { 
+  Flame, Target, AlertTriangle, 
+  TrendingUp, TrendingDown, Calendar, BrainCircuit, Activity
+} from 'lucide-react';
+import { Task, Meta } from '../types';
 
-// --- TIMEZONE GUARD: MUST MATCH MATRIX VIEW ---
+interface StatsProps {
+  tasks: Task[];
+  meta: Meta;
+}
+
 const getLocalDate = (date: Date) => {
   const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - (offset * 60000));
+  const local = new Date(date.getTime() - offset * 60000);
   return local.toISOString().split('T')[0];
 };
 
-export default function StatsGrid({ tasks, meta }: { tasks: Task[], meta: Meta }) {
-  const [mode, setMode] = useState<'month' | 'year' | 'custom'>('month');
-  const [selectedMonth, setSelectedMonth] = useState(meta.currentMonth);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [startDate, setStartDate] = useState(getLocalDate(new Date()));
-  const [endDate, setEndDate] = useState(getLocalDate(new Date()));
-  const [today, setToday] = useState(getLocalDate(new Date()));
+const getISODay = (date: Date) => {
+  const day = date.getDay();
+  return day === 0 ? 7 : day; 
+};
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const newToday = getLocalDate(new Date());
-      setToday(prev => (prev !== newToday ? newToday : prev));
-    }, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const isInSelectedRange = useMemo(() => (date: string) => {
-    if (mode === 'month') return date.startsWith(selectedMonth);
-    if (mode === 'year') return date.startsWith(String(selectedYear));
-    if (mode === 'custom') return date >= startDate && date <= endDate;
-    return false;
-  }, [mode, selectedMonth, selectedYear, startDate, endDate]);
-
-  // --- 1. STREAK: REAL-TIME CONTINUITY ---
-  const streak = useMemo(() => {
-    let count = 0;
-    // Check up to 365 days back
-    for (let i = 0; i < 365; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const ds = getLocalDate(d);
-
-      const hasActivity = tasks.some(t => t.history?.[ds] === true);
-
-      // Rule: If checking today and it's empty, we don't break yet (allow today to be finished)
-      // If checking yesterday or before and it's empty, the streak is officially broken.
-      if (!hasActivity) {
-        if (ds === today) continue; 
-        else break;
+// Global Helpers
+const calculateBestStreak = (tasks: Task[]) => {
+  let max = 0;
+  tasks.forEach(t => {
+    if (!t.history) return;
+    const dates = Object.keys(t.history).sort();
+    let currentStreak = 0;
+    let lastDate: string | null = null;
+    
+    dates.forEach(d => {
+      if (t.history![d]) {
+        if (!lastDate) currentStreak = 1;
+        else {
+          const diff = Math.round((new Date(d).getTime() - new Date(lastDate).getTime()) / 86400000);
+          if (diff === 1) currentStreak++;
+          else currentStreak = 1;
+        }
+        max = Math.max(max, currentStreak);
+        lastDate = d;
       }
-      count++;
+    });
+  });
+  return max;
+};
+
+export default function StatsGrid({ tasks, meta }: StatsProps) {
+  const actualToday = getLocalDate(new Date());
+
+  // --- UI STATE ---
+  const [mode, setMode] = useState<'preset' | 'custom'>('preset');
+  const [activePreset, setActivePreset] = useState<number>(30);
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return getLocalDate(d);
+  });
+  const [endDate, setEndDate] = useState(actualToday);
+  const [targetGoal, setTargetGoal] = useState<number>(100);
+
+  // --- SMART RANGE SELECTOR LOGIC ---
+  const presets = [
+    { label: "7D", days: 7 },
+    { label: "30D", days: 30 },
+    { label: "90D", days: 90 },
+    { label: "365D", days: 365 },
+  ];
+
+  const applyPreset = (days: number) => {
+    const end = getLocalDate(new Date());
+    const startObj = new Date();
+    startObj.setDate(startObj.getDate() - days + 1); 
+    setStartDate(getLocalDate(startObj));
+    setEndDate(end);
+    setMode('preset');
+    setActivePreset(days);
+  };
+
+  // --- DATA ENGINE ---
+  const rangeDates = useMemo(() => {
+    const dates: string[] = [];
+    let curr = new Date(startDate);
+    const end = new Date(endDate);
+    while (curr <= end) {
+      dates.push(getLocalDate(curr));
+      curr.setDate(curr.getDate() + 1);
     }
-    return count;
-  }, [tasks, today]);
+    return dates;
+  }, [startDate, endDate]);
 
-  // --- 2. CONSISTENCY & EFFICIENCY (PAST DAYS ONLY) ---
-  const aggregates = useMemo(() => {
-    let activeDaysCount = 0;
-    let totalPossibleDays = 0;
-    let totalEfficiencySum = 0;
-    let totalReps = 0;
-    const dayCheckins: Record<string, number> = {};
+  const {
+    totalReps,
+    totalPossible,
+    consistencyPercent,
+    avgPerDay,
+    peakDay,
+    heatmapData,
+    worstDayInsight,
+    bestDayInsight,
+    zeroDays
+  } = useMemo(() => {
+    let reps = 0;
+    let zeroCount = 0;
+    const possible = rangeDates.length * (tasks.length || 1);
+    const dayCounts: Record<string, number> = {};
+    
+    const weekdayMisses = Array(7).fill(0);
+    const weekdayTotals = Array(7).fill(0);
+    const weekdayHits = Array(7).fill(0);
 
-    // Scan last 365 days to find matches for the selected range
-    for (let i = 0; i < 365; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const ds = getLocalDate(d);
+    const heatmap = rangeDates.map(dateStr => {
+      let dailyCount = 0;
+      tasks.forEach(t => {
+        if (t.history?.[dateStr]) {
+          dailyCount++;
+          reps++;
+        }
+      });
 
-      if (!isInSelectedRange(ds)) continue;
+      if (dailyCount === 0) zeroCount++;
 
-      // We only calculate consistency/efficiency for completed days (Past Days)
-      // to avoid "diluting" the average with today's partial progress.
-      if (ds < today) {
-        totalPossibleDays++;
-        const completedToday = tasks.filter(t => t.history?.[ds] === true).length;
-        
-        if (completedToday > 0) {
-          activeDaysCount++;
-          if (tasks.length > 0) {
-            totalEfficiencySum += (completedToday / tasks.length);
-          }
+      dayCounts[dateStr] = dailyCount;
+
+      const dateObj = new Date(dateStr);
+      const isoDay = getISODay(dateObj) - 1; 
+      weekdayTotals[isoDay] += tasks.length;
+      weekdayHits[isoDay] += dailyCount;
+      weekdayMisses[isoDay] += (tasks.length - dailyCount);
+
+      return {
+        date: dateStr,
+        count: dailyCount,
+        intensity: tasks.length === 0 ? 0 : dailyCount / tasks.length
+      };
+    });
+
+    let peak = { date: '-', count: 0 };
+    Object.entries(dayCounts).forEach(([d, c]) => {
+      if (c > peak.count) peak = { date: d, count: c };
+    });
+
+    let worstDayIdx = 0;
+    let worstMissRate = 0;
+    let bestDayIdx = 0;
+    let bestHitRate = 0;
+
+    weekdayTotals.forEach((total, i) => {
+      if (total > 0) {
+        const missRate = weekdayMisses[i] / total;
+        if (missRate > worstMissRate) {
+          worstMissRate = missRate;
+          worstDayIdx = i;
+        }
+
+        const hitRate = weekdayHits[i] / total;
+        if (hitRate > bestHitRate) {
+          bestHitRate = hitRate;
+          bestDayIdx = i;
         }
       }
+    });
 
-      // Total Reps & Peaks include today
-      const completedAnytime = tasks.filter(t => t.history?.[ds] === true).length;
-      if (completedAnytime > 0) {
-        dayCheckins[ds] = completedAnytime;
-        totalReps += completedAnytime;
-      }
-    }
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    
+    const wInsight = worstMissRate > 0.4 
+      ? `Slip pattern on ${dayNames[worstDayIdx]}s (${Math.round(worstMissRate * 100)}% miss rate)`
+      : "Execution is evenly distributed";
 
-    const consistencyPercent = totalPossibleDays > 0 
-      ? Math.round((activeDaysCount / totalPossibleDays) * 100) 
-      : 0;
+    const bInsight = `${dayNames[bestDayIdx]} strongest`;
 
-    const efficiencyPercent = activeDaysCount > 0 
-      ? Math.round((totalEfficiencySum / totalPossibleDays) * 100) 
-      : 0;
-
-    const peak = Object.values(dayCheckins).length > 0 ? Math.max(...Object.values(dayCheckins)) : 0;
-
-    return { 
-      consistencyPercent, 
-      efficiencyPercent, 
-      peak, 
-      totalReps, 
-      activeDaysCount, 
-      totalPossibleDays 
+    return {
+      totalReps: reps,
+      totalPossible: possible === 0 ? 1 : possible,
+      consistencyPercent: possible === 0 ? 0 : Math.round((reps / possible) * 100),
+      avgPerDay: rangeDates.length ? Math.round((reps / rangeDates.length) * 10) / 10 : 0,
+      peakDay: peak,
+      heatmapData: heatmap,
+      worstDayInsight: wInsight,
+      bestDayInsight: bInsight,
+      zeroDays: zeroCount
     };
-  }, [tasks, isInSelectedRange, today]);
+  }, [rangeDates, tasks]);
+
+  // --- MOMENTUM & STREAKS ---
+  const momentum = useMemo(() => {
+    const todayCount = tasks.filter(t => t.history?.[actualToday]).length;
+    const d = new Date(actualToday);
+    d.setDate(d.getDate() - 1);
+    const yesterdayStr = getLocalDate(d);
+    const yesterdayCount = tasks.filter(t => t.history?.[yesterdayStr]).length;
+    return todayCount - yesterdayCount;
+  }, [tasks, actualToday]);
+
+  const bestStreak = useMemo(() => calculateBestStreak(tasks), [tasks]);
+
+  const currentGlobalStreak = useMemo(() => {
+    let streak = 0;
+    let d = new Date(actualToday);
+    let dateStr = getLocalDate(d);
+    
+    let activeToday = tasks.some(t => t.history?.[dateStr]);
+    
+    d.setDate(d.getDate() - 1);
+    let prevStr = getLocalDate(d);
+    let activeYesterday = tasks.some(t => t.history?.[prevStr]);
+
+    if (!activeToday && !activeYesterday) return 0;
+    if (activeToday) streak++;
+
+    while (tasks.some(t => t.history?.[prevStr])) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+      prevStr = getLocalDate(d);
+    }
+    return streak;
+  }, [tasks, actualToday]);
+
+  // --- AI RISK SCORE ---
+  const riskScore = useMemo(() => {
+    if (zeroDays > 3) return 'High';
+    if (momentum < 0) return 'Medium';
+    return 'Low';
+  }, [zeroDays, momentum]);
+
+  // --- HELPERS FOR UI ---
+  const getColorClass = (intensity: number) => {
+    if (intensity === 0) return 'bg-gray-100';
+    if (intensity < 0.3) return 'bg-orange-200';
+    if (intensity < 0.6) return 'bg-orange-400';
+    if (intensity < 0.9) return 'bg-green-400';
+    return 'bg-green-600';
+  };
+
+  const goalProgress = Math.min(Math.round((totalReps / targetGoal) * 100), 100);
 
   return (
-    <div className="flex flex-col bg-gray-50 shrink-0 border-b border-gray-200">
-      {/* FILTER TABS */}
-      <div className="px-5 pt-5 flex flex-wrap items-center gap-3">
-        <div className="flex bg-gray-200 p-1 rounded-xl">
-          {(['month', 'year', 'custom'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setMode(t)}
-              className={`px-5 py-1.5 text-[10px] font-black rounded-lg transition-all uppercase tracking-tight ${
-                mode === t ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+    <div className="flex-1 p-4 md:p-8 max-w-[1200px] mx-auto w-full flex flex-col gap-6 pb-24">
+      
+      {/* HEADER & SMART RANGE SELECTOR */}
+      <div className="bg-white border border-gray-200 rounded-[20px] p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-lg font-bold text-gray-800">
+            Performance Insights
+          </h1>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Range analytics
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {mode === 'month' && (
-            <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
-              className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-bold bg-white outline-none" />
-          )}
-          {mode === 'year' && (
-            <input type="number" value={selectedYear} onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-bold bg-white w-20 outline-none" />
-          )}
-          {mode === 'custom' && (
-            <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-xl px-2 py-1">
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-                className="text-[10px] font-bold outline-none bg-transparent" />
-              <span className="text-gray-300 font-bold">→</span>
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                className="text-[10px] font-bold outline-none bg-transparent" />
-            </div>
-          )}
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex gap-2">
+            {presets.map(p => (
+              <button
+                key={p.label}
+                onClick={() => applyPreset(p.days)}
+                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
+                  mode === 'preset' && activePreset === p.days 
+                    ? 'bg-orange-500 text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* ANALYTICS GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-5">
-        <div className="border border-gray-200 p-5 rounded-2xl text-center bg-white shadow-sm">
-          <div className="text-3xl font-black text-blue-600">{streak}</div>
-          <div className="text-[10px] text-gray-400 uppercase mt-1 font-black tracking-widest">Streak</div>
-        </div>
+      {/* --- REFINED METRICS HIERARCHY --- */}
+      <div className="flex flex-col gap-4">
+        
+        {/* PRIMARY METRIC ROW (High Impact) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Consistency */}
+          <div className="border border-gray-200 rounded-[20px] p-6 bg-white shadow-sm flex flex-col justify-center items-center text-center">
+            <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">Consistency</span>
+            <div className={`text-3xl font-black mt-3 ${consistencyPercent >= 70 ? 'text-green-600' : consistencyPercent >= 40 ? 'text-orange-500' : 'text-red-500'}`}>
+              {consistencyPercent}%
+            </div>
+          </div>
 
-        <div className="border border-gray-200 p-5 rounded-2xl text-center bg-white shadow-sm">
-          <div className="text-3xl font-black text-purple-600">{aggregates.consistencyPercent}%</div>
-          <div className="text-[10px] text-gray-400 uppercase mt-1 font-black tracking-widest">Consistency</div>
-          <div className="text-[9px] text-gray-300 font-bold mt-1 uppercase">
-            {aggregates.activeDaysCount} / {aggregates.totalPossibleDays} Days
+          {/* Avg / Day */}
+          <div className="border border-gray-200 rounded-[20px] p-6 bg-white shadow-sm flex flex-col justify-center items-center text-center">
+            <span className="text-xs text-gray-400 font-bold uppercase tracking-widest flex items-center gap-1.5"><Activity size={14} /> Avg / Day</span>
+            <div className="text-3xl font-black mt-3 text-orange-600">
+              {avgPerDay}
+            </div>
+          </div>
+
+          {/* Momentum */}
+          <div className="border border-gray-200 rounded-[20px] p-6 bg-white shadow-sm flex flex-col justify-center items-center text-center">
+            <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">Momentum</span>
+            <div className={`text-3xl font-black mt-3 flex items-center gap-1.5 ${momentum > 0 ? 'text-green-600' : momentum < 0 ? 'text-red-500' : 'text-gray-500'}`}>
+              {momentum > 0 && <TrendingUp size={24} strokeWidth={3} />}
+              {momentum < 0 && <TrendingDown size={24} strokeWidth={3} />}
+              {momentum > 0 ? `+${momentum}` : momentum}
+            </div>
           </div>
         </div>
 
-        <div className="border border-gray-200 p-5 rounded-2xl text-center bg-white shadow-sm">
-          <div className="text-3xl font-black text-gray-900">{aggregates.peak}</div>
-          <div className="text-[10px] text-gray-400 uppercase mt-1 font-black tracking-widest">Peak Reps</div>
-        </div>
+        {/* SECONDARY METRIC ROW */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Peak Streak */}
+          <div className="border border-gray-200 rounded-[16px] p-4 bg-white">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-400 font-semibold">Peak Streak</span>
+              <Flame size={16} className="text-orange-500" />
+            </div>
+            <div className="text-xl font-bold mt-2 text-orange-600">
+              {bestStreak}
+            </div>
+          </div>
 
-        <div className="border border-gray-200 p-5 rounded-2xl text-center bg-white shadow-sm">
-          <div className="text-3xl font-black text-green-600">{aggregates.efficiencyPercent}%</div>
-          <div className="text-[10px] text-gray-400 uppercase mt-1 font-black tracking-widest">Efficiency</div>
+          {/* Current Streak */}
+          <div className="border border-gray-200 rounded-[16px] p-4 bg-white">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-400 font-semibold">Active Streak</span>
+            </div>
+            <div className="text-xl font-bold mt-2 text-gray-800">
+              {currentGlobalStreak}
+            </div>
+          </div>
+
+          {/* Zero Days */}
+          <div className="border border-gray-200 rounded-[16px] p-4 bg-white">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-400 font-semibold">Zero Days</span>
+            </div>
+            <div className={`text-xl font-bold mt-2 ${zeroDays > 0 ? 'text-red-500' : 'text-green-600'}`}>
+              {zeroDays}
+            </div>
+          </div>
+
+          {/* Merged Peak Output */}
+          <div className="border border-gray-200 rounded-[16px] p-4 bg-white">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-400 font-semibold">Peak Output</span>
+            </div>
+            <div className="text-xl font-bold mt-1 text-gray-800 flex items-end gap-2">
+              {peakDay.count} <span className="text-[10px] text-gray-400 font-semibold mb-1 uppercase">reps</span>
+            </div>
+            <div className="text-[10px] font-bold mt-1 text-orange-500 uppercase tracking-widest">
+              {bestDayInsight}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* FOOTER INSIGHT */}
-      <div className="px-5 pb-5">
-        <div className="bg-white border border-gray-200 rounded-2xl p-4 flex justify-between items-center px-8 shadow-sm">
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Output</span>
-            <span className="text-[10px] font-bold text-gray-600">
-              {mode === 'custom' ? `${startDate} to ${endDate}` : (mode === 'month' ? selectedMonth : selectedYear)}
+      {/* MID SECTION: Target Goal & AI Insights */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        {/* GOAL TRACKING (Color Fixed) */}
+        <div className="bg-white border border-gray-200 rounded-[20px] p-5">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2"><Target size={16} className="text-gray-500" /> Target vs Actual</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold text-gray-400 uppercase">Target:</span>
+              <input 
+                type="number" 
+                value={targetGoal} 
+                onChange={(e) => setTargetGoal(Number(e.target.value) || 1)} 
+                className="w-16 bg-gray-50 border border-gray-200 rounded text-xs font-bold px-2 py-1 outline-none text-center"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-end">
+              <span className="text-2xl font-bold text-gray-800">{totalReps} <span className="text-sm text-gray-400 font-normal">/ {targetGoal}</span></span>
+              <span className={`text-sm font-bold ${goalProgress >= 100 ? 'text-green-600' : 'text-gray-600'}`}>{goalProgress}%</span>
+            </div>
+            <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all duration-500 ${goalProgress >= 100 ? 'bg-green-500' : 'bg-orange-400'}`} 
+                style={{ width: `${goalProgress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* PATTERN DETECTION */}
+        <div className="bg-white border border-gray-200 rounded-[20px] p-5 flex flex-col justify-center">
+          <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2 mb-3">
+            <BrainCircuit size={16} className="text-gray-500" /> Pattern Detection
+          </h3>
+          <div className="flex gap-3 items-start">
+            <div className="mt-0.5">
+              {worstDayInsight.includes('Slip') ? <AlertTriangle size={16} className="text-orange-500" /> : <Activity size={16} className="text-green-500" />}
+            </div>
+            <p className="text-sm font-semibold text-gray-700 leading-relaxed">
+              {worstDayInsight}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* HEATMAP */}
+      <div className="bg-white border border-gray-200 rounded-[20px] p-5">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2"><Calendar size={16} className="text-gray-500" /> Execution Map</h3>
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-400 uppercase">
+            <span>Less</span>
+            <div className="w-3 h-3 rounded-[3px] bg-gray-100"></div>
+            <div className="w-3 h-3 rounded-[3px] bg-orange-200"></div>
+            <div className="w-3 h-3 rounded-[3px] bg-orange-400"></div>
+            <div className="w-3 h-3 rounded-[3px] bg-green-400"></div>
+            <div className="w-3 h-3 rounded-[3px] bg-green-600"></div>
+            <span>More</span>
+          </div>
+        </div>
+
+        <div className="w-full overflow-x-auto pb-2 custom-scrollbar">
+          <div className="min-w-max flex flex-col gap-1">
+            <div 
+              className="grid gap-1.5" 
+              style={{ 
+                gridTemplateRows: 'repeat(7, 1fr)', 
+                gridAutoFlow: 'column',
+                gridAutoColumns: '14px' 
+              }}
+            >
+              {heatmapData.map((day) => (
+                <div 
+                  key={day.date} 
+                  title={`${day.date}: ${day.count} reps`}
+                  className={`w-[14px] h-[14px] rounded-[3px] transition-colors ${getColorClass(day.intensity)}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* CLEAN INSIGHT BAR w/ RISK SCORE */}
+      <div className="bg-white border border-gray-200 rounded-[20px] p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">
+              Insight
+            </span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${
+              riskScore === 'High' ? 'bg-red-50 text-red-500' :
+              riskScore === 'Medium' ? 'bg-orange-50 text-orange-600' :
+              'bg-green-50 text-green-600'
+            }`}>
+              {riskScore} Risk
             </span>
           </div>
-          <div className="text-right">
-            <div className="text-xl font-black text-gray-900">{aggregates.totalReps}</div>
-            <div className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Total Completions</div>
+          <p className="text-sm font-semibold text-gray-700 mt-2">
+            {consistencyPercent < 40
+              ? "Low consistency — fix routine immediately."
+              : consistencyPercent < 70
+              ? "Inconsistent execution — improve baseline discipline."
+              : consistencyPercent < 90
+              ? "Strong performance — maintain current pace."
+              : "Elite execution — operating at maximum efficiency."}
+          </p>
+        </div>
+
+        <div className="text-right">
+          <div className="text-2xl font-black text-gray-800">
+            {totalReps}
+          </div>
+          <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+            Total Output
           </div>
         </div>
       </div>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar {
+          height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #e5e7eb;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #d1d5db;
+        }
+      `}} />
+
     </div>
   );
 }
