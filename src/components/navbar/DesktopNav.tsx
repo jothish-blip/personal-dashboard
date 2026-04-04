@@ -27,7 +27,7 @@ export default function DesktopNav({
       {/* LEFT: Brand & Switcher */}
       <div className="flex items-center gap-6">
         <div className="text-lg font-semibold text-gray-800 flex items-center gap-3">
-          <div>NexTask <span className="text-orange-500 font-bold">v12</span></div>
+          <div>NexTask <span className="text-orange-500 font-bold">v1.2</span></div>
           <div className="h-4 w-[1px] bg-gray-200" />
           <div className="text-[10px] px-2 py-1 rounded border border-gray-200 text-gray-500 bg-gray-50 uppercase tracking-wide font-medium">
             {activePaths.isMini ? 'Nisc' : 'Engine'}

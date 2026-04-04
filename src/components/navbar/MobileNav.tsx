@@ -27,7 +27,7 @@ export default function MobileNav({
       {/* ROW 1: Brand & Data Actions */}
       <div className="flex items-center justify-between">
         <div className="text-lg font-semibold text-gray-800">
-          NexTask <span className="text-orange-500 font-bold">v12</span>
+          NexTask <span className="text-orange-500 font-bold">v1.2</span>
         </div>
         <div className="flex items-center gap-2">
           <button 
