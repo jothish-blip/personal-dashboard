@@ -66,7 +66,7 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
 
   useEffect(() => {
     // Check if user already initialized
-    const hasInitialized = localStorage.getItem('nexup_workspace_init_v08');
+    const hasInitialized = localStorage.getItem('nextask_workspace_init_v08');
     if (!hasInitialized) {
       setShowOnboarding(true);
     }
@@ -95,7 +95,7 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ tasks, meta, exportDate: new Date() }, null, 2));
     const a = document.createElement('a');
     a.href = dataStr;
-    a.download = `NexUP_Backup_${getLocalDate(new Date())}.json`;
+    a.download = `Nextask_Backup_${getLocalDate(new Date())}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -109,7 +109,7 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
   };
 
   const handleInitialize = () => {
-    localStorage.setItem('nexup_workspace_init_v08', 'true');
+    localStorage.setItem('nextask_workspace_init_v08', 'true');
     setShowOnboarding(false);
   };
 
@@ -310,7 +310,7 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
             <div className="px-8 py-6 border-b border-gray-100 bg-white/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <h2 className="text-2xl font-black tracking-tight text-gray-900 flex items-center gap-2">
-                  <BrainCircuit className="text-orange-500" /> NexUP Workspace
+                  <BrainCircuit className="text-orange-500" /> Nextask Workspace
                 </h2>
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Initialization Sequence</p>
               </div>

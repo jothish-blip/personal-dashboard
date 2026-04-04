@@ -56,7 +56,7 @@ function timeAgo(ts: number): string {
   return new Date(ts).toLocaleDateString();
 }
 
-export default function NexUpWorkspace() {
+export default function NexTaskWorkspace() {
   const { state, setMonthYear } = useNexCore();
 
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -96,10 +96,10 @@ export default function NexUpWorkspace() {
   // --- SESSION POPUP EFFECT ---
   useEffect(() => {
     // Check session storage so it only shows once per session
-    const hasSeenPopup = sessionStorage.getItem('nexup_workspace_wip_seen');
+    const hasSeenPopup = sessionStorage.getItem('nextask_workspace_wip_seen');
     if (!hasSeenPopup) {
       setShowWipPopup(true);
-      sessionStorage.setItem('nexup_workspace_wip_seen', 'true');
+      sessionStorage.setItem('nextask_workspace_wip_seen', 'true');
     }
   }, []);
 
@@ -116,8 +116,8 @@ export default function NexUpWorkspace() {
 
   // Load data
   useEffect(() => {
-    const savedWorkspace = localStorage.getItem("nexup-workspace-v6");
-    const savedMedia = localStorage.getItem("nexup-media-v6");
+    const savedWorkspace = localStorage.getItem("nextask-workspace-v6");
+    const savedMedia = localStorage.getItem("nextask-media-v6");
 
     if (savedWorkspace) {
       const data = JSON.parse(savedWorkspace);
@@ -127,7 +127,7 @@ export default function NexUpWorkspace() {
     } else {
       const welcome: Document = {
         id: "welcome-doc",
-        title: "Welcome to NexUp Workspace",
+        title: "Welcome to Nextask Workspace",
         content: "<p>This is your personal workspace with folder-based media.</p>",
         tags: ["welcome"],
         createdAt: Date.now(),
@@ -153,8 +153,8 @@ export default function NexUpWorkspace() {
     if (documents.length === 0 && folders.length === 0) return;
     setSaveState('saving');
     const timer = setTimeout(() => {
-      localStorage.setItem("nexup-workspace-v6", JSON.stringify({ documents, folders }));
-      localStorage.setItem("nexup-media-v6", JSON.stringify(media));
+      localStorage.setItem("nextask-workspace-v6", JSON.stringify({ documents, folders }));
+      localStorage.setItem("nextask-media-v6", JSON.stringify(media));
       setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       setSaveState('saved');
     }, 800);
@@ -595,7 +595,7 @@ export default function NexUpWorkspace() {
         `}>
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h1 className="font-bold text-2xl tracking-tight text-gray-800">NexUp</h1>
+              <h1 className="font-bold text-2xl tracking-tight text-gray-800">Nextask</h1>
               <button onClick={createFolder} className="text-xs font-semibold text-green-600 hover:text-green-700 transition-colors">+ Folder</button>
             </div>
 
