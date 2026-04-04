@@ -1,12 +1,60 @@
 @import "tailwindcss";
 
+/* 1. Base Variables & Theme */
+:root {
+  --background: #f9fafb;
+  --foreground: #111827;
+  --primary-orange: #f97316;
+}
+
 html, body {
-  background-color: #ffffff;
-  color: #111827;
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  @apply transition-colors duration-200;
+  @apply transition-colors duration-200 min-h-screen flex flex-col;
+  /* Smooth scrolling for the whole page */
+  scroll-behavior: smooth;
+}
+
+/* 2. Modern Scrollbar Styling (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 8px; /* Slimmer for a modern look */
+  height: 8px; /* For horizontal scrollbars */
+}
+
+/* The Background of the scrollbar */
+::-webkit-scrollbar-track {
+  background: #f1f5f9; /* slate-100 */
+}
+
+/* The actual draggable bar */
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* slate-300 (Subtle when inactive) */
+  border-radius: 10px;
+  border: 2px solid #f1f5f9; /* Creates a padding effect */
+}
+
+/* Handle on hover - Transitions to your theme orange */
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-orange);
+  cursor: pointer;
+}
+
+/* 3. Firefox Scrollbar Support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+/* 4. Text Selection Color */
+::selection {
+  background-color: #ffedd5; /* orange-100 */
+  color: #9a3412; /* orange-900 */
+}
+
+/* Ensure prose doesn't look cramped */
+.prose {
+  max-width: 100% !important;
 }
