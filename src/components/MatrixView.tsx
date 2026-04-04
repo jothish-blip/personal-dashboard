@@ -75,11 +75,11 @@ export default function MatrixView({
   const [weekOffset, setWeekOffset] = useState(0); 
   const todayRef = useRef<HTMLTableCellElement | null>(null);
 
-  // Swipe & Drag States
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragAction, setDragAction] = useState<boolean | null>(null);
+  // Swipe States for Mobile Week Navigation
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+  const [isSwiping, setIsSwiping] = useState(false);
 
   const showError = useCallback((msg: string) => { 
     setError(msg); 
@@ -101,7 +101,6 @@ export default function MatrixView({
   const [year, month] = meta.currentMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
 
-  // Performance: Memoized Group Mapping
   const groupedTasks = useMemo(() => {
     const map: Record<string, Task[]> = {};
     tasks.forEach(t => {
@@ -141,7 +140,6 @@ export default function MatrixView({
     return weeks;
   }, [daysInMonth, year, month]);
 
-  // INITIALIZE ACTIVE WEEK SMARTLY
   const activeWeekIndex = useMemo(() => {
     return weeksInMonth.findIndex(week =>
       week.days.some(d => d && `${meta.currentMonth}-${d}` === actualToday)
@@ -150,22 +148,11 @@ export default function MatrixView({
 
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
 
-  // FIX 1: Initial Week Bug - Set week safely after initial render
   useEffect(() => {
     if (activeWeekIndex !== -1) {
       setSelectedWeek(activeWeekIndex);
     }
   }, [activeWeekIndex]);
-
-  // Global Mouse Up for drag-to-check
-  useEffect(() => {
-    const handleGlobalPointerUp = () => {
-      setIsDragging(false);
-      setDragAction(null);
-    };
-    window.addEventListener('pointerup', handleGlobalPointerUp);
-    return () => window.removeEventListener('pointerup', handleGlobalPointerUp);
-  }, []);
 
   // --- 3. WEEKLY COMPARISON ENGINE ---
   const { compareCurrentWeek, comparePrevWeek } = useMemo(() => {
@@ -305,7 +292,6 @@ export default function MatrixView({
 
   const visibleDays = weeksInMonth.flatMap(w => w.days);
 
-  // FIX 3: Safe toggle wrapper (Prevents extreme re-renders on drag)
   const handleToggleSafe = useCallback((task: Task, dateStr: string) => {
     const selected = parseLocalDate(dateStr);
     const todayDate = parseLocalDate(actualToday);
@@ -313,61 +299,55 @@ export default function MatrixView({
     if (selected > todayDate) return showError(`Can't edit the future`);
     if (selected < todayDate) return showError(`Past days are locked`);
     if (meta.lockedDates?.includes(dateStr)) return showError(`Date is locked`);
-    
-    // Premium App Feel: Haptic Feedback
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(15);
-    }
   
     toggleTask(task.id, dateStr);
   }, [actualToday, meta.lockedDates, showError, toggleTask]);
 
-  // --- DRAG TO CHECK HANDLERS ---
-  const handlePointerDown = (e: React.PointerEvent, task: Task, dateStr: string, isDone: boolean, isDisabled: boolean) => {
-    if (isDisabled) return;
-    setIsDragging(true);
-    setDragAction(!isDone);
-    handleToggleSafe(task, dateStr);
-    e.preventDefault(); // Prevents selection
-  };
-
-  const handlePointerEnter = (task: Task, dateStr: string, isDone: boolean, isDisabled: boolean) => {
-    if (!isDragging || dragAction === null || isDisabled) return;
-    if (isDone !== dragAction) handleToggleSafe(task, dateStr);
-  };
-
-  // --- SWIPE LOGIC ---
+  // --- SMART SWIPE LOGIC (Direction Locked) ---
   const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
+    setTouchEndX(null);
+    setIsSwiping(false);
+    setTouchStartX(e.targetTouches[0].clientX);
+    setTouchStartY(e.targetTouches[0].clientY);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    if (!touchStartX || !touchStartY) return;
+    
+    const currentX = e.targetTouches[0].clientX;
+    const currentY = e.targetTouches[0].clientY;
+
+    const diffX = Math.abs(currentX - touchStartX);
+    const diffY = Math.abs(currentY - touchStartY);
+
+    // Only allow horizontal swipe if clearly horizontal to prevent scroll block
+    if (diffX > diffY && diffX > 10) {
+      setIsSwiping(true);
+      setTouchEndX(currentX);
+    }
   };
 
   const handleTouchEnd = () => {
-    if (isDragging) return; // FIX 5: Prevent conflict with drag-to-check
-    if (!touchStart || !touchEnd) return;
+    if (!isSwiping || !touchStartX || !touchEndX) return;
     
-    const distance = touchStart - touchEnd;
-    const threshold = 30; // FIX 2: Better sensitivity
+    const distance = touchStartX - touchEndX;
+    const threshold = 50; 
     
-    const isLeftSwipe = distance > threshold;
-    const isRightSwipe = distance < -threshold;
-
-    if (isLeftSwipe && selectedWeek < weeksInMonth.length - 1) {
+    if (distance > threshold && selectedWeek < weeksInMonth.length - 1) {
       setSelectedWeek(selectedWeek + 1);
     }
-    if (isRightSwipe && selectedWeek > 0) {
+    if (distance < -threshold && selectedWeek > 0) {
       setSelectedWeek(selectedWeek - 1);
     }
-    setTouchStart(null);
-    setTouchEnd(null);
+    
+    setTouchStartX(null);
+    setTouchStartY(null);
+    setTouchEndX(null);
+    setIsSwiping(false);
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-[#F9FAFB] text-gray-800 pb-24 relative pt-[120px] md:pt-[0px] touch-pan-y">
+    <div className="flex-1 flex flex-col min-h-screen bg-[#F9FAFB] text-gray-800 pb-24 relative pt-0 overscroll-y-contain">
       
       {/* ERROR TOAST */}
       {error && (
@@ -415,8 +395,8 @@ export default function MatrixView({
       </div>
 
       {/* --- MOBILE HEADER --- */}
-      <div className="md:hidden sticky top-[112px] z-[80] bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 py-4">
-        <div className="flex justify-between items-end mb-4">
+      <div className="md:hidden z-[80] bg-white border-b border-gray-100 px-4 py-4 shadow-sm">
+        <div className="flex justify-between items-end">
           <div>
             <input type="month" value={meta.currentMonth} onChange={(e) => setMonthYear(e.target.value)} className="text-xs font-bold text-gray-600 uppercase tracking-widest bg-transparent outline-none mb-1" />
             <h1 className="text-2xl font-bold text-gray-800">Today</h1>
@@ -429,7 +409,7 @@ export default function MatrixView({
       </div>
 
       {/* --- SHARED CONTROL BAR --- */}
-      <div className="p-4 sticky top-0 md:top-[176px] z-[70] bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
+      <div className="p-4 md:sticky md:top-[176px] z-[70] bg-white border-b border-gray-100">
         <div className="max-w-[1500px] mx-auto flex flex-col md:flex-row items-center gap-3">
           <div className="flex-1 flex flex-col w-full">
             <div className="flex gap-2">
@@ -498,7 +478,6 @@ export default function MatrixView({
             </div>
           </div>
 
-          {/* FIX 7: Empty State Handling */}
           {tasks.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center p-12 bg-white border border-gray-200 rounded-[20px] text-gray-400">
               <Target size={48} className="mb-4 opacity-30" />
@@ -614,17 +593,14 @@ export default function MatrixView({
 
                                     return (
                                       <td key={day} className={`text-center border-b border-r border-gray-50 p-0 ${dateStr === actualToday ? 'bg-orange-50/30' : ''}`} title={tooltipMsg}>
-                                        <div 
-                                          className="h-14 flex items-center justify-center touch-none cursor-pointer"
-                                          onPointerDown={(e) => handlePointerDown(e, task, dateStr, isDone, isDisabled)}
-                                          onPointerEnter={() => handlePointerEnter(task, dateStr, isDone, isDisabled)}
-                                          onClick={() => { if (!isDisabled && !isDragging) handleToggleSafe(task, dateStr); }} // FIX 6: Fallback
-                                        >
+                                        <div className="h-14 flex items-center justify-center touch-manipulation">
                                           <input 
                                             type="checkbox" 
                                             checked={isDone} 
-                                            onChange={() => {}} // Handled by pointer/click events
-                                            className={`w-5 h-5 rounded border-gray-300 transition-all pointer-events-none accent-green-600 ${isDone ? 'opacity-80' : 'hover:scale-110'} ${isDisabled ? 'opacity-30 grayscale' : ''} ${isElite && isDone ? 'shadow-[0_0_10px_rgba(249,115,22,0.4)]' : ''}`} 
+                                            onChange={() => {
+                                              if (!isDisabled) handleToggleSafe(task, dateStr);
+                                            }} 
+                                            className={`w-5 h-5 rounded border-gray-300 transition-all accent-green-600 ${isDone ? 'opacity-80' : 'hover:scale-110'} ${isDisabled ? 'opacity-30 grayscale cursor-not-allowed' : 'cursor-pointer'} ${isElite && isDone ? 'shadow-[0_0_10px_rgba(249,115,22,0.4)]' : ''}`} 
                                           />
                                         </div>
                                       </td>
@@ -648,6 +624,18 @@ export default function MatrixView({
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
               >
+                {/* Visual Week Indicator Dots */}
+                <div className="flex justify-center gap-1.5 mb-2">
+                  {weeksInMonth.map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        i === selectedWeek ? "w-5 bg-orange-500" : "w-1.5 bg-gray-300"
+                      }`}
+                    />
+                  ))}
+                </div>
+
                 {groups.map(group => {
                   const groupTasks = groupedTasks[group];
                   if (!groupTasks || groupTasks.length === 0) return null;
@@ -664,7 +652,6 @@ export default function MatrixView({
                         const isActiveWeek = selectedWeek === wIndex;
                         if (!isActiveWeek) return null;
 
-                        // Weekly Progress Bar logic
                         const weekValidDays = week.days.filter(Boolean).length;
                         const totalWeekTasks = groupTasks.length * weekValidDays;
                         let completedWeekTasks = 0;
@@ -677,12 +664,11 @@ export default function MatrixView({
                         const isPerfectGroupWeek = progressPct === 100 && totalWeekTasks > 0;
 
                         return (
-                          // FIX 8: Animated properly only on key change (week swap)
-                          <div key={`${week.weekLabel}-${selectedWeek}`} className="bg-white border border-gray-200 rounded-xl p-3 space-y-4 shadow-sm relative animate-in slide-in-from-right-4 fade-in duration-300">
+                          <div key={week.weekLabel} className="bg-white border border-gray-200 rounded-2xl p-4 space-y-5 shadow-sm relative">
                             
                             {/* WEEK HEADER */}
                             <div>
-                              <div className="flex justify-between items-end mb-1">
+                              <div className="flex justify-between items-end mb-1.5">
                                 <div className="flex items-center gap-2 text-[10px] font-bold text-orange-500 uppercase tracking-widest">
                                   {week.weekLabel}
                                   {isPerfectGroupWeek && (
@@ -704,7 +690,7 @@ export default function MatrixView({
                             {/* TASKS IN THIS GROUP */}
                             {groupTasks.map(task => {
                               return (
-                                <div key={task.id} className="space-y-2 pb-2">
+                                <div key={task.id} className="space-y-3 pb-2">
                                   {/* TASK NAME & DELETE */}
                                   <div className="flex justify-between items-center">
                                     <div className="text-sm font-semibold text-gray-800">
@@ -714,7 +700,7 @@ export default function MatrixView({
                                   </div>
 
                                   {/* CHECKBOX 7-DAY GRID */}
-                                  <div className="grid grid-cols-7 gap-1 relative">
+                                  <div className="grid grid-cols-7 gap-2 relative">
                                     {week.days.map((day, i) => {
                                       if (!day) return <div key={i} className="flex-shrink-0" />;
 
@@ -732,7 +718,6 @@ export default function MatrixView({
 
                                       const tooltipMsg = isFuture ? "Future locked" : isPast ? "Past locked" : isLocked ? "Saved" : "";
 
-                                      // FIX 4: Perfect Streak Line Logic
                                       const prevDayStr = i > 0 && week.days[i-1] ? `${meta.currentMonth}-${week.days[i-1]}` : null;
                                       const isPrevDone = prevDayStr && !!task.history?.[prevDayStr];
 
@@ -746,13 +731,9 @@ export default function MatrixView({
                                       return (
                                         <div 
                                           key={day} 
-                                          className={`relative flex flex-col items-center justify-center gap-1.5 py-1.5 rounded-lg flex-shrink-0 touch-none cursor-pointer ${heatmapBg} ${isToday ? "bg-orange-100 border border-orange-300" : "border border-transparent"}`}
+                                          className={`relative flex flex-col items-center justify-center gap-1.5 py-2 rounded-xl flex-shrink-0 touch-manipulation ${heatmapBg} ${isToday ? "bg-orange-100 border border-orange-300" : "border border-transparent"}`}
                                           title={tooltipMsg}
-                                          onPointerDown={(e) => handlePointerDown(e, task, dateStr, isDone, isDisabled)}
-                                          onPointerEnter={() => handlePointerEnter(task, dateStr, isDone, isDisabled)}
-                                          onClick={() => { if (!isDisabled && !isDragging) handleToggleSafe(task, dateStr); }} // FIX 6: Fallback
                                         >
-                                          {/* FIX 4: Streak Connecting Line (Connects to previous box center seamlessly) */}
                                           {isDone && isPrevDone && (
                                             <div className={`absolute top-[50%] left-[-50%] w-[100%] h-[2px] z-0 pointer-events-none ${isEliteStreak ? 'bg-orange-300' : 'bg-green-300'}`} />
                                           )}
@@ -762,13 +743,15 @@ export default function MatrixView({
                                             {['M','T','W','T','F','S','S'][i]}
                                           </span>
 
-                                          {/* CHECKBOX */}
+                                          {/* NATIVE CHECKBOX */}
                                           <input
                                             type="checkbox"
                                             checked={isDone}
-                                            onChange={() => {}} // Handled by pointer/click events
-                                            className={`w-5 h-5 rounded z-10 pointer-events-none ${heatmapAccent} ${glowClass} ${
-                                              isDisabled ? "opacity-30 grayscale" : "transition-transform"
+                                            onChange={() => {
+                                              if (!isDisabled) handleToggleSafe(task, dateStr);
+                                            }} 
+                                            className={`w-6 h-6 rounded-md z-10 ${heatmapAccent} ${glowClass} ${
+                                              isDisabled ? "opacity-30 grayscale cursor-not-allowed" : "transition-transform cursor-pointer"
                                             }`}
                                           />
                                         </div>

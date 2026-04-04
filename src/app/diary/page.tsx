@@ -74,7 +74,7 @@ export default function DiaryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isReplaying, setIsReplaying] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-
+  
   // NEW STATES FOR UPGRADES
   const [moodFilter, setMoodFilter] = useState<'good' | 'neutral' | 'bad' | null>(null);
   const [energyFilter, setEnergyFilter] = useState<'high' | 'medium' | 'low' | null>(null);
@@ -82,7 +82,18 @@ export default function DiaryPage() {
   const [voiceField, setVoiceField] = useState<keyof DiaryEntry | null>(null);
   const [showVersions, setShowVersions] = useState(false);
   const [passwordAttempt, setPasswordAttempt] = useState('');
+  const [showWipPopup, setShowWipPopup] = useState(false); // Pop-up state
   const recognitionRef = useRef<any>(null);
+
+  // --- SESSION POPUP EFFECT ---
+  useEffect(() => {
+    // Check session storage so it only shows once per session
+    const hasSeenPopup = sessionStorage.getItem('nexengine_diary_wip_seen');
+    if (!hasSeenPopup) {
+      setShowWipPopup(true);
+      sessionStorage.setItem('nexengine_diary_wip_seen', 'true');
+    }
+  }, []);
 
   // --- SPEECH RECOGNITION (12. Voice Entry) ---
   const startVoiceInput = (field: keyof DiaryEntry) => {
@@ -482,13 +493,50 @@ export default function DiaryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] text-gray-900 font-sans pb-24">
+    <div className="min-h-screen bg-[#F9FAFB] text-gray-900 font-sans pb-24 relative">
+      
+      {/* --- ONE TIME SESSION POPUP --- */}
+      {showWipPopup && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-lg w-full relative">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="bg-orange-100 p-3 rounded-full text-orange-600">
+                <AlertTriangle size={28} />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">Work in Progress</h2>
+            </div>
+            
+            <p className="text-gray-600 text-base leading-relaxed mb-4">
+              We are still working hard on this page, actively fixing bugs and pushing improvements. 
+              My team and I are currently developing these features. 
+            </p>
+            <p className="text-gray-600 text-base leading-relaxed mb-6">
+              If you find any issues, please contact:<br />
+              <a href="mailto:jothishgandham2@gmail.com" className="text-orange-500 font-semibold hover:underline">
+                jothishgandham2@gmail.com
+              </a>
+            </p>
+            <div className="mb-8">
+              <p className="text-gray-800 font-bold">Regards,</p>
+              <p className="text-gray-800 font-bold">Jothish Gandham</p>
+            </div>
+
+            <button
+              onClick={() => setShowWipPopup(false)}
+              className="w-full py-4 bg-orange-500 text-white font-bold text-lg rounded-2xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/30"
+            >
+              Acknowledge & Continue
+            </button>
+          </div>
+        </div>
+      )}
+
       <Navbar
-  meta={{ currentMonth: selectedDate.slice(0,7), isFocus: false, theme: 'light', lockedDates: [], rollbackUsedDates: [] }}
-  setMonthYear={() => {}}
-  exportData={() => {}}
-  importData={() => {}}
-/>
+        meta={{ currentMonth: selectedDate.slice(0,7), isFocus: false, theme: 'light', lockedDates: [], rollbackUsedDates: [] }}
+        setMonthYear={() => {}}
+        exportData={() => {}}
+        importData={() => {}}
+      />
 
       <div className="p-4 md:p-8 max-w-[1100px] mx-auto w-full flex flex-col gap-6 pt-8">
 

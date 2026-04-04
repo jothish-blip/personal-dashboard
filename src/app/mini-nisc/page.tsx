@@ -83,12 +83,25 @@ export default function NexUpWorkspace() {
   // Mobile Sidebar State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // WIP Pop-up State
+  const [showWipPopup, setShowWipPopup] = useState(false);
+
   const editorRef = useRef<HTMLDivElement>(null);
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastHistorySave = useRef<number>(0);
   const formatTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const activeDocument = documents.find(d => d.id === activeDocId);
+
+  // --- SESSION POPUP EFFECT ---
+  useEffect(() => {
+    // Check session storage so it only shows once per session
+    const hasSeenPopup = sessionStorage.getItem('nexup_workspace_wip_seen');
+    if (!hasSeenPopup) {
+      setShowWipPopup(true);
+      sessionStorage.setItem('nexup_workspace_wip_seen', 'true');
+    }
+  }, []);
 
   // Media counts per folder
   const mediaCounts = useMemo(() => {
@@ -521,13 +534,50 @@ export default function NexUpWorkspace() {
   const readTime = Math.ceil(words / 200);
 
   return (
-    <div className="min-h-screen bg-white text-gray-700 flex flex-col">
+    <div className="min-h-screen bg-white text-gray-700 flex flex-col relative">
+
+      {/* --- ONE TIME SESSION POPUP --- */}
+      {showWipPopup && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-lg w-full relative">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="bg-green-100 p-3 rounded-full text-green-600">
+                <AlertTriangle size={28} />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">Work in Progress</h2>
+            </div>
+            
+            <p className="text-gray-600 text-base leading-relaxed mb-4">
+              We are still working hard on this page, actively fixing bugs and pushing improvements. 
+              My team and I are currently developing these features. 
+            </p>
+            <p className="text-gray-600 text-base leading-relaxed mb-6">
+              If you find any issues, please contact:<br />
+              <a href="mailto:jothishgandham2@gmail.com" className="text-green-500 font-semibold hover:underline">
+                jothishgandham2@gmail.com
+              </a>
+            </p>
+            <div className="mb-8">
+              <p className="text-gray-800 font-bold">Regards,</p>
+              <p className="text-gray-800 font-bold">Jothish Gandham</p>
+            </div>
+
+            <button
+              onClick={() => setShowWipPopup(false)}
+              className="w-full py-4 bg-green-500 text-white font-bold text-lg rounded-2xl hover:bg-green-600 transition-colors shadow-lg shadow-green-500/30"
+            >
+              Acknowledge & Continue
+            </button>
+          </div>
+        </div>
+      )}
+
       <Navbar 
-  meta={state.meta} 
-  setMonthYear={setMonthYear} 
-  exportData={() => {}} 
-  importData={() => {}} 
-/>
+        meta={state.meta} 
+        setMonthYear={setMonthYear} 
+        exportData={() => {}} 
+        importData={() => {}} 
+      />
 
       <div className="flex flex-1 overflow-hidden relative">
         
