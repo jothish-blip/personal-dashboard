@@ -18,9 +18,23 @@ interface DesktopNavProps {
   exportData: () => void;
 }
 
+// Stable month names (prevents hydration mismatch)
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+];
+
 export default function DesktopNav({
-  activePaths, handleNav, y, m, years, setMonthYear, handleImportClick, exportData
+  activePaths,
+  handleNav,
+  y,
+  m,
+  years,
+  setMonthYear,
+  handleImportClick,
+  exportData
 }: DesktopNavProps) {
+
   return (
     <div className="hidden md:flex h-[64px] items-center px-6 max-w-[1500px] mx-auto justify-between">
       
@@ -97,13 +111,15 @@ export default function DesktopNav({
 
         <div className="h-5 w-[1px] bg-gray-200 mx-1" />
 
-        {/* DATE SELECTORS */}
+        {/* DATE SELECTORS - FIXED FOR HYDRATION */}
         <select 
           value={y} 
           onChange={(e) => setMonthYear(`${e.target.value}-${m}`)} 
           className="bg-gray-50 border border-gray-200 rounded-md px-2 py-1.5 text-xs font-medium text-gray-700 outline-none hover:border-gray-300 transition-colors cursor-pointer"
         >
-          {years.map(year => <option key={year} value={year}>{year}</option>)}
+          {years.map(year => (
+            <option key={year} value={year}>{year}</option>
+          ))}
         </select>
 
         <select 
@@ -111,10 +127,13 @@ export default function DesktopNav({
           onChange={(e) => setMonthYear(`${y}-${e.target.value}`)} 
           className="bg-gray-50 border border-gray-200 rounded-md px-2 py-1.5 text-xs font-medium text-gray-700 outline-none hover:border-gray-300 transition-colors cursor-pointer"
         >
-          {Array.from({ length: 12 }, (_, i) => {
+          {MONTH_NAMES.map((name, i) => {
             const val = String(i + 1).padStart(2, '0');
-            const name = new Date(2024, i).toLocaleString('default', { month: 'short' });
-            return <option key={val} value={val}>{name}</option>;
+            return (
+              <option key={val} value={val}>
+                {name}
+              </option>
+            );
           })}
         </select>
 

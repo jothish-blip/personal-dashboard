@@ -1,153 +1,445 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Bold, Italic, Underline, CheckSquare, Circle, Image as ImageIcon, Undo, Redo, Zap, CheckCircle2, Plus, Tag, FileText } from 'lucide-react';
-import { timeAgo, Media } from './types';
+"use client";
+import React, { useState, useEffect, useRef } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
+import TextAlign from '@tiptap/extension-text-align';
+import Link from '@tiptap/extension-link';
+import CharacterCount from '@tiptap/extension-character-count';
+import Color from '@tiptap/extension-color';
+import { TextStyle } from '@tiptap/extension-text-style';
+import Highlight from '@tiptap/extension-highlight';
+import FontFamily from '@tiptap/extension-font-family';
+import Subscript from '@tiptap/extension-subscript';
+import Superscript from '@tiptap/extension-superscript';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import {
+  Bold, Italic, Strikethrough, Highlighter, Undo, Redo, RotateCcw,
+  Heading1, Heading2, List, Terminal, Minus, Plus, Eye, EyeOff
+} from 'lucide-react';
 
-function ToolbarButton({ children, onClick, title, isActive }: { children: React.ReactNode; onClick: () => void; title?: string; isActive?: boolean }) {
-  return (
-    <button onClick={onClick} title={title} className={`p-1.5 md:p-2 rounded-lg flex items-center justify-center transition-colors font-medium border ${isActive ? "bg-green-50 text-green-600 border-green-200 shadow-sm" : "bg-transparent text-gray-500 border-transparent hover:bg-gray-100 hover:text-gray-800"}`}>
-      {children}
-    </button>
-  );
-}
+// --- Font Size Extension ---
+const FontSize = TextStyle.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      fontSize: {
+        default: null,
+        parseHTML: element => element.style.fontSize,
+        renderHTML: attributes => {
+          if (!attributes.fontSize) return {};
+          return { style: `font-size: ${attributes.fontSize}` };
+        },
+      },
+    };
+  },
+  addCommands() {
+    return {
+      setFontSize: (size: string) => ({ chain }: any) => {
+        return chain()
+          .setMark('textStyle', { fontSize: size })
+          .run();
+      },
+    };
+  },
+});
+
+const ToolbarButton = ({ children, onClick, isActive, title, className = "" }: any) => (
+  <button
+    type="button"
+    onMouseDown={(e) => e.preventDefault()}
+    onClick={onClick}
+    title={title}
+    className={`p-3 rounded-xl flex items-center justify-center transition-all border active:bg-gray-100 md:hover:bg-gray-50 flex-shrink-0 ${
+      isActive
+        ? "bg-green-100 text-green-700 border-green-200 shadow-sm"
+        : "bg-transparent text-gray-600 border-transparent hover:bg-gray-50"
+    } ${className}`}
+  >
+    {children}
+  </button>
+);
+
+const GroupLabel = ({ children }: { children: string }) => (
+  <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest absolute -top-3 left-2 bg-white px-1">
+    {children}
+  </span>
+);
 
 export default function Editor({ system }: any) {
-  const { activeDocument, activeDocId, updateDocumentTitle, updateDocumentContent, addTag, removeTag, saveState, lastSavedTime, createDocument, activeFolderId, setView, setDocuments } = system;
-  const editorRef = useRef<HTMLDivElement>(null);
+  const {
+    activeDocument,
+    activeDocId,
+    updateDocumentTitle,
+    updateDocumentContent,
+    removeTag,
+    saveState,
+    lastSavedTime
+  } = system;
+
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [showFocusMode, setShowFocusMode] = useState(false);
+  const [showQuickMenu, setShowQuickMenu] = useState(false);
+
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
-  const formatTimeout = useRef<NodeJS.Timeout | null>(null);
-  const [activeFormats, setActiveFormats] = useState<string[]>([]);
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3] },
+        bulletList: { keepMarks: true },
+        orderedList: { keepMarks: true },
+      }),
+      TextStyle,
+      FontSize as any,
+      Color,
+      FontFamily,
+      Subscript,
+      Superscript,
+      Highlight.configure({ multicolor: true }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Placeholder.configure({ placeholder: "Type '/' for commands or start writing..." }),
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      Link.configure({ openOnClick: false }),
+      CharacterCount,
+    ],
+    content: activeDocument?.content || '',
+    onUpdate: ({ editor }) => {
+      const html = editor.getHTML();
+      const { from } = editor.state.selection;
+      const textBefore = editor.state.doc.textBetween(Math.max(0, from - 1), from);
+      setShowSlashMenu(textBefore === '/');
+
+      if (saveTimeout.current) clearTimeout(saveTimeout.current);
+      saveTimeout.current = setTimeout(() => {
+        updateDocumentContent(activeDocId, html);
+      }, 600);
+    },
+  });
 
   useEffect(() => {
-    if (editorRef.current && activeDocument) {
-      if (editorRef.current.innerHTML !== activeDocument.content) {
-        editorRef.current.innerHTML = activeDocument.content;
-      }
+    if (editor && activeDocument && editor.getHTML() !== activeDocument.content) {
+      editor.commands.setContent(activeDocument.content || "<p></p>");
     }
-  }, [activeDocId]);
+  }, [activeDocId, editor, activeDocument?.content]);
 
-  const checkFormat = () => {
-    if (formatTimeout.current) clearTimeout(formatTimeout.current);
-    formatTimeout.current = setTimeout(() => {
-      const formats = [];
-      if (document.queryCommandState('bold')) formats.push('bold');
-      if (document.queryCommandState('italic')) formats.push('italic');
-      if (document.queryCommandState('underline')) formats.push('underline');
-      setActiveFormats(formats);
-    }, 100);
-  };
+  if (!activeDocument || !editor) return null;
 
-  const execCommand = (command: string, value?: string) => {
-    if (!editorRef.current) return;
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-    const range = selection.getRangeAt(0);
-    editorRef.current.focus();
-    setTimeout(() => {
-      selection.removeAllRanges();
-      selection.addRange(range);
-      document.execCommand(command, false, value);
-      checkFormat();
-      if (activeDocId) updateDocumentContent(activeDocId, editorRef.current!.innerHTML);
-    }, 0);
-  };
-
-  const handleInput = () => {
-    if (!editorRef.current || !activeDocId) return;
-    const newContent = editorRef.current.innerHTML;
-    if (newContent === activeDocument?.content) return;
-    if (saveTimeout.current) clearTimeout(saveTimeout.current);
-    saveTimeout.current = setTimeout(() => { updateDocumentContent(activeDocId, newContent); }, 500);
-  };
-
-  const insertElement = (html: string) => {
-    if (!editorRef.current) return;
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-    const range = selection.getRangeAt(0);
-    editorRef.current.focus();
-    setTimeout(() => {
-      selection.removeAllRanges();
-      selection.addRange(range);
-      document.execCommand("insertHTML", false, html);
-      if (activeDocId) updateDocumentContent(activeDocId, editorRef.current!.innerHTML);
-    }, 0);
-  };
-
-  const handleEditorClick = (e: React.MouseEvent) => {
-    checkFormat();
-    const target = e.target as HTMLInputElement;
-    if (target.type === "checkbox") {
-      const taskItem = target.closest(".task-item");
-      const taskText = taskItem?.querySelector(".task-text") as HTMLElement;
-      if (taskText) {
-        target.checked ? taskText.classList.add("line-through", "text-gray-400") : taskText.classList.remove("line-through", "text-gray-400");
-      }
-      if (activeDocId && editorRef.current) updateDocumentContent(activeDocId, editorRef.current.innerHTML);
+  const handleSlashCommand = (command: string) => {
+    const chain = editor.chain().focus();
+    switch (command) {
+      case 'h1':
+        chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from })
+             .toggleHeading({ level: 1 }).run();
+        break;
+      case 'h2':
+        chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from })
+             .toggleHeading({ level: 2 }).run();
+        break;
+      case 'todo':
+        chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from })
+             .toggleTaskList().run();
+        break;
+      case 'quote':
+        chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from })
+             .toggleBlockquote().run();
+        break;
+      case 'divider':
+        chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from })
+             .setHorizontalRule().run();
+        break;
+      case 'code':
+        chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from })
+             .toggleCodeBlock().run();
+        break;
+      default:
+        break;
     }
+    setShowSlashMenu(false);
   };
 
-  if (!activeDocument) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-10 border-2 border-dashed border-gray-200 rounded-2xl">
-        <FileText size={48} className="text-gray-300 mb-4" />
-        <p className="text-gray-500 font-semibold">No document selected</p>
-        <button onClick={() => createDocument(activeFolderId || undefined)} className="mt-4 px-4 py-2 bg-green-500 text-white text-sm font-bold rounded-lg hover:bg-green-600 transition-colors shadow-sm">Create New Document</button>
-      </div>
-    );
-  }
-
-  const words = activeDocument.content.replace(/<[^>]+>/g, "").trim().split(/\s+/).filter(Boolean).length;
-  const readTime = Math.ceil(words / 200);
+  const wordCount = editor.storage.characterCount.words();
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-6">
-        <button onClick={() => createDocument(activeFolderId || undefined)} className="text-xs font-semibold flex items-center gap-1.5 text-gray-500 hover:text-green-600 bg-gray-50 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-green-200 transition-colors shadow-sm"><Plus size={14}/> New Doc</button>
-        <button onClick={() => setView("media")} className="text-xs font-semibold flex items-center gap-1.5 text-gray-500 hover:text-green-600 bg-gray-50 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-green-200 transition-colors shadow-sm"><ImageIcon size={14}/> Upload</button>
-        <button onClick={() => document.getElementById('tag-input')?.focus()} className="text-xs font-semibold flex items-center gap-1.5 text-gray-500 hover:text-green-600 bg-gray-50 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-green-200 transition-colors shadow-sm"><Tag size={14}/> Tag</button>
+    <div className={`min-h-screen transition-all duration-300 ${showFocusMode ? 'bg-zinc-950' : 'bg-gray-50'}`}>
+
+      {/* DOCUMENT HEADER - Improved Tags */}
+      <div className={`max-w-5xl mx-auto px-4 pt-6 pb-8 ${showFocusMode ? 'hidden' : ''}`}>
+        <div className="bg-white border border-gray-200 rounded-[2.5rem] shadow-sm p-8">
+          <input
+            type="text"
+            value={activeDocument.title}
+            onChange={(e) => updateDocumentTitle(activeDocId!, e.target.value)}
+            className="w-full text-4xl md:text-5xl font-black bg-transparent border-b-2 border-gray-100 outline-none text-gray-900 placeholder-gray-200 pb-4 focus:border-green-500"
+            placeholder="Untitled Note"
+          />
+          
+          {/* Improved Tag System */}
+          <div className="flex flex-wrap gap-2 mt-6">
+            {activeDocument.tags?.map((tag: string) => (
+              <span 
+                key={tag} 
+                className="px-4 py-1.5 bg-green-50 text-green-700 text-sm font-semibold rounded-2xl border border-green-100 flex items-center gap-2 shadow-sm"
+              >
+                #{tag}
+                <button 
+                  onClick={() => removeTag(activeDocument.id, tag)} 
+                  className="ml-1 text-green-600 hover:text-red-500 font-bold text-lg leading-none"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            {(!activeDocument.tags || activeDocument.tags.length === 0) && (
+              <p className="text-gray-400 text-sm italic">No tags yet</p>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center gap-4">
-        <input type="text" value={activeDocument.title} onChange={(e) => updateDocumentTitle(activeDocId!, e.target.value)} className="flex-1 text-3xl md:text-4xl font-bold tracking-tight bg-transparent outline-none border-b border-gray-200 pb-3 text-gray-800 focus:border-green-400 transition-colors" placeholder="Document Title" />
-        <div className="flex flex-wrap items-center gap-2">
-          {activeDocument.tags?.map((tag: string) => (
-            <span key={tag} className="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-600 text-xs font-semibold rounded-md flex items-center gap-1">#{tag}<button onClick={() => removeTag(activeDocument.id, tag)} className="text-gray-400 hover:text-red-500 transition-colors">×</button></span>
+      {/* DESKTOP TOOLBAR */}
+      <div className="hidden md:block sticky top-4 z-40 max-w-5xl mx-auto px-4">
+        <div className="bg-white/95 backdrop-blur-xl border border-gray-200 rounded-2xl p-3 shadow-xl flex flex-wrap gap-4 items-center">
+          {/* Style Group */}
+          <div className="relative flex items-center gap-1 border border-gray-100 p-1.5 rounded-xl">
+            <GroupLabel>Style</GroupLabel>
+            <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')}><Bold size={18}/></ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')}><Italic size={18}/></ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} isActive={editor.isActive('strike')}><Strikethrough size={18}/></ToolbarButton>
+            
+            <div className="w-px h-6 bg-gray-200 mx-2" />
+            
+            <input
+              type="color"
+              className="w-9 h-9 p-1 rounded-xl cursor-pointer border border-gray-200"
+              onInput={(e) => editor.chain().focus().setColor((e.target as HTMLInputElement).value).run()}
+              title="Text Color"
+            />
+            <ToolbarButton onClick={() => editor.chain().focus().toggleHighlight().run()} isActive={editor.isActive('highlight')}><Highlighter size={18}/></ToolbarButton>
+          </div>
+
+          {/* Font Group */}
+          <div className="relative flex items-center gap-2 border border-gray-100 p-1.5 rounded-xl">
+            <GroupLabel>Font</GroupLabel>
+            <select
+              className="bg-transparent text-sm font-medium outline-none cursor-pointer text-gray-700"
+              onChange={(e) => editor.chain().focus().setFontFamily(e.target.value).run()}
+            >
+              <option value="Inter">Inter</option>
+              <option value="Georgia">Georgia</option>
+              <option value="monospace">Mono</option>
+            </select>
+            <select
+              className="bg-transparent text-sm font-medium outline-none cursor-pointer text-gray-700 border-l pl-3"
+              onChange={(e) => editor.chain().focus().extendMarkRange('textStyle').setFontSize(e.target.value).run()}
+            >
+              <option value="16px">16</option>
+              <option value="18px">18</option>
+              <option value="20px">20</option>
+              <option value="24px">24</option>
+              <option value="32px">32</option>
+            </select>
+          </div>
+
+          {/* Blocks */}
+          <div className="relative flex items-center gap-1 border border-gray-100 p-1.5 rounded-xl">
+            <GroupLabel>Blocks</GroupLabel>
+            <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} isActive={editor.isActive('heading', { level: 1 })}>H1</ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} isActive={editor.isActive('heading', { level: 2 })}>H2</ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive('bulletList')}><List size={18}/></ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().toggleTaskList().run()} isActive={editor.isActive('taskList')}>☑</ToolbarButton>
+          </div>
+
+          <div className="flex-1" />
+
+          {/* Right Controls - Fixed Undo/Redo */}
+          <div className="flex items-center gap-2">
+            <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Undo"><Undo size={20}/></ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Redo"><Redo size={20}/></ToolbarButton>
+            <ToolbarButton onClick={() => setShowFocusMode(!showFocusMode)} title="Focus Mode">
+              {showFocusMode ? <EyeOff size={20}/> : <Eye size={20}/>}
+            </ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} title="Clear Format">
+              <RotateCcw size={20}/>
+            </ToolbarButton>
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN EDITOR AREA */}
+      <div className={`max-w-5xl mx-auto px-4 pb-48 md:pb-20 transition-all ${showFocusMode ? 'pt-8' : 'pt-4'}`}>
+        <div className={`relative rounded-[3rem] shadow-sm transition-all ${showFocusMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'}`}>
+          <style jsx global>{`
+            .ProseMirror {
+              outline: none !important;
+              border: none !important;
+              caret-color: #22c55e;
+              min-height: 700px;
+              padding: 3rem 2.5rem;
+              font-size: 17px;
+              line-height: 1.85;
+            }
+            .ProseMirror p { margin-bottom: 1.25em; }
+            .ProseMirror h1, .ProseMirror h2, .ProseMirror h3 {
+              margin-top: 2em;
+              margin-bottom: 0.75em;
+              font-weight: 900;
+              color: ${showFocusMode ? '#f1f5f9' : '#111827'};
+            }
+            .ProseMirror ::selection {
+              background: #86efac;
+              color: #14532d;
+            }
+            .ProseMirror blockquote {
+              border-left: 5px solid #4ade80;
+              padding-left: 1.5rem;
+              color: #64748b;
+              font-style: italic;
+              margin: 2em 0;
+            }
+            @media (max-width: 768px) {
+              .ProseMirror {
+                padding: 2rem 1.25rem;
+                font-size: 16.5px;
+              }
+            }
+            body { padding-bottom: env(safe-area-inset-bottom); }
+          `}</style>
+          <EditorContent editor={editor} className="prose prose-lg max-w-none focus:outline-none" />
+        </div>
+      </div>
+
+      {/* ==================== MOBILE COMBINED TOOLBAR ==================== */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-2xl">
+        {/* Toolbar Row */}
+        <div className="flex items-center gap-1 p-2 overflow-x-auto border-b border-gray-100">
+          {/* Formatting */}
+          <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')}><Bold size={20}/></ToolbarButton>
+          <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')}><Italic size={20}/></ToolbarButton>
+          <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} isActive={editor.isActive('strike')}><Strikethrough size={20}/></ToolbarButton>
+
+          {/* Compact Color + Highlight */}
+          <div className="flex items-center gap-1 border-l border-r border-gray-200 px-2 mx-1">
+            <input
+              type="color"
+              className="w-8 h-8 p-0.5 rounded-lg cursor-pointer border border-gray-200"
+              onInput={(e) => editor.chain().focus().setColor((e.target as HTMLInputElement).value).run()}
+              title="Text Color"
+            />
+            <ToolbarButton onClick={() => editor.chain().focus().toggleHighlight().run()} isActive={editor.isActive('highlight')} className="p-2">
+              <Highlighter size={20} />
+            </ToolbarButton>
+          </div>
+
+          {/* Font Family & Size */}
+          <select
+            className="bg-white border border-gray-200 text-sm font-medium rounded-xl px-3 py-2 outline-none cursor-pointer text-gray-700 flex-shrink-0"
+            onChange={(e) => editor.chain().focus().setFontFamily(e.target.value).run()}
+          >
+            <option value="Inter">Inter</option>
+            <option value="Georgia">Georgia</option>
+            <option value="monospace">Mono</option>
+          </select>
+
+          <select
+            className="bg-white border border-gray-200 text-sm font-medium rounded-xl px-3 py-2 outline-none cursor-pointer text-gray-700 flex-shrink-0"
+            onChange={(e) => editor.chain().focus().extendMarkRange('textStyle').setFontSize(e.target.value).run()}
+          >
+            <option value="16px">16</option>
+            <option value="18px">18</option>
+            <option value="20px">20</option>
+            <option value="24px">24</option>
+            <option value="32px">32</option>
+          </select>
+
+          {/* Blocks */}
+          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} isActive={editor.isActive('heading', { level: 1 })}>H1</ToolbarButton>
+          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} isActive={editor.isActive('heading', { level: 2 })}>H2</ToolbarButton>
+          <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive('bulletList')}><List size={20}/></ToolbarButton>
+          <ToolbarButton onClick={() => editor.chain().focus().toggleTaskList().run()} isActive={editor.isActive('taskList')}>☑</ToolbarButton>
+
+          <div className="flex-1 min-w-4" />
+
+          {/* Undo / Redo / Focus - Now clearly visible */}
+          <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Undo"><Undo size={21}/></ToolbarButton>
+          <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Redo"><Redo size={21}/></ToolbarButton>
+          <ToolbarButton onClick={() => setShowFocusMode(!showFocusMode)} title="Focus Mode">
+            {showFocusMode ? <EyeOff size={21}/> : <Eye size={21}/>}
+          </ToolbarButton>
+        </div>
+
+        {/* Status Bar */}
+        <div className="flex justify-between items-center px-6 py-2.5 text-xs font-medium bg-white">
+          <div className="font-mono text-gray-400">
+            {wordCount} words
+          </div>
+          <div className="flex items-center gap-2 text-green-600">
+            {saveState === 'saving' ? (
+              <>⟳ Saving...</>
+            ) : (
+              <>✓ Saved {lastSavedTime}</>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* QUICK INSERT FLOATING BUTTON */}
+      <button
+        onClick={() => setShowQuickMenu(!showQuickMenu)}
+        className="md:hidden fixed bottom-24 right-6 z-50 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white p-5 rounded-full shadow-2xl transition-all"
+      >
+        <Plus size={28} />
+      </button>
+
+      {/* Quick Insert Menu */}
+      {showQuickMenu && (
+        <div className="md:hidden fixed bottom-40 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 w-56">
+          {[
+            { label: "Heading 1", icon: <Heading1 size={18} />, cmd: 'h1' },
+            { label: "Heading 2", icon: <Heading2 size={18} />, cmd: 'h2' },
+            { label: "To-do List", icon: "☑", cmd: 'todo' },
+            { label: "Quote", icon: '"', cmd: 'quote' },
+            { label: "Divider", icon: <Minus size={18} />, cmd: 'divider' },
+            { label: "Code Block", icon: <Terminal size={18} />, cmd: 'code' },
+          ].map((item, i) => (
+            <button
+              key={i}
+              onClick={() => { handleSlashCommand(item.cmd); setShowQuickMenu(false); }}
+              className="w-full px-4 py-3 text-left hover:bg-green-50 flex items-center gap-3 text-sm font-medium"
+            >
+              <span className="text-green-600">{item.icon}</span>
+              {item.label}
+            </button>
           ))}
-          <input id="tag-input" type="text" placeholder="+ tag" className="text-xs px-3 py-1.5 bg-transparent border border-dashed border-gray-300 rounded-md w-24 focus:outline-none focus:border-green-400 focus:bg-green-50 transition-colors font-medium" onKeyDown={(e) => { if (e.key === "Enter") { addTag(activeDocument.id, e.currentTarget.value); e.currentTarget.value = ""; } }} />
         </div>
-      </div>
+      )}
 
-      <div className="flex flex-wrap gap-1 md:gap-2 bg-white border border-gray-200 rounded-xl p-2 shadow-sm sticky top-0 z-10">
-        <ToolbarButton isActive={activeFormats.includes('bold')} onClick={() => execCommand("bold")} title="Bold"><Bold size={16} /></ToolbarButton>
-        <ToolbarButton isActive={activeFormats.includes('italic')} onClick={() => execCommand("italic")} title="Italic"><Italic size={16} /></ToolbarButton>
-        <ToolbarButton isActive={activeFormats.includes('underline')} onClick={() => execCommand("underline")} title="Underline"><Underline size={16} /></ToolbarButton>
-        <div className="w-px h-6 bg-gray-200 mx-1 self-center" />
-        <ToolbarButton onClick={() => execCommand("undo")} title="Undo"><Undo size={16} /></ToolbarButton>
-        <ToolbarButton onClick={() => execCommand("redo")} title="Redo"><Redo size={16} /></ToolbarButton>
-        <div className="w-px h-6 bg-gray-200 mx-1 self-center" />
-        <select onChange={(e) => insertElement(`<h${e.target.value} class="font-bold my-4 text-gray-800">Heading ${e.target.value}</h${e.target.value}>`)} className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-xs font-medium text-gray-600 outline-none hover:border-gray-300 cursor-pointer focus:border-green-400">
-          <option value="0">Normal</option><option value="1">H1</option><option value="2">H2</option><option value="3">H3</option>
-        </select>
-        <ToolbarButton onClick={() => setView("media")} title="Upload Media"><ImageIcon size={16} /></ToolbarButton>
-        <ToolbarButton onClick={() => insertElement(`<div class="task-item flex items-center gap-3 my-3"><input type="checkbox" class="w-5 h-5 accent-green-500 cursor-pointer" /> <span contenteditable="true" class="task-text">New task</span></div>`)} title="Task"><CheckSquare size={16} /></ToolbarButton>
-        <ToolbarButton onClick={() => insertElement(`<div class="flex items-center gap-3 my-2"><input type="radio" name="radio-group" class="w-5 h-5 accent-green-500 cursor-pointer" /> <span contenteditable="true">Option</span></div>`)} title="Radio"><Circle size={16} /></ToolbarButton>
-      </div>
-
-      <div className="relative">
-        <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={handleInput} onClick={handleEditorClick} onKeyUp={checkFormat} onMouseUp={checkFormat} className="min-h-[400px] md:min-h-[500px] p-6 md:p-8 bg-white border border-gray-200 rounded-2xl text-gray-700 text-base leading-relaxed outline-none focus:border-green-400 focus:ring-4 ring-green-500/10 shadow-sm transition-all prose max-w-none" />
-      </div>
-
-      <div className="text-xs text-gray-400 font-semibold flex flex-wrap justify-between items-center px-2 pb-6">
-        <span>{words} words • {readTime} min read</span>
-        <div className="flex items-center gap-2">
-          <span className="hidden sm:inline">Edited {timeAgo(activeDocument.updatedAt)}</span>
-          <span className="sm:hidden text-gray-300">|</span>
-          <span className={`flex items-center gap-1.5 px-2 py-1 rounded-md border ${saveState === 'saving' ? 'bg-green-50 border-green-200 text-green-600' : 'bg-green-50 border-green-200 text-green-600'}`}>
-            {saveState === 'saving' ? <Zap size={12} className="animate-pulse" /> : <CheckCircle2 size={12} />}
-            {saveState === 'saving' ? 'Saving...' : `Saved at ${lastSavedTime || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
-          </span>
+      {/* SLASH MENU */}
+      {showSlashMenu && (
+        <div className="fixed left-1/2 top-1/3 -translate-x-1/2 z-[60] bg-white border border-gray-200 shadow-2xl rounded-2xl p-3 w-72">
+          <p className="text-[10px] font-black text-gray-400 px-3 py-1 uppercase tracking-widest">Quick Commands</p>
+          {[
+            { label: "Heading 1", cmd: 'h1', icon: <Heading1 size={18} /> },
+            { label: "Heading 2", cmd: 'h2', icon: <Heading2 size={18} /> },
+            { label: "To-do List", cmd: 'todo', icon: "☑" },
+            { label: "Blockquote", cmd: 'quote', icon: '"' },
+            { label: "Divider", cmd: 'divider', icon: <Minus size={18} /> },
+            { label: "Code Block", cmd: 'code', icon: <Terminal size={18} /> },
+          ].map((item) => (
+            <button
+              key={item.cmd}
+              onClick={() => handleSlashCommand(item.cmd)}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-green-50 rounded-xl text-left text-sm font-medium"
+            >
+              <span className="text-green-600">{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
         </div>
-      </div>
+      )}
     </div>
   );
 }
