@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrainCircuit, Laptop, Shield, Activity, CheckCircle2, ServerOff, AlertTriangle, Download, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BrainCircuit, Download, RotateCcw, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { Task, Meta } from '../../types';
 import { getLocalDate } from './utils';
 
@@ -11,27 +11,24 @@ interface OnboardingProps {
 
 export default function OnboardingFlow({ tasks, meta, onComplete }: OnboardingProps) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [deviceId, setDeviceId] = useState('Detecting...');
-  const [agreements, setAgreements] = useState({ beta: false, localOnly: false, noSync: false });
+  const [isVisible, setIsVisible] = useState(false);
 
+  // STEP 1: Show Only Once Logic
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const ua = navigator.userAgent;
-      let os = "Unknown";
-      let browser = "Browser";
-      if (ua.indexOf("Win") !== -1) os = "Win";
-      if (ua.indexOf("Mac") !== -1) os = "Mac";
-      if (ua.indexOf("Linux") !== -1) os = "Linux";
-      if (ua.indexOf("Android") !== -1) os = "Android";
-      if (ua.indexOf("like Mac") !== -1) os = "iOS";
-      if (ua.indexOf("Chrome") !== -1) browser = "Chrome";
-      else if (ua.indexOf("Safari") !== -1) browser = "Safari";
-      else if (ua.indexOf("Firefox") !== -1) browser = "Firefox";
-      
-      const hash = Math.floor(Math.random() * 9000) + 1000;
-      setDeviceId(`${browser}-${os}-${hash}`);
+      const seen = localStorage.getItem("nextask_onboarding_seen");
+      if (seen) {
+        onComplete(); // Skip entirely if already seen
+      } else {
+        setIsVisible(true); // Only render if they haven't seen it
+      }
     }
-  }, []);
+  }, [onComplete]);
+
+  const handleComplete = () => {
+    localStorage.setItem("nextask_onboarding_seen", "true");
+    onComplete();
+  };
 
   const handleBackupJSON = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ tasks, meta, exportDate: new Date() }, null, 2));
@@ -50,147 +47,165 @@ export default function OnboardingFlow({ tasks, meta, onComplete }: OnboardingPr
     }
   };
 
-  const allAgreed = agreements.beta && agreements.localOnly && agreements.noSync;
+  if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-start md:items-center justify-center bg-gray-900/60 backdrop-blur-md p-4 sm:p-6 overflow-y-auto">
-      <div className="mt-8 md:mt-0 mb-8 bg-white/95 backdrop-blur-xl max-w-2xl w-full rounded-[24px] shadow-2xl border border-white/50 overflow-hidden flex flex-col transform transition-all animate-in fade-in zoom-in-95 duration-300">
+    // REMOVED BLACK UI: Using white/70 backdrop and bottom sheet layout for mobile
+    <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-white/70 backdrop-blur-sm p-0 md:p-6 transition-opacity">
+      
+      {/* Container: Scroll Safe & Mobile Bottom Sheet */}
+      <div className="bg-white w-full md:max-w-2xl rounded-t-[2rem] md:rounded-[24px] shadow-2xl border border-slate-200 overflow-hidden flex flex-col transform transition-all animate-in slide-in-from-bottom-8 md:zoom-in-95 duration-300 max-h-[90vh]">
         
-        {/* Header */}
-        <div className="px-5 sm:px-8 py-6 border-b border-gray-100 bg-white/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        {/* Header (Simplified) */}
+        <div className="px-5 md:px-8 py-5 md:py-6 border-b border-gray-100 bg-white flex justify-between items-center">
           <div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-gray-900 flex items-center gap-2">
-              <BrainCircuit className="text-orange-500" /> Nextask Workspace
+            <h2 className="text-xl md:text-2xl font-black tracking-tight text-gray-900 flex items-center gap-2">
+              <BrainCircuit className="text-orange-500" /> Nextask
             </h2>
-            <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Initialization Sequence</p>
-          </div>
-          <div className="text-left sm:text-right flex flex-col items-start sm:items-end gap-1">
-            <span className="px-2.5 py-1 bg-gray-100 rounded-md text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
-              <Laptop size={12}/> {deviceId}
-            </span>
-            <span className="text-[10px] text-gray-400 font-semibold">Version: v0.8.2 Beta</span>
+            <p className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">
+              Getting Started
+            </p>
           </div>
         </div>
 
-        {/* Progress */}
+        {/* Progress Bar */}
         <div className="w-full bg-gray-100 h-1.5">
-          <div className="h-full bg-gradient-to-r from-orange-400 to-red-500 transition-all duration-500 ease-out" style={{ width: `${(currentStep / 4) * 100}%` }} />
+          <div 
+            className="h-full bg-orange-500 transition-all duration-500 ease-out" 
+            style={{ width: `${(currentStep / 4) * 100}%` }} 
+          />
         </div>
-        <div className="px-5 sm:px-8 pt-4 pb-2">
+        <div className="px-5 md:px-8 pt-4 pb-0">
           <span className="text-xs font-bold text-orange-500 uppercase tracking-widest">Step {currentStep} of 4</span>
         </div>
 
-        {/* Content */}
-        <div className="px-5 sm:px-8 py-6 min-h-[320px]">
+        {/* Scrollable Content Area */}
+        <div className="px-5 md:px-8 py-5 md:py-6 overflow-y-auto scrollbar-hide">
+          
+          {/* STEP 1: How to use */}
           {currentStep === 1 && (
             <div className="animate-in slide-in-from-right-4 fade-in duration-300">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-6">Current System Status</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl border border-blue-100 bg-blue-50/50 flex flex-col gap-2">
-                  <div className="flex justify-between items-center"><Shield className="text-blue-500" size={20}/><span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase">Active</span></div>
-                  <span className="font-bold text-gray-900">System Phase</span>
-                  <span className="text-xs text-gray-500 font-medium">Public Beta Testing</span>
+              <h3 className="text-xl font-bold text-gray-800 mb-5">How to Use Tasks System</h3>
+              <div className="space-y-5 text-sm text-gray-600">
+                <div>
+                  <p className="font-bold text-gray-900">Create Tasks</p>
+                  <p className="mt-0.5">Add multiple tasks for your day using the + button.</p>
                 </div>
-                <div className="p-4 rounded-2xl border border-orange-100 bg-orange-50/50 flex flex-col gap-2">
-                  <div className="flex justify-between items-center"><Activity className="text-orange-500" size={20}/><span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded uppercase">Partial</span></div>
-                  <span className="font-bold text-gray-900">Stability Index</span>
-                  <span className="text-xs text-gray-500 font-medium">Updates shipped weekly</span>
+                <div>
+                  <p className="font-bold text-gray-900">Daily Check System</p>
+                  <p className="mt-0.5">You can only complete tasks for today. Yesterday is locked and tomorrow is not editable.</p>
                 </div>
-                <div className="p-4 rounded-2xl border border-green-100 bg-green-50/50 flex flex-col gap-2">
-                  <div className="flex justify-between items-center"><CheckCircle2 className="text-green-500" size={20}/><span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded uppercase">Verified</span></div>
-                  <span className="font-bold text-gray-900">Core Features</span>
-                  <span className="text-xs text-gray-500 font-medium">Local execution functional</span>
+                <div>
+                  <p className="font-bold text-gray-900">Track Performance</p>
+                  <p className="mt-0.5">See how many tasks you complete each day and improve consistency.</p>
                 </div>
-                <div className="p-4 rounded-2xl border border-red-100 bg-red-50/50 flex flex-col gap-2">
-                  <div className="flex justify-between items-center"><ServerOff className="text-red-500" size={20}/><span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase">Offline</span></div>
-                  <span className="font-bold text-gray-900">Cloud Sync</span>
-                  <span className="text-xs text-gray-500 font-medium">Not available in build</span>
+                <div>
+                  <p className="font-bold text-gray-900">History & Activity</p>
+                  <p className="mt-0.5">View all actions like completed tasks, updates, and changes.</p>
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900">Filters & Views</p>
+                  <p className="mt-0.5">Switch between Today, All Tasks, and Activity easily.</p>
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900">Weekly Comparison</p>
+                  <p className="mt-0.5">Compare your performance with previous days and weeks.</p>
                 </div>
               </div>
             </div>
           )}
 
+          {/* STEP 2: Your Data */}
           {currentStep === 2 && (
             <div className="animate-in slide-in-from-right-4 fade-in duration-300">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2">Data Storage & Control</h3>
-              <p className="text-sm text-gray-500 mb-6">Your data is stored exclusively on this device.</p>
-              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 mb-6">
-                <h4 className="font-bold text-orange-800 flex items-center gap-2 mb-2 text-sm"><AlertTriangle size={16} /> Data Risk Profile</h4>
-                <p className="text-xs text-orange-700 leading-relaxed font-medium">Clearing your browser cache or switching devices will result in permanent data loss. We highly recommend utilizing the local backup tools provided below.</p>
-              </div>
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-gray-200 rounded-xl bg-white hover:border-gray-300 transition-colors gap-4">
-                  <div><p className="font-bold text-gray-800 text-sm">Manual JSON Backup</p><p className="text-xs text-gray-500 mt-0.5">Export all tasks & notes.</p></div>
-                  <button onClick={handleBackupJSON} className="w-full sm:w-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg transition-colors flex justify-center items-center gap-2"><Download size={14}/> Export</button>
-                </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border border-gray-200 rounded-xl bg-white gap-4">
-                  <div><p className="font-bold text-gray-800 text-sm">System Wipe</p><p className="text-xs text-gray-500 mt-0.5">Factory reset this environment.</p></div>
-                  <button onClick={handleSystemReset} className="w-full sm:w-auto px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-lg transition-colors flex justify-center items-center gap-2"><RotateCcw size={14}/> Reset</button>
-                </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">Your Data</h3>
+              <p className="text-sm text-gray-500 mb-6">Your data is saved only on this device.</p>
+              
+              <div className="space-y-3">
+                <button 
+                  onClick={handleBackupJSON}
+                  className="w-full text-left p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors flex justify-between items-center group"
+                >
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm">Backup</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Download your tasks and notes anytime.</p>
+                  </div>
+                  <Download size={18} className="text-slate-400 group-hover:text-orange-500 transition-colors" />
+                </button>
+
+                <button 
+                  onClick={handleSystemReset}
+                  className="w-full text-left p-4 border border-slate-200 rounded-xl hover:bg-red-50 hover:border-red-100 transition-colors flex justify-between items-center group"
+                >
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm">Reset</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Clear all data if needed.</p>
+                  </div>
+                  <RotateCcw size={18} className="text-slate-400 group-hover:text-red-500 transition-colors" />
+                </button>
               </div>
             </div>
           )}
 
+          {/* STEP 3: Available Features */}
           {currentStep === 3 && (
             <div className="animate-in slide-in-from-right-4 fade-in duration-300">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2">Module Completion Status</h3>
-              <p className="text-sm text-gray-500 mb-6">Visual overview of feature readiness in v0.8.</p>
-              <div className="space-y-5">
-                {[
-                  { name: 'Tasks (To-Do)', progress: 70, color: 'bg-green-500' },
-                  { name: 'MINI (Notes)', progress: 40, color: 'bg-orange-400' },
-                  { name: 'Calendar Planner', progress: 40, color: 'bg-orange-400' },
-                  { name: 'Diary System', progress: 30, color: 'bg-red-400' },
-                  { name: 'Finance Engine', progress: 10, color: 'bg-gray-300', status: 'In Progress' },
-                ].map((mod) => (
-                  <div key={mod.name}>
-                    <div className="flex justify-between text-sm font-bold mb-1.5">
-                      <span className="text-gray-700">{mod.name}</span>
-                      <span className={mod.status ? 'text-gray-400' : 'text-gray-600'}>{mod.status || `${mod.progress}%`}</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                      <div className={`h-full rounded-full transition-all duration-1000 ease-out ${mod.color}`} style={{ width: `${mod.progress}%` }} />
-                    </div>
-                  </div>
-                ))}
+              <h3 className="text-xl font-bold text-gray-800 mb-5">Available Features</h3>
+              <div className="space-y-4 text-sm text-gray-600">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
+                  <p><span className="font-bold text-gray-900">Tasks</span> – Plan and track your daily work</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
+                  <p><span className="font-bold text-gray-900">Notes (Mini)</span> – Write and manage notes</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
+                  <p><span className="font-bold text-gray-900">Calendar</span> – Plan events and schedule tasks</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5" />
+                  <p><span className="font-bold text-gray-900">Diary</span> – Track personal reflections</p>
+                </div>
               </div>
             </div>
           )}
 
+          {/* STEP 4: Ready */}
           {currentStep === 4 && (
-            <div className="animate-in slide-in-from-right-4 fade-in duration-300">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2">Final Authorization</h3>
-              <p className="text-sm text-gray-500 mb-6">Acknowledge the system parameters to initialize.</p>
-              <div className="space-y-3">
-                <label className={`flex items-start gap-4 p-4 rounded-xl border transition-all cursor-pointer ${agreements.beta ? 'bg-green-50 border-green-500 shadow-sm transform scale-[1.01]' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
-                  <input type="checkbox" checked={agreements.beta} onChange={(e) => setAgreements(prev => ({ ...prev, beta: e.target.checked }))} className="w-5 h-5 mt-0.5 accent-green-600 shrink-0" />
-                  <span className={`text-sm font-semibold leading-snug ${agreements.beta ? 'text-green-800' : 'text-gray-700'}`}>I understand this is a beta environment subject to changes.</span>
-                </label>
-                <label className={`flex items-start gap-4 p-4 rounded-xl border transition-all cursor-pointer ${agreements.localOnly ? 'bg-green-50 border-green-500 shadow-sm transform scale-[1.01]' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
-                  <input type="checkbox" checked={agreements.localOnly} onChange={(e) => setAgreements(prev => ({ ...prev, localOnly: e.target.checked }))} className="w-5 h-5 mt-0.5 accent-green-600 shrink-0" />
-                  <span className={`text-sm font-semibold leading-snug ${agreements.localOnly ? 'text-green-800' : 'text-gray-700'}`}>I accept that data is stored locally and requires manual backups.</span>
-                </label>
-                <label className={`flex items-start gap-4 p-4 rounded-xl border transition-all cursor-pointer ${agreements.noSync ? 'bg-green-50 border-green-500 shadow-sm transform scale-[1.01]' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
-                  <input type="checkbox" checked={agreements.noSync} onChange={(e) => setAgreements(prev => ({ ...prev, noSync: e.target.checked }))} className="w-5 h-5 mt-0.5 accent-green-600 shrink-0" />
-                  <span className={`text-sm font-semibold leading-snug ${agreements.noSync ? 'text-green-800' : 'text-gray-700'}`}>I acknowledge cloud sync is not currently available.</span>
-                </label>
-              </div>
+            <div className="animate-in slide-in-from-right-4 fade-in duration-300 py-4">
+              <h3 className="text-2xl font-bold text-gray-800 mb-3">You're Ready</h3>
+              <p className="text-base text-gray-600 mb-6 leading-relaxed">
+                Start by adding 2–3 tasks and completing them today.<br/>
+                <span className="font-bold text-gray-900">Consistency is key.</span>
+              </p>
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-5 sm:px-8 py-5 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center rounded-b-[24px]">
-          <button onClick={() => setCurrentStep(prev => Math.max(1, prev - 1))} className={`px-2 sm:px-4 py-2 text-xs sm:text-sm font-bold text-gray-500 hover:text-gray-800 flex items-center gap-1 transition-colors ${currentStep === 1 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-            <ChevronLeft size={16}/> <span className="hidden sm:inline">Back</span>
+        {/* Footer Navigation */}
+        <div className="px-5 md:px-8 py-5 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center">
+          <button 
+            onClick={() => setCurrentStep(prev => Math.max(1, prev - 1))} 
+            className={`px-3 py-2 text-sm font-bold text-gray-500 hover:text-gray-800 flex items-center gap-1 transition-colors ${currentStep === 1 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+          >
+            <ChevronLeft size={18}/> Back
           </button>
+          
           {currentStep < 4 ? (
-            <button onClick={() => setCurrentStep(prev => Math.min(4, prev + 1))} className="px-5 sm:px-6 py-2.5 bg-gray-900 hover:bg-black text-white text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center gap-2 shadow-md hover:shadow-lg">
-              Continue <ChevronRight size={16}/>
+            <button 
+              onClick={() => setCurrentStep(prev => Math.min(4, prev + 1))} 
+              className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-xl transition-all flex items-center gap-2 shadow-md shadow-orange-500/20 active:scale-95"
+            >
+              Continue <ChevronRight size={18}/>
             </button>
           ) : (
-            <button onClick={onComplete} disabled={!allAgreed} className={`px-5 sm:px-6 py-2.5 text-white text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg ${allAgreed ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 hover:scale-[1.02] shadow-orange-500/30' : 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'}`}>
-              Initialize <ChevronRight size={16}/>
+            <button 
+              onClick={handleComplete} 
+              className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-xl transition-all flex items-center gap-2 shadow-md shadow-orange-500/20 active:scale-95"
+            >
+              Start Using Nextask <ChevronRight size={18}/>
             </button>
           )}
         </div>
