@@ -46,11 +46,11 @@ export default function MatrixIntelligenceSystem() {
         onAddClick={() => system.setIsAddModalOpen(true)} 
       />
 
-      {/* 3. Main Dashboard Content */}
-      <main className="max-w-7xl mx-auto px-4 md:px-6 pt-6 lg:pt-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+      {/* 3. Main Dashboard Content (Fixed Mobile Layout) */}
+      <main className="max-w-7xl mx-auto px-4 md:px-6 pt-6 lg:pt-10 flex flex-col lg:grid lg:grid-cols-12 gap-8 lg:gap-12">
         
         {/* Left Side: Event List */}
-        <div className="lg:col-span-8">
+        <div className="w-full lg:col-span-8">
           <EventList 
             activeTab={system.activeTab} 
             setActiveTab={system.setActiveTab} 
@@ -64,6 +64,7 @@ export default function MatrixIntelligenceSystem() {
               system.setFormData(ev); 
               system.setIsAddModalOpen(true); 
             }}
+            onAddClick={() => system.setIsAddModalOpen(true)} 
           />
         </div>
 
