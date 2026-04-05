@@ -190,7 +190,7 @@ export default function AddEventModal({
             </div>
           </div>
 
-          {/* PRIMARY ACTION BUTTON - Improved Feel */}
+          {/* PRIMARY ACTION BUTTON */}
           <div className="pt-4">
             <button
               onClick={handleSave}

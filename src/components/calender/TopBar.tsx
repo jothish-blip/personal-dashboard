@@ -4,14 +4,12 @@ import React, { useState, useEffect, useMemo } from "react";
 import { 
   Plus, 
   Target, 
-  Search, 
-  LayoutGrid, 
-  BarChart3,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  CalendarDays,
+  LayoutList
 } from "lucide-react";
 
-// 🚨 THE FIX: Import the shared type instead of defining it locally
 import { PlannerEvent } from "./types";
 
 interface TopBarProps {
@@ -70,6 +68,7 @@ export default function TopBar({
     <>
       <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-100">
         <div className="max-w-7xl mx-auto">
+          {/* Top Row: Brand & Time */}
           <div className="px-4 md:px-6 py-3 flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-200">
@@ -91,6 +90,7 @@ export default function TopBar({
             </div>
           </div>
 
+          {/* Middle Row: Stats & Next Task */}
           <div className="px-4 md:px-6 py-2 bg-slate-50/50 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">
               <span className="text-slate-900">{stats.done}/{stats.total} Completed</span>
@@ -109,6 +109,7 @@ export default function TopBar({
             )}
           </div>
 
+          {/* Bottom Row: Desktop Filter (Hidden on Mobile) */}
           <div className="hidden md:flex px-6 py-4 items-center justify-between">
             <div className="flex bg-slate-100 p-1 rounded-xl">
               <button 
@@ -135,29 +136,36 @@ export default function TopBar({
         </div>
       </nav>
 
-      {/* MOBILE THUMB NAVIGATION */}
+      {/* MOBILE THUMB NAVIGATION (Updated Layout) */}
       <div className="md:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm">
-        <div className="bg-white/95 backdrop-blur-md rounded-[2.5rem] p-2 shadow-2xl shadow-slate-300 border border-slate-200 flex items-center justify-between">
-          <button className="p-4 text-slate-400">
-            <LayoutGrid size={22} />
+        <div className="bg-white/95 backdrop-blur-md rounded-[2.5rem] p-2 shadow-2xl shadow-slate-300 border border-slate-200 flex items-center justify-between px-6">
+          
+          {/* Today Tasks Button */}
+          <button 
+            onClick={() => setFilterMode('today')}
+            className={`flex flex-col items-center gap-1 transition-all ${filterMode === 'today' ? 'text-orange-500' : 'text-slate-400'}`}
+          >
+            <CalendarDays size={20} />
+            <span className="text-[8px] font-black uppercase tracking-widest">Today</span>
           </button>
-          <button className="p-4 text-slate-400">
-            <Search size={22} />
-          </button>
+
+          {/* Centered Add Button */}
           <button 
             onClick={onAddClick}
-            className="flex items-center justify-center bg-orange-500 text-white h-14 w-14 rounded-full shadow-lg transition-transform active:scale-90"
+            className="flex items-center justify-center bg-orange-500 text-white h-14 w-14 rounded-full shadow-lg shadow-orange-200 transition-transform active:scale-90 -mt-2"
           >
             <Plus size={28} strokeWidth={3} />
           </button>
-          <button className="p-4 text-slate-400">
-            <BarChart3 size={22} />
+
+          {/* All Tasks Button */}
+          <button 
+            onClick={() => setFilterMode('all')}
+            className={`flex flex-col items-center gap-1 transition-all ${filterMode === 'all' ? 'text-orange-500' : 'text-slate-400'}`}
+          >
+            <LayoutList size={20} />
+            <span className="text-[8px] font-black uppercase tracking-widest">All Tasks</span>
           </button>
-          <button className="p-4">
-             <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
-                JD
-             </div>
-          </button>
+
         </div>
       </div>
     </>
