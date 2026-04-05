@@ -4,7 +4,7 @@ export type TaskType = "Work" | "Study" | "Health" | "Finance" | "Personal" | "D
 
 export interface SystemLog {
   id: string;
-  action: "CREATE" | "UPDATE" | "DELETE" | "STATUS_TOGGLE" | "RESCHEDULE";
+  action: "CREATE" | "UPDATE" | "DELETE" | "STATUS_TOGGLE" | "RESCHEDULE" | "STATUS"; // Added STATUS for flexibility
   details: string;
   timestamp: number;
 }
