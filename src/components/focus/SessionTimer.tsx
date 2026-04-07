@@ -9,12 +9,9 @@ export default function SessionTimer() {
     isActive, isPaused, mode, sessions,
     isSessionComplete, setIsSessionComplete,
     startSession, pauseSession, stopSession, exitFocusMode,
-    setMode, setTimeRemaining, setActiveTask
+    setMode, setTimeRemaining, setInitialSessionTime, setActiveTask
   } = useFocusSystem();
 
-  // Local UI state for fallback progress calculation
-  const [initialTime, setInitialTime] = useState<number>(timeRemaining);
-  
   // ✅ SMART REMINDER: Predictive Distraction State
   const [smartAlert, setSmartAlert] = useState<string | null>(null);
 
@@ -52,12 +49,12 @@ export default function SessionTimer() {
     }
   }, [focusedTime, isActive, avgDistractionTime]);
 
-  // --- TIME TRACKING SETUP ---
+  // --- TICKING VIBRATION (LAST 10 SECONDS) ---
   useEffect(() => {
-    if (!isActive && !isPaused && !isSessionComplete) {
-      setInitialTime(timeRemaining);
+    if (isActive && !isPaused && timeRemaining > 0 && timeRemaining < 10) {
+      if (navigator.vibrate) navigator.vibrate(50);
     }
-  }, [timeRemaining, isActive, isPaused, isSessionComplete]);
+  }, [timeRemaining, isActive, isPaused]);
 
   // --- KEYBOARD SHORTCUTS ---
   useEffect(() => {
@@ -73,7 +70,7 @@ export default function SessionTimer() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [isActive, isPaused, isSessionComplete, startSession, pauseSession]);
 
-  // --- FORMATTERS ---
+  // --- FORMATTERS & DYNAMIC STYLES ---
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, "0");
     const s = (seconds % 60).toString().padStart(2, "0");
@@ -87,10 +84,15 @@ export default function SessionTimer() {
     return `Custom • ${mins} min`;
   };
 
-  const getTimeColor = () => {
-    if (timeRemaining > 600) return "text-gray-900"; 
-    if (timeRemaining > 120) return "text-orange-500"; 
-    return "text-red-500 animate-pulse"; 
+  const getDynamicColor = () => {
+    const progressRemaining = initialSessionTime > 0 ? timeRemaining / initialSessionTime : 1; 
+
+    if (progressRemaining > 0.6) return "text-green-500";
+    if (progressRemaining > 0.3) return "text-yellow-500";
+    if (progressRemaining > 0.15) return "text-orange-500";
+    
+    // PRESSURE EFFECT (Scale + Pulse)
+    return "text-red-500 animate-pulse scale-105 transition-transform duration-300"; 
   };
 
   const getStateText = () => {
@@ -100,37 +102,51 @@ export default function SessionTimer() {
     return "Deep focus in progress";
   };
 
-  // --- PROGRESS RING CALCS ---
-  const circleRadius = 130;
+  // --- PROGRESS RING CALCS (FIXED SINGLE SOURCE OF TRUTH) ---
+  // 🔥 FIX 6: SVG SIZE MISMATCH
+  const circleRadius = 110; 
   const circumference = 2 * Math.PI * circleRadius;
-  const progressPercentage = initialSessionTime > 0 ? (timeRemaining / initialSessionTime) : 1;
-  const strokeDashoffset = circumference - progressPercentage * circumference;
+  
+  // 🔥 FIX 4: CLAMP PROGRESS (0 to 1)
+  const rawProgress = initialSessionTime > 0 
+    ? (initialSessionTime - timeRemaining) / initialSessionTime 
+    : 0;
+  const progress = Math.min(Math.max(rawProgress, 0), 1);
+    
+  const strokeDashoffset = circumference * (1 - progress);
 
   // --- ACTION HANDLERS ---
   const handleStartBreak = () => {
     setIsSessionComplete(false);
     setMode("custom");
     setTimeRemaining(5 * 60); // 5 min break
+    setInitialSessionTime(5 * 60); // 🔥 FIX 3: REQUIRED FOR CUSTOM MODE PROGRESS 
     setActiveTask("Rest & Recharge");
     setTimeout(() => startSession(), 50);
   };
 
   const handleDismissCompletion = () => {
-    // 🔥 FIX: Stop the session fully to reset the Provider and kill the alarm sound
     stopSession(false);
-    
     setIsSessionComplete(false);
     exitFocusMode(); 
 
-    if (mode === "pomodoro") setTimeRemaining(25 * 60);
-    if (mode === "deepWork") setTimeRemaining(90 * 60);
+    if (mode === "pomodoro") {
+      setTimeRemaining(25 * 60);
+      setInitialSessionTime(25 * 60);
+    }
+    if (mode === "deepWork") {
+      setTimeRemaining(90 * 60);
+      setInitialSessionTime(90 * 60);
+    }
   };
 
   return (
     <div className={`flex flex-col items-center justify-center py-10 sm:py-12 md:py-16 border rounded-xl transition-all duration-700 relative overflow-hidden ${
-      isActive && !isPaused 
-        ? "bg-green-50/30 border-green-200 shadow-[0_0_40px_rgba(34,197,94,0.1)]" 
-        : "bg-white border-gray-200 shadow-sm"
+      isActive && timeRemaining < 120 && !isPaused
+        ? "bg-red-50/10 border-red-200 shadow-[0_0_50px_rgba(239,68,68,0.4)]"
+        : isActive && !isPaused 
+          ? "bg-green-50/30 border-green-200 shadow-[0_0_40px_rgba(34,197,94,0.1)]" 
+          : "bg-white border-gray-200 shadow-sm"
     }`}>
       
       {/* ⚠️ SMART PREDICTIVE ALERT */}
@@ -178,12 +194,34 @@ export default function SessionTimer() {
       <div className="relative flex items-center justify-center mt-6 mb-8 w-[240px] h-[240px] sm:w-[280px] sm:h-[280px] md:w-[320px] md:h-[320px]">
         
         <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+          <defs>
+            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#22c55e" /> {/* Green */}
+              <stop offset="50%" stopColor="#f59e0b" /> {/* Amber */}
+              <stop offset="100%" stopColor="#ef4444" /> {/* Red */}
+            </linearGradient>
+          </defs>
+
           <circle cx="50%" cy="50%" r={circleRadius} stroke="currentColor" strokeWidth="8" fill="transparent" className="text-gray-100" />
-          <circle cx="50%" cy="50%" r={circleRadius} stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" className={`transition-all duration-1000 ease-linear ${timeRemaining > 120 ? 'text-green-500' : 'text-red-500'}`} />
+          
+          {/* ⚡ FIXED: Smooth 1000ms Linear Animation with single source of truth math */}
+          <circle 
+            cx="50%" 
+            cy="50%" 
+            r={circleRadius} 
+            stroke="url(#progressGradient)" 
+            strokeWidth="8" 
+            fill="transparent" 
+            strokeDasharray={circumference} 
+            strokeDashoffset={strokeDashoffset} 
+            strokeLinecap="round" 
+            style={{ transformOrigin: "50% 50%" }}
+            className="transition-[stroke-dashoffset] duration-1000 linear" 
+          />
         </svg>
 
         {/* TIME DISPLAY */}
-        <div className={`absolute z-10 flex flex-col items-center justify-center ${getTimeColor()}`}>
+        <div className={`absolute z-10 flex flex-col items-center justify-center transition-colors duration-500 ${getDynamicColor()}`}>
           <div className="text-6xl sm:text-7xl md:text-8xl font-semibold tracking-tighter tabular-nums leading-none">
             {formatTime(timeRemaining)}
           </div>

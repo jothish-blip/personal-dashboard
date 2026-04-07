@@ -58,7 +58,11 @@ export interface FocusState {
   stopSession: (isNatural?: boolean) => void; 
   addDistraction: (reason: string) => void;
   undoDistraction: () => void;
-  setTimeRemaining: (seconds: number) => void;
+  
+  // ✅ FIX: Added to resolve the TypeScript build error
+  setInitialSessionTime: (time: number) => void;
+  setTimeRemaining: (seconds: number | ((prev: number) => number)) => void;
+  
   enterFocusMode: () => void;
   exitFocusMode: () => void;
 }

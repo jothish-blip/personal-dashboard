@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react";
 import { FocusState, FocusMode, FocusSession, ActiveSession, Distraction } from "./types";
+import { useNotificationSystem } from '@/notifications/useNotificationSystem'; 
 
 const FocusContext = createContext<FocusState | undefined>(undefined);
 
@@ -10,7 +11,21 @@ const MODE_DURATIONS = {
   deepWork: 90 * 60,
 };
 
+// 🔥 HELPER: Persistent Locks (Prevents Notification Spam)
+const acquireLock = (lockKey: string, cooldownMs: number): boolean => {
+  if (typeof window === "undefined") return false;
+  const last = Number(localStorage.getItem(lockKey) || 0);
+  const now = Date.now();
+  if (now - last > cooldownMs) {
+    localStorage.setItem(lockKey, now.toString());
+    return true;
+  }
+  return false;
+};
+
 export function FocusProvider({ children }: { children: ReactNode }) {
+  const { addNotification } = useNotificationSystem();
+
   // --- CONFIG STATE ---
   const [mode, setMode] = useState<FocusMode>("pomodoro");
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
@@ -42,19 +57,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     return Math.max(0, Math.round(100 - distractionPenalty + (Math.min(duration / 60, 100) * 0.2)));
   };
 
-  // ✅ SW NOTIFICATION TRIGGER
-  const triggerSWNotification = (title: string, body: string) => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.ready.then((reg) => {
-        reg.active?.postMessage({
-          type: "SHOW_FOCUS_NOTIFICATION",
-          title,
-          body
-        });
-      });
-    }
-  };
-
   const exitFocusMode = () => {
     setIsFocusMode(false);
     if (typeof document !== 'undefined' && document.fullscreenElement) {
@@ -74,7 +76,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     const handleStorageSync = (e: StorageEvent) => {
       if (!e.newValue) return;
 
-      // 1. Remote Stop Signal
       if (e.key === "focus_stop_signal") {
         try {
           const data = JSON.parse(e.newValue);
@@ -94,7 +95,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         } catch (err) {}
       }
       
-      // 2. Remote Completion Signal
       if (e.key === "focus_complete_signal") {
         if (audioRef.current) {
           audioRef.current.pause();
@@ -113,7 +113,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const stopSession = (isNatural = false) => {
-    // 🔥 FORCE STOP AUDIO LOCALLY
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -127,7 +126,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     lastTickRef.current = null;
     exitFocusMode();
 
-    // 🔥 CROSS-TAB BROADCAST
     if (isNatural) {
       localStorage.removeItem("focus_complete_signal");
       localStorage.setItem("focus_complete_signal", JSON.stringify({ time: Date.now() }));
@@ -137,6 +135,11 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         time: Date.now(),
         type: "STOP"
       }));
+
+      // 🔥 BEHAVIORAL: Manual Abort Alert
+      if (acquireLock('focus_abort_alert', 5000)) {
+        addNotification('focus', 'Session Aborted ⚠️', 'Focus broken before completion. Regroup and try again.', 'high', '/focus');
+      }
     }
 
     const endTime = Date.now();
@@ -274,12 +277,22 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isSessionComplete && !alarmPlayedRef.current) {
       alarmPlayedRef.current = true;
+      
       if (audioRef.current) {
         audioRef.current.volume = 1.0;
         audioRef.current.play().catch(() => {});
       }
       if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
-      triggerSWNotification("Focus Complete 🎉", "Excellent discipline. Your session has ended.");
+      
+      // ✅ SUCCESS NOTIFICATION (Includes specific routing path)
+      addNotification(
+        'focus', 
+        'Focus Complete 🎉', 
+        'Excellent discipline. Your session has ended. Time to reflect.', 
+        'high',
+        '/focus'
+      );
+
     } else if (!isSessionComplete) {
       alarmPlayedRef.current = false; 
       if (audioRef.current) {
@@ -287,22 +300,25 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         audioRef.current.currentTime = 0;
       }
     }
-  }, [isSessionComplete]);
+  }, [isSessionComplete, addNotification]);
 
-  // --- TIMER INTERVAL ---
+  // --- 🔥 FIX 5: TIMER DRIFT LOGIC ---
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isActive) {
       if (!lastTickRef.current) lastTickRef.current = Date.now();
       interval = setInterval(() => {
         const now = Date.now();
-        const deltaSeconds = Math.round((now - lastTickRef.current!) / 1000);
+        const deltaSeconds = (now - lastTickRef.current!) / 1000;
+        
         if (deltaSeconds >= 1) {
           lastTickRef.current = now;
-          setTotalElapsed((prev) => prev + deltaSeconds);
+          const delta = Math.floor(deltaSeconds);
+          
+          setTotalElapsed((prev) => prev + delta);
           if (!isPaused) {
-            setFocusedTime((prev) => prev + deltaSeconds);
-            setTimeRemaining((prev) => Math.max(0, prev - deltaSeconds));
+            setFocusedTime((prev) => prev + delta);
+            setTimeRemaining((prev) => Math.max(0, prev - delta));
           }
         }
       }, 1000);
@@ -324,18 +340,29 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
 
-  // --- ✅ HANDLERS DEFINITION ---
+  // --- 🔥 FIX 2: MODE CHANGE SYNC ---
   const setModeHandler = (newMode: FocusMode) => {
     if (isActive) return;
     setMode(newMode);
-    if (newMode === "pomodoro") setTimeRemaining(MODE_DURATIONS.pomodoro);
-    if (newMode === "deepWork") setTimeRemaining(MODE_DURATIONS.deepWork);
+    if (newMode === "pomodoro") {
+      setTimeRemaining(MODE_DURATIONS.pomodoro);
+      setInitialSessionTime(MODE_DURATIONS.pomodoro);
+    }
+    if (newMode === "deepWork") {
+      setTimeRemaining(MODE_DURATIONS.deepWork);
+      setInitialSessionTime(MODE_DURATIONS.deepWork);
+    }
   };
 
+  // --- 🔥 FIX 1: START SESSION LOCK ---
   const startSession = () => {
     setIsActive(true);
     setIsPaused(false);
     setIsSessionComplete(false);
+    
+    // Lock correct initial time on start
+    setInitialSessionTime(timeRemaining);
+    
     lastTickRef.current = Date.now();
     setCurrentSession({
       id: crypto.randomUUID(),
@@ -346,6 +373,11 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       distractions: [],
     });
     enterFocusMode();
+
+    // 🔥 BEHAVIORAL: Session Started Alert
+    if (acquireLock('focus_start_alert', 5000)) {
+      addNotification('focus', 'Deep Work Initiated 🧠', 'Distractions suppressed. Maintain your focus.', 'low', '/focus');
+    }
   };
 
   return (
@@ -360,10 +392,17 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         setIsSessionComplete, 
         enterFocusMode, exitFocusMode,
         setTimeRemaining, 
-        setMode: setModeHandler, // ✅ FIXED: setModeHandler is now correctly scoped
+        setInitialSessionTime, 
+        setMode: setModeHandler, 
         setActiveTask: setActiveTaskId,
         startSession, 
-        pauseSession: () => setIsPaused(true), 
+        pauseSession: () => {
+          setIsPaused(true);
+          // 🔥 BEHAVIORAL: Session Paused Alert
+          if (acquireLock('focus_pause_alert', 5000)) {
+            addNotification('focus', 'Session Paused ⏸️', 'Momentum halted. Return as soon as possible.', 'medium', '/focus');
+          }
+        }, 
         stopSession, 
         addDistraction: (reason: string) => {
           if (!currentSession) return;
@@ -371,6 +410,10 @@ export function FocusProvider({ children }: { children: ReactNode }) {
             ...prev!,
             distractions: [...prev!.distractions, { id: crypto.randomUUID(), reason, timestamp: Date.now() }],
           }));
+          // 🔥 BEHAVIORAL: Distraction Logged
+          if (acquireLock('focus_distraction_alert', 2000)) {
+            addNotification('focus', 'Distraction Logged 📝', 'Acknowledged. Now return your attention to the task immediately.', 'low', '/focus');
+          }
         },
         undoDistraction: () => {
           if (!currentSession || !currentSession.distractions.length) return;
