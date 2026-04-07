@@ -1,19 +1,18 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+// Import high-performance local fonts (replaces Google Fonts)
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
 import TopProgressBar from "@/components/TopProgressBar";
 import OfflineView from "@/app/not-found/OfflineView";
-import ServiceWorkerRegister from "@/components/ServiceWorkerRegister"; // ✅ Import here
+import PWARegistration from "@/components/PWARegistration";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+export const viewport: Viewport = {
+  themeColor: "#111827",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
 
 export const metadata: Metadata = {
   title: {
@@ -21,6 +20,16 @@ export const metadata: Metadata = {
     default: 'Task Engine | NexTask',
   },
   description: "Your personal execution and life engine.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico", 
+    apple: "/favicon.ico", 
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "NexTask",
+  },
 };
 
 export default function RootLayout({
@@ -29,11 +38,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html 
+      lang="en" 
+      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col bg-[#F9FAFB] text-slate-900 selection:bg-orange-100">
-        {/* ✅ Client-side SW registration happens here without breaking Server Component rules */}
-        <ServiceWorkerRegister />
-        
+        <PWARegistration />
         <TopProgressBar />
         <OfflineView />
         {children}

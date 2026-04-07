@@ -7,6 +7,7 @@ import { Meta } from "../types";
 import DesktopNav from "./navbar/DesktopNav";
 import MobileNav from "./navbar/MobileNav";
 import { Search, LayoutGrid, ListTodo, BookOpen, Brain, CalendarDays } from "lucide-react";
+import { useNotificationSystem } from "@/notifications/useNotificationSystem"; // ✅ Import Notification System
 
 interface NavbarProps {
   meta: Meta;
@@ -31,11 +32,14 @@ export default function Navbar({
   const router = useRouter();
   const pathname = usePathname() || ""; 
 
+  // ✅ Initialize Notifications
+  const { notifications, unreadCount, markAsRead, clearAll } = useNotificationSystem();
+  const [isNoteOpen, setIsNoteOpen] = useState(false);
+
   // --- CMD+K STATE ---
   const [isCmdKOpen, setIsCmdKOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Keyboard listener for Cmd+K / Ctrl+K
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -58,7 +62,6 @@ export default function Navbar({
 
   const handleImportClick = () => fileInputRef.current?.click();
 
-  // SINGLE SOURCE OF TRUTH
   const activePaths = {
     isTasks: pathname === "/",
     isMini: pathname === "/mini-nisc",
@@ -80,10 +83,16 @@ export default function Navbar({
     y, m, years,
     setMonthYear,
     handleImportClick,
-    exportData
+    exportData,
+    // ✅ Pass Notification Props down
+    notifications,
+    unreadCount,
+    markAsRead,
+    clearAll,
+    isNoteOpen,
+    setIsNoteOpen
   };
 
-  // Filter command routes based on search
   const filteredCommands = COMMAND_ROUTES.filter(route => 
     route.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -94,7 +103,6 @@ export default function Navbar({
         <DesktopNav {...navProps} />
         <MobileNav {...navProps} />
 
-        {/* Hidden File Input for Data Import */}
         <input 
           type="file" 
           ref={fileInputRef} 
@@ -109,16 +117,11 @@ export default function Navbar({
         />
       </nav>
 
-      {/* ✅ NEXT LEVEL: CMD+K COMMAND PALETTE OVERLAY */}
+      {/* CMD+K COMMAND PALETTE OVERLAY */}
       {isCmdKOpen && (
         <div className="fixed inset-0 z-[9999] bg-gray-900/50 backdrop-blur-sm flex items-start justify-center pt-[15vh] px-4">
-          
-          {/* Close background click */}
           <div className="absolute inset-0" onClick={() => setIsCmdKOpen(false)} />
-          
           <div className="relative bg-white w-full max-w-xl rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            
-            {/* Search Input */}
             <div className="flex items-center px-4 py-4 border-b border-gray-100">
               <Search size={20} className="text-gray-400 mr-3" />
               <input 
@@ -132,7 +135,6 @@ export default function Navbar({
               <div className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded">ESC</div>
             </div>
 
-            {/* Results */}
             <div className="max-h-[300px] overflow-y-auto p-2">
               {filteredCommands.length === 0 ? (
                 <div className="py-8 text-center text-sm text-gray-400">No matching routes found.</div>
