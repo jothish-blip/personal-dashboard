@@ -6,8 +6,18 @@ import { Meta } from "../types";
 
 import DesktopNav from "./navbar/DesktopNav";
 import MobileNav from "./navbar/MobileNav";
-import { Search, LayoutGrid, ListTodo, BookOpen, Brain, CalendarDays } from "lucide-react";
-import { useNotificationSystem } from "@/notifications/useNotificationSystem"; // ✅ Import Notification System
+import { 
+  Search, 
+  LayoutGrid, 
+  ListTodo, 
+  BookOpen, 
+  Brain, 
+  CalendarDays, 
+  LogOut,
+  User // Added User icon
+} from "lucide-react";
+import { useNotificationSystem } from "@/notifications/useNotificationSystem";
+import { getSupabaseClient } from "@/lib/supabase"; // Correct client import
 
 interface NavbarProps {
   meta: Meta;
@@ -22,23 +32,53 @@ const COMMAND_ROUTES = [
   { label: "Go to Diary", path: "/diary", icon: BookOpen },
   { label: "Go to Focus Engine", path: "/focus", icon: Brain },
   { label: "Go to Planner", path: "/calender-event", icon: CalendarDays },
+  { label: "Settings", path: "/settings", icon: User }, // Added Settings Route
 ];
 
 export default function Navbar({ 
   meta, setMonthYear, exportData, importData 
 }: NavbarProps) {
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const pathname = usePathname() || ""; 
 
-  // ✅ Initialize Notifications
+  // Safely instantiate supabase
+  const supabase = getSupabaseClient();
+
   const { notifications, unreadCount, markAsRead, clearAll } = useNotificationSystem();
   const [isNoteOpen, setIsNoteOpen] = useState(false);
-
-  // --- CMD+K STATE ---
   const [isCmdKOpen, setIsCmdKOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // 🔥 Add User Profile State
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  // 🔥 Fetch Profile on Mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!supabase) return;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      if (data) setUserProfile(data);
+    };
+
+    fetchProfile();
+  }, [supabase]);
+
+  const handleLogout = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+      window.location.href = "/login";
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -80,17 +120,18 @@ export default function Navbar({
   const navProps = {
     activePaths,
     handleNav,
+    handleLogout,
     y, m, years,
     setMonthYear,
     handleImportClick,
     exportData,
-    // ✅ Pass Notification Props down
     notifications,
     unreadCount,
     markAsRead,
     clearAll,
     isNoteOpen,
-    setIsNoteOpen
+    setIsNoteOpen,
+    userProfile // Passed down in case child components need it
   };
 
   const filteredCommands = COMMAND_ROUTES.filter(route => 
@@ -102,7 +143,6 @@ export default function Navbar({
       <nav className="sticky top-0 z-[100] bg-white border-b border-gray-200 shadow-sm transition-all">
         <DesktopNav {...navProps} />
         <MobileNav {...navProps} />
-
         <input 
           type="file" 
           ref={fileInputRef} 
@@ -117,7 +157,6 @@ export default function Navbar({
         />
       </nav>
 
-      {/* CMD+K COMMAND PALETTE OVERLAY */}
       {isCmdKOpen && (
         <div className="fixed inset-0 z-[9999] bg-gray-900/50 backdrop-blur-sm flex items-start justify-center pt-[15vh] px-4">
           <div className="absolute inset-0" onClick={() => setIsCmdKOpen(false)} />
@@ -132,38 +171,56 @@ export default function Navbar({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 bg-transparent text-gray-900 font-medium text-lg outline-none placeholder:text-gray-300"
               />
-              <div className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded">ESC</div>
             </div>
 
-            <div className="max-h-[300px] overflow-y-auto p-2">
+            <div className="max-h-[400px] overflow-y-auto p-2">
               {filteredCommands.length === 0 ? (
                 <div className="py-8 text-center text-sm text-gray-400">No matching routes found.</div>
               ) : (
-                filteredCommands.map((route, i) => {
-                  const Icon = route.icon;
-                  const isActivePath = pathname === route.path;
-                  return (
+                <>
+                  {filteredCommands.map((route, i) => (
                     <button
                       key={i}
                       onClick={() => handleNav(route.path)}
                       className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors group
-                        ${isActivePath ? "bg-gray-50 text-gray-400 cursor-default" : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"}
+                        ${pathname === route.path ? "bg-gray-50 text-gray-400 cursor-default" : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"}
                       `}
                     >
                       <div className="flex items-center gap-3">
-                        <Icon size={16} className={isActivePath ? "text-gray-300" : "text-gray-400 group-hover:text-gray-700"} />
+                        <route.icon size={16} />
                         {route.label}
                       </div>
-                      {isActivePath && <span className="text-[10px] uppercase tracking-wider font-bold">Current</span>}
                     </button>
-                  );
-                })
-              )}
-            </div>
+                  ))}
+                  
+                  <div className="mt-2 pt-2 border-t border-gray-100">
+                    {/* 🔥 User Profile displayed right above logout */}
+                    {userProfile && (
+                      <div className="flex items-center gap-3 px-4 py-3 mb-1">
+                        <img 
+                          src={userProfile.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=fallback"} 
+                          alt="Avatar"
+                          className="w-8 h-8 rounded-full border border-gray-200" 
+                        />
+                        <div className="flex flex-col text-left">
+                          <span className="text-sm font-bold text-gray-900">
+                            {userProfile.full_name || "User"}
+                          </span>
+                          <span className="text-xs text-gray-400">Signed in</span>
+                        </div>
+                      </div>
+                    )}
 
-            <div className="bg-gray-50 px-4 py-2 border-t border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-4">
-              <span>Use <kbd className="font-sans bg-white border border-gray-200 px-1 rounded shadow-sm">↑</kbd> <kbd className="font-sans bg-white border border-gray-200 px-1 rounded shadow-sm">↓</kbd> to navigate</span>
-              <span><kbd className="font-sans bg-white border border-gray-200 px-1.5 rounded shadow-sm">Enter</kbd> to select</span>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors group"
+                    >
+                      <LogOut size={16} />
+                      Sign Out
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -19,6 +19,8 @@ export interface DiaryEntry {
   morningTime?: string;                       
   afternoonTime?: string;
   eveningTime?: string;
+  suggestedAction?: string; // Used for tomorrow bridging
+  carryOver?: any;
 }
 
 export interface Task {

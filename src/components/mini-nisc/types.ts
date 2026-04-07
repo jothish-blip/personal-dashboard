@@ -13,11 +13,11 @@ export interface Document {
   id: string;
   title: string;
   content: string;
-  folderId?: string;
-  tags?: string[];
-  pinned?: boolean;
-  history?: HistoryEntry[];
-  mediaIds?: string[];
+  folderId: string | null; // 🔥 Strict null for DB
+  tags: string[];
+  pinned: boolean;
+  history: HistoryEntry[];
+  mediaIds: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -27,7 +27,7 @@ export interface Media {
   type: "image" | "video";
   url: string;
   name?: string;
-  folderId?: string;          
+  folderId: string | null; // 🔥 Strict null for DB        
   createdAt: number;
 }
 

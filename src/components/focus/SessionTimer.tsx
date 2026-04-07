@@ -12,14 +12,10 @@ export default function SessionTimer() {
     setMode, setTimeRemaining, setInitialSessionTime, setActiveTask
   } = useFocusSystem();
 
-  // ✅ SMART REMINDER: Predictive Distraction State
   const [smartAlert, setSmartAlert] = useState<string | null>(null);
 
-  // 🔥 FIX: Defensive exit from fullscreen when session completes automatically
   useEffect(() => {
-    if (isSessionComplete) {
-      exitFocusMode();
-    }
+    if (isSessionComplete) exitFocusMode();
   }, [isSessionComplete, exitFocusMode]);
 
   // --- SMART PREDICTIVE INTELLIGENCE ---
@@ -35,24 +31,19 @@ export default function SessionTimer() {
     return count > 0 ? Math.floor(totalSeconds / count) : -1;
   }, [sessions]);
 
-  // Trigger Smart Alert 60 seconds BEFORE they usually get distracted
   useEffect(() => {
     if (isActive && avgDistractionTime > 60) {
       if (focusedTime === avgDistractionTime - 60) {
         setSmartAlert("⚠️ Stay sharp! You usually lose focus around this mark.");
-        
-        // Vibrate gently as a physical warning
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-        
-        setTimeout(() => setSmartAlert(null), 10000); // Hide after 10s
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        setTimeout(() => setSmartAlert(null), 10000); 
       }
     }
   }, [focusedTime, isActive, avgDistractionTime]);
 
-  // --- TICKING VIBRATION (LAST 10 SECONDS) ---
   useEffect(() => {
     if (isActive && !isPaused && timeRemaining > 0 && timeRemaining < 10) {
-      if (navigator.vibrate) navigator.vibrate(50);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
     }
   }, [timeRemaining, isActive, isPaused]);
 
@@ -86,12 +77,9 @@ export default function SessionTimer() {
 
   const getDynamicColor = () => {
     const progressRemaining = initialSessionTime > 0 ? timeRemaining / initialSessionTime : 1; 
-
     if (progressRemaining > 0.6) return "text-green-500";
     if (progressRemaining > 0.3) return "text-yellow-500";
     if (progressRemaining > 0.15) return "text-orange-500";
-    
-    // PRESSURE EFFECT (Scale + Pulse)
     return "text-red-500 animate-pulse scale-105 transition-transform duration-300"; 
   };
 
@@ -102,25 +90,21 @@ export default function SessionTimer() {
     return "Deep focus in progress";
   };
 
-  // --- PROGRESS RING CALCS (FIXED SINGLE SOURCE OF TRUTH) ---
-  // 🔥 FIX 6: SVG SIZE MISMATCH
+  // --- PROGRESS RING CALCS ---
   const circleRadius = 110; 
   const circumference = 2 * Math.PI * circleRadius;
   
-  // 🔥 FIX 4: CLAMP PROGRESS (0 to 1)
   const rawProgress = initialSessionTime > 0 
     ? (initialSessionTime - timeRemaining) / initialSessionTime 
     : 0;
   const progress = Math.min(Math.max(rawProgress, 0), 1);
-    
   const strokeDashoffset = circumference * (1 - progress);
 
-  // --- ACTION HANDLERS ---
   const handleStartBreak = () => {
     setIsSessionComplete(false);
     setMode("custom");
-    setTimeRemaining(5 * 60); // 5 min break
-    setInitialSessionTime(5 * 60); // 🔥 FIX 3: REQUIRED FOR CUSTOM MODE PROGRESS 
+    setTimeRemaining(5 * 60); 
+    setInitialSessionTime(5 * 60); 
     setActiveTask("Rest & Recharge");
     setTimeout(() => startSession(), 50);
   };
@@ -129,7 +113,6 @@ export default function SessionTimer() {
     stopSession(false);
     setIsSessionComplete(false);
     exitFocusMode(); 
-
     if (mode === "pomodoro") {
       setTimeRemaining(25 * 60);
       setInitialSessionTime(25 * 60);
@@ -149,14 +132,12 @@ export default function SessionTimer() {
           : "bg-white border-gray-200 shadow-sm"
     }`}>
       
-      {/* ⚠️ SMART PREDICTIVE ALERT */}
       {smartAlert && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-amber-100 border border-amber-300 text-amber-800 text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg shadow-lg text-center animate-in fade-in slide-in-from-top-4 z-20 flex items-center justify-center gap-2">
           <span className="animate-bounce">⚡</span> {smartAlert}
         </div>
       )}
 
-      {/* ✅ SESSION COMPLETE OVERLAY */}
       {isSessionComplete && (
         <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in zoom-in-95 duration-300">
           <div className="text-6xl mb-4 animate-bounce">🎉</div>
@@ -184,43 +165,36 @@ export default function SessionTimer() {
         </div>
       )}
 
-      {/* MODE HEADER */}
       <div className="absolute top-5 md:top-6 text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
         {getModeLabel()}
       </div>
 
-      {/* SVG PROGRESS RING & TIMER */}
       <div className="relative flex items-center justify-center mt-6 mb-8 w-[240px] h-[240px] sm:w-[280px] sm:h-[280px] md:w-[320px] md:h-[320px]">
         
         <svg className="absolute inset-0 w-full h-full transform -rotate-90">
           <defs>
             <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#22c55e" /> {/* Green */}
-              <stop offset="50%" stopColor="#f59e0b" /> {/* Amber */}
-              <stop offset="100%" stopColor="#ef4444" /> {/* Red */}
+              <stop offset="0%" stopColor="#22c55e" />
+              <stop offset="50%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#ef4444" />
             </linearGradient>
           </defs>
 
           <circle cx="50%" cy="50%" r={circleRadius} stroke="currentColor" strokeWidth="8" fill="transparent" className="text-gray-100" />
           
-          {/* ⚡ FIXED: Smooth 1000ms Linear Animation with single source of truth math */}
+          {/* 🔥 FIX: The CSS transition logic here prevents the "stuttering" effect */}
           <circle 
-            cx="50%" 
-            cy="50%" 
-            r={circleRadius} 
-            stroke="url(#progressGradient)" 
-            strokeWidth="8" 
-            fill="transparent" 
-            strokeDasharray={circumference} 
-            strokeDashoffset={strokeDashoffset} 
-            strokeLinecap="round" 
-            style={{ transformOrigin: "50% 50%" }}
-            className="transition-[stroke-dashoffset] duration-1000 linear" 
+            cx="50%" cy="50%" r={circleRadius} 
+            stroke="url(#progressGradient)" strokeWidth="8" fill="transparent" 
+            strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" 
+            style={{ 
+              transformOrigin: "50% 50%",
+              transition: isActive && !isPaused ? "stroke-dashoffset 1s linear" : "none" 
+            }}
           />
         </svg>
 
-        {/* TIME DISPLAY */}
         <div className={`absolute z-10 flex flex-col items-center justify-center transition-colors duration-500 ${getDynamicColor()}`}>
           <div className="text-6xl sm:text-7xl md:text-8xl font-semibold tracking-tighter tabular-nums leading-none">
             {formatTime(timeRemaining)}
@@ -231,12 +205,9 @@ export default function SessionTimer() {
             {getStateText()}
           </div>
         </div>
-
       </div>
 
-      {/* CONTROLS */}
       <div className="flex flex-col sm:flex-row gap-3 w-full max-w-[280px] sm:max-w-none sm:w-auto px-4 sm:px-0 z-10">
-        
         {!isActive || isPaused ? (
           <button onClick={startSession} className="w-full sm:w-auto px-10 py-3.5 sm:py-3 bg-gray-900 text-white text-sm md:text-base font-semibold rounded-xl hover:bg-black transition-all shadow-md active:scale-[0.98]">
             {isPaused ? "▶ Resume Focus" : "▶ Start Session"}
@@ -259,7 +230,6 @@ export default function SessionTimer() {
         )}
       </div>
 
-      {/* KEYBOARD HINT */}
       <div className="hidden sm:block absolute bottom-4 text-[10px] text-gray-400 font-medium">
         Press <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500 font-mono shadow-sm">Space</kbd> to play/pause
       </div>

@@ -3,10 +3,10 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Document, Folder, Media, View, HistoryEntry } from "./types";
 import { useNotificationSystem } from "@/notifications/useNotificationSystem";
-// ✅ FIXED: Imported handleGlobalState to replace the removed inactivity function
 import { handleWorkspaceAction, handleGlobalState } from "@/notifications/nexNotificationBrain";
+import { getSupabaseClient } from "@/lib/supabase"; 
 
-// 🔥 HELPER: Persistent Behavioral Locks (Cross-tab anti-spam)
+// 🔥 HELPER: Persistent Behavioral Locks
 const acquireLock = (lockKey: string, cooldownMs: number): boolean => {
   if (typeof window === "undefined") return false;
   const last = Number(localStorage.getItem(lockKey) || 0);
@@ -18,8 +18,20 @@ const acquireLock = (lockKey: string, cooldownMs: number): boolean => {
   return false;
 };
 
+// 🔥 HELPER: Non-blocking activity logger
+const pingActivity = () => {
+  if (typeof window !== "undefined") {
+    const last = Number(sessionStorage.getItem("temp_activity") || 0);
+    if (Date.now() - last > 5000) {
+      localStorage.setItem("last_activity", Date.now().toString());
+      sessionStorage.setItem("temp_activity", Date.now().toString());
+    }
+  }
+};
+
 export function useWorkspaceSystem() {
   const { addNotification } = useNotificationSystem();
+  const supabase = getSupabaseClient();
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -44,89 +56,135 @@ export function useWorkspaceSystem() {
   const activeDocument = documents.find(d => d.id === activeDocId);
   const lastHistorySave = useRef<number>(0);
   const firstLoadDone = useRef(false);
+  
+  const dbSyncTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // --- SUPABASE SYNC HELPERS ---
+  const getUser = async () => {
+    if (!supabase) return null;
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user || null;
+  };
+
+  const syncDocToDB = async (doc: Document) => {
+    try {
+      const user = await getUser();
+      if (!user || !supabase) return;
+      await supabase.from('workspace_documents').upsert({
+        id: doc.id,
+        user_id: user.id,
+        folder_id: doc.folderId || null,
+        title: doc.title,
+        content: doc.content,
+        tags: doc.tags || [],
+        pinned: doc.pinned || false,
+        history: doc.history || [],
+        media_ids: doc.mediaIds || [],
+        updated_at: new Date(doc.updatedAt).toISOString(),
+        created_at: new Date(doc.createdAt).toISOString()
+      }, { onConflict: 'id' });
+    } catch (e) { console.error("Doc Sync Error", e); }
+  };
+
+  const queueDocDBSync = useCallback((doc: Document) => {
+    setSaveState('saving');
+    if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
+    dbSyncTimerRef.current = setTimeout(() => {
+      syncDocToDB(doc).then(() => {
+        setSaveState('saved');
+        setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      });
+    }, 1500); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const syncFolderToDB = async (folder: Folder) => {
+    const user = await getUser();
+    if (!user || !supabase) return;
+    await supabase.from('workspace_folders').upsert({ id: folder.id, user_id: user.id, name: folder.name });
+  };
+
+  const syncMediaToDB = async (mediaItem: Media) => {
+    const user = await getUser();
+    if (!user || !supabase) return;
+    await supabase.from('workspace_media').upsert({
+      id: mediaItem.id, user_id: user.id, folder_id: mediaItem.folderId || null,
+      type: mediaItem.type, url: mediaItem.url, name: mediaItem.name
+    });
+  };
+
+  // --- INITIAL LOAD ---
   useEffect(() => {
     const hasSeenPopup = sessionStorage.getItem('nextask_workspace_wip_seen');
     if (!hasSeenPopup) {
       setShowWipPopup(true);
       sessionStorage.setItem('nextask_workspace_wip_seen', 'true');
     }
+
+    const initWorkspace = async () => {
+      const user = await getUser();
+      if (!user || !supabase) return;
+
+      const [docsRes, foldersRes, mediaRes] = await Promise.all([
+        supabase.from('workspace_documents').select('*').eq('user_id', user.id).order('updated_at', { ascending: false }),
+        supabase.from('workspace_folders').select('*').eq('user_id', user.id),
+        supabase.from('workspace_media').select('*').eq('user_id', user.id)
+      ]);
+
+      let loadedFolders: Folder[] = [];
+      if (foldersRes.data && foldersRes.data.length > 0) {
+        // 🔥 FIX: Explicitly typed 'f' as any
+        loadedFolders = foldersRes.data.map((f: any) => ({ id: f.id, name: f.name }));
+        setFolders(loadedFolders);
+      } else {
+        const defaultFolders = [{ id: crypto.randomUUID(), name: "Work" }, { id: crypto.randomUUID(), name: "Personal" }];
+        setFolders(defaultFolders);
+        defaultFolders.forEach(f => syncFolderToDB(f));
+        loadedFolders = defaultFolders;
+      }
+
+      if (mediaRes.data) {
+        // 🔥 FIX: Explicitly typed 'm' as any
+        setMedia(mediaRes.data.map((m: any) => ({
+          id: m.id, type: m.type as "image"|"video", url: m.url, name: m.name, folderId: m.folder_id, createdAt: new Date(m.created_at).getTime()
+        })));
+      }
+
+      if (docsRes.data && docsRes.data.length > 0) {
+        // 🔥 FIX: Explicitly typed 'd' as any
+        const loadedDocs: Document[] = docsRes.data.map((d: any) => ({
+          id: d.id, title: d.title, content: d.content, folderId: d.folder_id, tags: d.tags, pinned: d.pinned, history: d.history,
+          mediaIds: d.media_ids, createdAt: new Date(d.created_at).getTime(), updatedAt: new Date(d.updated_at).getTime()
+        }));
+        setDocuments(loadedDocs);
+        if (!activeDocId) setActiveDocId(loadedDocs[0].id);
+      } else {
+        const welcome: Document = {
+          id: crypto.randomUUID(), title: "Welcome to Nextask Workspace", content: "<p>This is your personal workspace...</p>",
+          folderId: null, tags: ["welcome"], pinned: true, history: [], mediaIds: [], createdAt: Date.now(), updatedAt: Date.now()
+        };
+        setDocuments([welcome]);
+        setActiveDocId(welcome.id);
+        syncDocToDB(welcome);
+      }
+
+      firstLoadDone.current = true;
+    };
+
+    initWorkspace();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- INITIAL LOAD & BEHAVIORAL SCANS ---
+  // --- LOCAL AUTO-SAVE (Runs parallel to DB debounce) ---
   useEffect(() => {
-    const savedWorkspace = localStorage.getItem("nextask-workspace-v6");
-    const savedMedia = localStorage.getItem("nextask-media-v6");
-
-    let loadedDocs: Document[] = [];
-    let loadedFolders: Folder[] = [];
-
-    if (savedWorkspace) {
-      const data = JSON.parse(savedWorkspace);
-      loadedDocs = data.documents || [];
-      loadedFolders = data.folders || [];
-      setDocuments(loadedDocs);
-      setFolders(loadedFolders);
-      if (loadedDocs.length && !activeDocId) setActiveDocId(loadedDocs[0].id);
-    } else {
-      const welcome: Document = {
-        id: "welcome-doc", title: "Welcome to Nextask Workspace",
-        content: "<p>This is your personal workspace with folder-based media.</p>",
-        tags: ["welcome"], createdAt: Date.now(), updatedAt: Date.now(), history: [], mediaIds: []
-      };
-      loadedDocs = [welcome];
-      setDocuments(loadedDocs);
-      setActiveDocId(welcome.id);
-      setFolders([{ id: "work", name: "Work" }, { id: "personal", name: "Personal" }]);
-    }
-
-    if (savedMedia) setMedia(JSON.parse(savedMedia));
-
-    setTimeout(() => { firstLoadDone.current = true; }, 1000);
-
-    // 🔥 BEHAVIORAL BOOT SCANS
-    if (acquireLock('workspace_behavior_scanned', 12 * 60 * 60 * 1000)) { 
-      if (loadedDocs.length === 0) {
-        setTimeout(() => addNotification('mini', 'Workspace Empty', 'Start by creating your first document.', 'high', '/mini-nisc'), 2000);
-      }
-      
-      const untitledCount = loadedDocs.filter(d => d.title.startsWith("Untitled")).length;
-      if (untitledCount > 4) {
-        setTimeout(() => addNotification('mini', 'Organize Workspace 📂', `You have ${untitledCount} untitled documents. Name them for clarity.`, 'medium', '/mini-nisc'), 3000);
-      }
-
-      const unorganizedCount = loadedDocs.filter(d => !d.folderId).length;
-      if (unorganizedCount > 10 && loadedFolders.length > 0) {
-        setTimeout(() => addNotification('mini', 'Structure Needed 🧱', `You have ${unorganizedCount} unassigned documents.`, 'low', '/mini-nisc'), 5000);
-      }
-
-      if (loadedDocs.length > 50) {
-        setTimeout(() => addNotification('mini', 'Workspace Heavy 🏋️', `You have ${loadedDocs.length} documents. Consider organizing.`, 'medium', '/mini-nisc'), 7000);
-      }
-    }
-  }, []);
-
-  // --- AUTO-SAVE ENGINE ---
-  useEffect(() => {
-    if (!firstLoadDone.current) return;
-    if (documents.length === 0 && folders.length === 0) return;
-    setSaveState('saving');
-    
+    if (!firstLoadDone.current || documents.length === 0) return;
     const timer = setTimeout(() => {
       localStorage.setItem("nextask-workspace-v6", JSON.stringify({ documents, folders }));
       localStorage.setItem("nextask-media-v6", JSON.stringify(media));
-      setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      setSaveState('saved');
-
       handleWorkspaceAction('save');
-
-      if (acquireLock('workspace_autosave_notified', 30 * 60 * 1000)) {
-        addNotification('mini', 'Saved', 'All workspace changes synced successfully.', 'low', '/mini-nisc');
-      }
-    }, 800);
-    
+    }, 1000);
     return () => clearTimeout(timer);
-  }, [documents, folders, media, addNotification]);
+  }, [documents, folders, media]);
 
   // --- IDLE ACTIVITY TRACKER ---
   useEffect(() => {
@@ -134,17 +192,13 @@ export function useWorkspaceSystem() {
       const lastActiveStr = localStorage.getItem("last_activity");
       if (!lastActiveStr) return;
       const diff = Date.now() - Number(lastActiveStr);
-      
-      // ✅ Now uses the consolidated handleGlobalState to check for inactivity
       if (diff > 3 * 60 * 60 * 1000 && diff < 3.5 * 60 * 60 * 1000) {
         handleGlobalState(documents);
-
         if (acquireLock('workspace_idle_notified', 6 * 60 * 60 * 1000)) {
           addNotification('mini', 'Workspace Idle 🧠', 'Capture your thoughts before they fade.', 'medium', '/mini-nisc');
         }
       }
     }, 15 * 60 * 1000);
-
     return () => clearInterval(idleTimer);
   }, [documents, addNotification]);
 
@@ -157,23 +211,16 @@ export function useWorkspaceSystem() {
         setGlobalSearchQuery("");
       }
       if (e.key === "Escape" && globalSearchOpen) setGlobalSearchOpen(false);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [globalSearchOpen]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key.toLowerCase() === "n") {
-          e.preventDefault();
-          createDocument(activeFolderId || undefined);
-        }
+      
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        createDocument(activeFolderId || undefined);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [activeFolderId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalSearchOpen, activeFolderId]);
 
   // --- MEMOIZED DATA ---
   const mediaCounts = useMemo(() => {
@@ -207,21 +254,10 @@ export function useWorkspaceSystem() {
   const globalSearchResults = useMemo(() => {
     if (!globalSearchQuery.trim()) return [];
     const term = globalSearchQuery.toLowerCase();
-    const results = documents
-      .filter(doc => 
-        doc.title.toLowerCase().includes(term) || 
-        doc.content.toLowerCase().includes(term) || 
-        doc.tags?.some(t => t.toLowerCase().includes(term))
-      )
+    return documents
+      .filter(doc => doc.title.toLowerCase().includes(term) || doc.content.toLowerCase().includes(term) || doc.tags?.some(t => t.toLowerCase().includes(term)))
       .sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8);
-      
-    if (results.length === 0 && globalSearchQuery.length > 3) {
-      if (acquireLock('search_fail_notified', 30000)) {
-        addNotification('mini', 'No Results', `Could not find "${globalSearchQuery}".`, 'low', '/mini-nisc');
-      }
-    }
-    return results;
-  }, [documents, globalSearchQuery, addNotification]);
+  }, [documents, globalSearchQuery]);
 
   const filteredMedia = useMemo(() => {
     let items = media;
@@ -237,50 +273,62 @@ export function useWorkspaceSystem() {
   const createFolder = () => {
     const name = prompt("Folder name:");
     if (!name) return;
-    setFolders([...folders, { id: crypto.randomUUID(), name }]);
-    localStorage.setItem("last_activity", Date.now().toString());
+    const newFolder = { id: crypto.randomUUID(), name };
+    setFolders([...folders, newFolder]);
+    syncFolderToDB(newFolder);
+    pingActivity();
     addNotification('mini', 'Folder Created', `"${name}" initialized.`, 'low', '/mini-nisc');
   };
 
   const createDocument = (folderId?: string) => {
     const newDoc: Document = {
       id: crypto.randomUUID(), title: "Untitled Document", content: "<p>Start writing...</p>",
-      folderId, tags: [], mediaIds: [], createdAt: Date.now(), updatedAt: Date.now(), history: []
+      folderId: folderId || null, tags: [], mediaIds: [], pinned: false, createdAt: Date.now(), updatedAt: Date.now(), history: []
     };
     setDocuments(prev => [newDoc, ...prev]);
     setActiveDocId(newDoc.id);
     setView("editor");
     setIsSidebarOpen(false);
-    localStorage.setItem("last_activity", Date.now().toString());
+    syncDocToDB(newDoc);
+    pingActivity();
     handleWorkspaceAction('create');
-    addNotification('mini', 'New Document', 'A blank canvas added.', 'low', '/mini-nisc');
   };
 
-  const deleteDocument = (id: string) => {
-    const targetDoc = documents.find(d => d.id === id);
+  const deleteDocument = async (id: string) => {
     if (!confirm("Delete this document?")) return;
     setDocuments(prev => {
       const updated = prev.filter(doc => doc.id !== id);
       if (activeDocId === id) setActiveDocId(updated[0]?.id || null);
       return updated;
     });
-    localStorage.setItem("last_activity", Date.now().toString());
-    handleWorkspaceAction('delete', `"${targetDoc?.title}" removed.`);
-    addNotification('mini', 'Document Deleted', `"${targetDoc?.title || 'Document'}" removed.`, 'medium', '/mini-nisc');
+    if (supabase) await supabase.from('workspace_documents').delete().eq('id', id);
+    pingActivity();
   };
 
   const togglePin = (id: string) => {
-    const doc = documents.find(d => d.id === id);
-    setDocuments(prev => prev.map(d => d.id === id ? { ...d, pinned: !d.pinned, updatedAt: Date.now() } : d));
-    localStorage.setItem("last_activity", Date.now().toString());
-    if (doc && !doc.pinned) {
-      addNotification('mini', 'Pinned', `"${doc.title}" prioritized.`, 'low', '/mini-nisc');
-    }
+    let updatedDoc: Document | undefined;
+    setDocuments(prev => prev.map(d => {
+      if (d.id === id) {
+        updatedDoc = { ...d, pinned: !d.pinned, updatedAt: Date.now() };
+        return updatedDoc;
+      }
+      return d;
+    }));
+    if (updatedDoc) queueDocDBSync(updatedDoc);
+    pingActivity();
   };
 
   const updateDocumentTitle = (id: string, title: string) => {
-    setDocuments(prev => prev.map(d => d.id === id ? { ...d, title, updatedAt: Date.now() } : d));
-    localStorage.setItem("last_activity", Date.now().toString());
+    let updatedDoc: Document | undefined;
+    setDocuments(prev => prev.map(d => {
+      if (d.id === id) {
+        updatedDoc = { ...d, title, updatedAt: Date.now() };
+        return updatedDoc;
+      }
+      return d;
+    }));
+    if (updatedDoc) queueDocDBSync(updatedDoc);
+    pingActivity();
   };
 
   const extractTitle = (html: string): string => {
@@ -289,8 +337,11 @@ export function useWorkspaceSystem() {
   };
 
   const updateDocumentContent = useCallback((id: string, content: string) => {
+    let modifiedDoc: Document | undefined;
+
     setDocuments(prev => prev.map(doc => {
       if (doc.id !== id) return doc;
+      
       const shouldAutoTitle = doc.title === "Untitled Document" || doc.title.startsWith("Untitled");
       const now = Date.now();
       let newHistoryList = doc.history || [];
@@ -298,73 +349,79 @@ export function useWorkspaceSystem() {
       if (now - lastHistorySave.current > 5000) {
         lastHistorySave.current = now;
         newHistoryList = [...newHistoryList, { content, timestamp: now, title: doc.title }].slice(-20); 
-        localStorage.setItem("last_activity", Date.now().toString());
         
-        if (acquireLock('workspace_progress_notified', 2 * 60 * 1000)) {
-          addNotification('mini', 'Progress Saved', 'Edits recorded.', 'low', '/mini-nisc');
-        }
-
-        const editCount = newHistoryList.length;
-        if (editCount === 15) { 
+        if (newHistoryList.length === 15) { 
           handleWorkspaceAction('deepWork');
-          if (acquireLock('workspace_deepwork_notified', 60 * 60 * 1000)) {
-            addNotification('mini', 'Deep Work Mode 🧠', 'High flow detected.', 'low', '/mini-nisc');
-          }
         }
       }
 
-      return { 
+      modifiedDoc = { 
         ...doc, 
         content, 
         title: shouldAutoTitle ? extractTitle(content) : doc.title, 
         updatedAt: now, 
         history: newHistoryList 
       };
+      return modifiedDoc;
     }));
-  }, [addNotification]);
+
+    if (modifiedDoc) queueDocDBSync(modifiedDoc);
+    pingActivity();
+  }, [queueDocDBSync]);
 
   const addTag = (docId: string, tagName: string) => {
     const cleanTag = tagName.trim().toLowerCase();
     if (!cleanTag) return;
-    setDocuments(prev => prev.map(d => d.id === docId ? { ...d, tags: [...(d.tags || []).filter(t => t !== cleanTag), cleanTag], updatedAt: Date.now() } : d));
-    localStorage.setItem("last_activity", Date.now().toString());
+    let updatedDoc: Document | undefined;
+    setDocuments(prev => prev.map(d => {
+      if (d.id === docId) {
+        updatedDoc = { ...d, tags: [...(d.tags || []).filter(t => t !== cleanTag), cleanTag], updatedAt: Date.now() };
+        return updatedDoc;
+      }
+      return d;
+    }));
+    if (updatedDoc) queueDocDBSync(updatedDoc);
+    pingActivity();
   };
 
   const removeTag = (docId: string, tagName: string) => {
-    setDocuments(prev => prev.map(d => d.id === docId ? { ...d, tags: d.tags?.filter(t => t !== tagName), updatedAt: Date.now() } : d));
-    localStorage.setItem("last_activity", Date.now().toString());
+    let updatedDoc: Document | undefined;
+    setDocuments(prev => prev.map(d => {
+      if (d.id === docId) {
+        updatedDoc = { ...d, tags: d.tags?.filter(t => t !== tagName), updatedAt: Date.now() };
+        return updatedDoc;
+      }
+      return d;
+    }));
+    if (updatedDoc) queueDocDBSync(updatedDoc);
+    pingActivity();
   };
 
   const addMedia = (file: File, onInsert: (mediaItem: Media) => void) => {
     if (!activeFolderId) {
       setMediaError("Select a folder first");
       setTimeout(() => setMediaError(""), 3000);
-      addNotification('mini', 'Upload Failed ⚠️', 'Folder required.', 'high', '/mini-nisc');
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
       const newMedia: Media = { 
-        id: crypto.randomUUID(), 
-        type: file.type.startsWith("video") ? "video" : "image", 
-        url: reader.result as string, 
-        name: file.name, 
-        folderId: activeFolderId, 
-        createdAt: Date.now() 
+        id: crypto.randomUUID(), type: file.type.startsWith("video") ? "video" : "image", 
+        url: reader.result as string, name: file.name, folderId: activeFolderId, createdAt: Date.now() 
       };
       setMedia(prev => [newMedia, ...prev]);
+      syncMediaToDB(newMedia);
       if (activeDocId) onInsert(newMedia);
-      localStorage.setItem("last_activity", Date.now().toString());
-      addNotification('mini', 'Media Uploaded', file.name, 'low', '/mini-nisc');
+      pingActivity();
     };
     reader.readAsDataURL(file);
   };
 
-  const deleteMedia = (id: string) => {
+  const deleteMedia = async (id: string) => {
     if (!confirm("Delete permanently?")) return;
     setMedia(prev => prev.filter(m => m.id !== id));
-    localStorage.setItem("last_activity", Date.now().toString());
-    addNotification('mini', 'Media Removed', 'Asset deleted.', 'medium', '/mini-nisc');
+    if (supabase) await supabase.from('workspace_media').delete().eq('id', id);
+    pingActivity();
   };
 
   return {

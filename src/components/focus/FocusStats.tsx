@@ -76,7 +76,7 @@ export default function FocusStats() {
     ? Math.round(filteredSessions.reduce((acc, s) => acc + s.score, 0) / totalSessions) 
     : 0;
 
-  // --- TREND & COMPARISON (Only valid for Today) ---
+  // --- TREND & COMPARISON ---
   const yestTotalSessions = yesterdaySessions.length;
   const yestAvgScore = yestTotalSessions > 0 
     ? Math.round(yesterdaySessions.reduce((acc, s) => acc + s.score, 0) / yestTotalSessions) 
@@ -216,14 +216,13 @@ export default function FocusStats() {
     else if (selectedRange === "year") newDate.setFullYear(newDate.getFullYear() + dir);
     else newDate.setDate(newDate.getDate() + dir);
     
-    // ✅ PREVENT FUTURE NAVIGATION
     if (newDate > new Date()) return;
 
     setRefDate(newDate);
     if (selectedRange === "today" || selectedRange === "yesterday") setSelectedRange("custom");
   };
 
-  // --- HEATMAP GENERATOR (For Month/Year Views) ---
+  // --- HEATMAP GENERATOR ---
   const generateHeatmap = () => {
     if (selectedRange !== "month" && selectedRange !== "year") return null;
     
@@ -273,15 +272,11 @@ export default function FocusStats() {
 
   return (
     <>
-      <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 p-5 rounded-xl shadow-sm hover:shadow-md transition-all space-y-7 animate-in fade-in slide-in-from-bottom-2 duration-300 mb-16 md:mb-0">
+      <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 p-5 rounded-xl shadow-sm hover:shadow-md transition-all space-y-7 animate-in fade-in duration-300 mb-4 md:mb-0">
         
-        {/* ✅ ROW 1, 2, 3: CLEAN HEADER ARCHITECTURE */}
+        {/* HEADER ARCHITECTURE */}
         <div className="space-y-4">
-
-          {/* ROW 1: TITLE + NAVIGATION */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            
-            {/* Title */}
             <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
               {selectedRange === "today" && "Today’s Intelligence"}
               {selectedRange === "yesterday" && "Yesterday’s Intelligence"}
@@ -290,13 +285,11 @@ export default function FocusStats() {
               {selectedRange === "month" && `Report: ${refDate.toLocaleDateString(undefined, {month: 'long', year: 'numeric'})}`}
               {selectedRange === "year" && `Report: ${refYearStr}`}
               
-              {/* Badge next to title on Desktop */}
               <div className={`hidden sm:flex text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md ${badge.style}`}>
                 {badge.label}
               </div>
             </h2>
 
-            {/* Navigation */}
             <div className="flex items-center bg-gray-100 rounded-md w-fit border border-gray-200/60 shadow-sm">
               <button onClick={() => shiftDate(-1)} className="px-3 py-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-800 rounded-l-md transition-colors active:scale-95">◀</button>
               <button onClick={jumpToToday} className="px-3 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-200 hover:text-gray-900 transition-colors active:scale-95 border-x border-gray-200/50 uppercase tracking-wider">Today</button>
@@ -304,7 +297,6 @@ export default function FocusStats() {
             </div>
           </div>
 
-          {/* ROW 2: DESCRIPTION + CONTEXT */}
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
             <div className="flex items-center gap-3">
               <span>
@@ -318,7 +310,6 @@ export default function FocusStats() {
               )}
             </div>
 
-            {/* Mobile Badge & Streak */}
             <div className="flex items-center gap-2">
               <div className={`sm:hidden text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${badge.style}`}>
                 {badge.label}
@@ -327,7 +318,6 @@ export default function FocusStats() {
             </div>
           </div>
 
-          {/* ROW 3: RANGE TOGGLES */}
           <div className="flex gap-1.5 overflow-x-auto bg-gray-100/80 p-1.5 rounded-lg w-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {(["today", "yesterday", "week", "month", "year", "custom"] as DateRange[]).map((range) => (
               <button
@@ -343,23 +333,18 @@ export default function FocusStats() {
               </button>
             ))}
           </div>
-
         </div>
 
-        {/* HEATMAP / CALENDAR VIEW */}
         {generateHeatmap()}
 
-        {/* WEEKLY CHART (Only visible in 7 Days mode) */}
         {selectedRange === "week" && (
           <div className="bg-white p-4 border border-gray-100 rounded-xl shadow-sm animate-in fade-in zoom-in-95">
             <div className="flex items-end justify-between h-24 gap-2">
               {weeklyData.data.map((day, i) => (
                 <div key={i} className="flex flex-col items-center flex-1 group relative">
-                  {/* Tooltip on hover */}
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 text-[10px] bg-gray-800 text-white px-2 py-1 rounded whitespace-nowrap pointer-events-none z-10">
                     {day.dayScore}% • {formatHrsMins(day.dayTime)}
                   </div>
-                  {/* Bar */}
                   <div className="w-full bg-gray-100 rounded-t-md relative flex items-end h-full" style={{ minHeight: '4px' }}>
                     <div 
                       className={`w-full rounded-t-md transition-all duration-500 ${day.dayScore >= 80 ? 'bg-green-400' : day.dayScore >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}
@@ -374,7 +359,7 @@ export default function FocusStats() {
         )}
 
         {/* ADAPTIVE METRICS GRID */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="p-4 bg-white border border-gray-100 rounded-xl text-center shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group relative overflow-hidden">
             <div className="absolute bottom-0 left-0 w-full bg-gray-100 h-1.5">
               <div className="h-full bg-blue-500 transition-all duration-1000" style={{ width: `${goalProgress}%` }} />
@@ -410,9 +395,8 @@ export default function FocusStats() {
           </div>
         </div>
 
-        {/* DESKTOP INTELLIGENCE PANEL / MOBILE COLLAPSIBLE */}
+        {/* INTELLIGENCE PANEL */}
         <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4">
-          
           <div className="flex-1 flex flex-col justify-between">
             <div>
               <div className="text-sm font-semibold text-gray-800 mb-1">{insight.summary}</div>
@@ -420,7 +404,6 @@ export default function FocusStats() {
                 <span className="font-medium text-gray-600">Analysis:</span> {insight.issue}
               </div>
             </div>
-            
             <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between">
               <span className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">Suggested Action</span>
               <button 
@@ -458,21 +441,23 @@ export default function FocusStats() {
             {showMobileDetails ? "Collapse Details ▲" : "View Session Patterns ▼"}
           </button>
         </div>
-      </div>
 
-      {/* MOBILE STICKY BOTTOM SUMMARY */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 p-3 z-50 md:hidden animate-in slide-in-from-bottom-full flex flex-col gap-2 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-        <div className="flex justify-around text-xs font-semibold text-gray-700">
-          <span className="flex items-center gap-1">⏱️ {formatHrsMins(totalFocusSeconds)}</span>
-          <span className={`flex items-center gap-1 ${avgScore >= 80 ? 'text-green-600' : avgScore >= 50 ? 'text-amber-500' : 'text-red-500'}`}>🎯 {avgScore}%</span>
-          <span className="flex items-center gap-1 text-red-500">⚠️ {totalDistractions}</span>
+        {/* ✅ FIXED: INTEGRATED MOBILE SUMMARY (NO LONGER FLOATING) */}
+        <div className="md:hidden bg-white border-t border-gray-200 pt-4 flex flex-col gap-3">
+          <div className="flex justify-around text-xs font-bold text-gray-700">
+            <span className="flex items-center gap-1">⏱️ {formatHrsMins(totalFocusSeconds)}</span>
+            <span className={`flex items-center gap-1 ${avgScore >= 80 ? 'text-green-600' : avgScore >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+              🎯 {avgScore}%
+            </span>
+            <span className="flex items-center gap-1 text-red-500">⚠️ {totalDistractions}</span>
+          </div>
+          <button 
+            onClick={handleQuickAction}
+            className="w-full py-4 bg-gray-900 text-white font-bold rounded-xl text-sm shadow-lg active:scale-[0.98] transition-all"
+          >
+            {insight.actionText}
+          </button>
         </div>
-        <button 
-          onClick={handleQuickAction}
-          className="w-full py-3 bg-gray-900 hover:bg-black active:scale-[0.98] text-white font-medium rounded-lg text-sm transition-all shadow-md"
-        >
-          {insight.actionText}
-        </button>
       </div>
     </>
   );
