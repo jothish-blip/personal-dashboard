@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
+import { User } from '@supabase/supabase-js'; // 🔥 Added Supabase types
 import { Task, Log, Meta, NexState } from '../types';
 import { useNotificationSystem } from '@/notifications/useNotificationSystem'; 
 import { handleTaskUpdate } from '@/notifications/nexNotificationBrain';
@@ -53,13 +54,35 @@ export function useNexCore() {
   
   const cleanupRef = useRef<(() => void) | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const realtimeRef = useRef<NodeJS.Timeout | null>(null);
   const isRealtimeStarted = useRef(false);
+  
+  // 🔥 FIX: Properly typed user reference
+  const userRef = useRef<User | null>(null); 
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (realtimeRef.current) clearTimeout(realtimeRef.current);
+    };
+  }, []);
+
+  // 🔥 FIX: Non-destructured typed fetch to avoid 'any' error
+  useEffect(() => {
+  const supabase = getSupabaseClient();
+
+  supabase.auth.getUser().then((res: { data: { user: User | null } }) => {
+    userRef.current = res.data.user;
+  });
+}, []);
 
   const debouncedSave = (key: string, data: any) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      localStorage.setItem(key, JSON.stringify(data));
-    }, 500);
+    if (!debounceRef.current) {
+      debounceRef.current = setTimeout(() => {
+        localStorage.setItem(key, JSON.stringify(data));
+        debounceRef.current = null;
+      }, 1000);
+    }
   };
 
   // 🔹 LOGGING ENGINE
@@ -108,8 +131,8 @@ export function useNexCore() {
         }
       } catch (e) {
         console.error("Queue processing error:", e);
-        remainingQueue = [...remainingQueue, action, ...queue.slice(i + 1)];
-        break; 
+        remainingQueue.push(action);
+        continue; 
       }
     }
 
@@ -124,13 +147,16 @@ export function useNexCore() {
 
   // 🔹 FETCH TASKS
   const fetchTasksFromDB = async () => {
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // 🔥 FIX: Use cached user instead of duplicate network call
+    const user = userRef.current;
     if (!user) return;
 
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase.from("tasks").select("*").eq("user_id", user.id);
+    
     if (error) {
       console.error("Fetch error:", error);
+      addNotification("system", "Sync Error", "Failed to fetch tasks", "high");
       return;
     }
 
@@ -143,7 +169,10 @@ export function useNexCore() {
       }));
       
       if (prev.tasks.length === newTasks.length && 
-          prev.tasks.every((t, i) => t.id === newTasks[i].id && JSON.stringify(t.history) === JSON.stringify(newTasks[i].history))) {
+          prev.tasks.every((t, i) => 
+            t.id === newTasks[i].id && 
+            Object.keys(t.history).length === Object.keys(newTasks[i].history).length
+          )) {
         return prev;
       }
 
@@ -155,51 +184,61 @@ export function useNexCore() {
 
   // 🔹 REALTIME ENGINE
   const setupRealtime = async () => {
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+    if (isRealtimeStarted.current) return null; 
+    isRealtimeStarted.current = true;
 
+    // 🔥 FIX: Use cached user instead of duplicate network call
+    const user = userRef.current;
+    if (!user) {
+      isRealtimeStarted.current = false;
+      return null;
+    }
+
+    const supabase = getSupabaseClient();
     const channel = supabase.channel("tasks-realtime");
 
     channel.on(
       "postgres_changes",
       { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` },
       (payload: any) => {
-        setState(prev => {
-          let updatedTasks = prev.tasks;
-          let changed = false;
-          
-          if (payload.eventType === 'INSERT') {
-            if (!prev.tasks.find(t => t.id === payload.new.id)) {
-              updatedTasks = [...prev.tasks, { 
-                id: payload.new.id, 
-                name: payload.new.name, 
-                group: payload.new.group_name, 
-                history: payload.new.history || {} 
-              }];
-              changed = true;
+        if (realtimeRef.current) clearTimeout(realtimeRef.current);
+        realtimeRef.current = setTimeout(() => {
+          setState(prev => {
+            let updatedTasks = prev.tasks;
+            let changed = false;
+            
+            if (payload.eventType === 'INSERT') {
+              if (!prev.tasks.find(t => t.id === payload.new.id)) {
+                updatedTasks = [...prev.tasks, { 
+                  id: payload.new.id, 
+                  name: payload.new.name, 
+                  group: payload.new.group_name, 
+                  history: payload.new.history || {} 
+                }];
+                changed = true;
+              }
+            } else if (payload.eventType === 'UPDATE') {
+              const exists = prev.tasks.some(t => t.id === payload.new.id);
+              if (exists) {
+                updatedTasks = prev.tasks.map(t => 
+                  t.id === payload.new.id 
+                    ? { ...t, name: payload.new.name, group: payload.new.group_name, history: payload.new.history || {} } 
+                    : t
+                );
+                changed = true;
+              }
+            } else if (payload.eventType === 'DELETE') {
+              const exists = prev.tasks.some(t => t.id === payload.old.id);
+              if (exists) {
+                updatedTasks = prev.tasks.filter(t => t.id !== payload.old.id);
+                changed = true;
+              }
             }
-          } else if (payload.eventType === 'UPDATE') {
-            const exists = prev.tasks.some(t => t.id === payload.new.id);
-            if (exists) {
-              updatedTasks = prev.tasks.map(t => 
-                t.id === payload.new.id 
-                  ? { ...t, name: payload.new.name, group: payload.new.group_name, history: payload.new.history || {} } 
-                  : t
-              );
-              changed = true;
-            }
-          } else if (payload.eventType === 'DELETE') {
-            const exists = prev.tasks.some(t => t.id === payload.old.id);
-            if (exists) {
-              updatedTasks = prev.tasks.filter(t => t.id !== payload.old.id);
-              changed = true;
-            }
-          }
-          
-          if (!changed) return prev;
-          return prev.tasks === updatedTasks ? prev : { ...prev, tasks: updatedTasks };
-        });
+            
+            if (!changed) return prev;
+            return { ...prev, tasks: updatedTasks };
+          });
+        }, 100);
       }
     );
 
@@ -234,13 +273,20 @@ export function useNexCore() {
       }
 
       setMounted(true);
+
+      // 🔥 FIX: Guard against init race condition. Wait max ~1s for userRef to populate.
+      let retries = 0;
+      while (!userRef.current && retries < 20) {
+        await new Promise(res => setTimeout(res, 50));
+        retries++;
+      }
+
       await fetchTasksFromDB();   
       setLoading(false);
       
       const cleanup = await setupRealtime();
       if (cleanup) {
         cleanupRef.current = cleanup; 
-        isRealtimeStarted.current = true;
       }
       
       if (navigator.onLine) processQueue();
@@ -254,15 +300,18 @@ export function useNexCore() {
       fetchTasksFromDB();
     };
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", () => {
+    const handleOffline = () => {
       addNotification("system", "Offline", "No internet connection. Actions will be queued.", "high");
-    });
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
       cleanupRef.current?.(); 
       isRealtimeStarted.current = false;
       window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -270,16 +319,22 @@ export function useNexCore() {
   // 🔹 ACTIONS
   const addTask = async (name: string, group: string) => {
     if (!name.trim()) return;
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    
+    // 🔥 FIX: Handle null user gracefully
+    const user = userRef.current;
+    if (!user) {
+      addNotification("system", "Auth Error", "User not ready. Try again.", "high");
+      return;
+    }
 
+    const supabase = getSupabaseClient();
     const newId = crypto.randomUUID(); 
     const groupName = (group.trim() || "GENERAL").toUpperCase();
     const newTaskDB = { id: newId, name: name.trim(), group_name: groupName, history: {}, user_id: user.id };
 
-    // 🔥 Added Logging here
     setState(prev => {
+      if (prev.tasks.some(t => t.id === newId)) return prev;
+
       const newState = {
         ...prev,
         tasks: [...prev.tasks, { id: newId, name: name.trim(), group: groupName, history: {} }],
@@ -307,10 +362,15 @@ export function useNexCore() {
       addNotification('system', 'Access Denied', 'Cannot modify finalized logs.', 'high');
       return;
     }
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    
+    // 🔥 FIX: Handle null user gracefully
+    const user = userRef.current;
+    if (!user) {
+      addNotification("system", "Auth Error", "User not ready. Try again.", "high");
+      return;
+    }
 
+    const supabase = getSupabaseClient();
     const task = state.tasks.find(t => t.id === id);
     if (!task) return;
 
@@ -318,7 +378,6 @@ export function useNexCore() {
     const updatedHistory = { ...task.history, [dateStr]: status };
     const updatedTasksArray = state.tasks.map(t => t.id === id ? { ...t, history: updatedHistory } : t);
 
-    // 🔥 Added Logging here
     setState(prev => {
       const newState = { 
         ...prev, 
@@ -345,13 +404,17 @@ export function useNexCore() {
 
   const deleteTask = async (id: string) => {
     if (!window.confirm("Delete objective?")) return;
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    
+    // 🔥 FIX: Handle null user gracefully
+    const user = userRef.current;
+    if (!user) {
+      addNotification("system", "Auth Error", "User not ready. Try again.", "high");
+      return;
+    }
 
+    const supabase = getSupabaseClient();
     const taskToDelete = state.tasks.find(t => t.id === id);
 
-    // 🔥 Added Logging here
     setState(prev => {
       const newState = { 
         ...prev, 
@@ -428,7 +491,6 @@ export function useNexCore() {
     anchor.click();
     URL.revokeObjectURL(url);
     
-    // Log the export
     setState(prev => {
       const newState = { ...prev, logs: logAction("EXPORT", "Data Backup", "User exported full JSON state", prev) };
       debouncedSave(KEY, newState);
@@ -436,7 +498,6 @@ export function useNexCore() {
     });
   };
 
-  // Add explicit manual log capability if needed
   const addAuditLog = (action: string, name: string, detail: string) => {
     setState(prev => {
       const newState = { ...prev, logs: logAction(action, name, detail, prev) };
