@@ -12,17 +12,16 @@ import MatrixView from "../components/MatrixView";
 import AnalyticsView from "../components/AnalyticsView";
 import AuditView from "../components/AuditView";
 
-// 🚀 Fix: Prevent Next.js from trying to pre-render this page as static
 export const dynamic = "force-dynamic";
 
 export default function Home() {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<string>("matrix");
   const [isStateLoaded, setIsStateLoaded] = useState(false);
 
-  const pathname = usePathname();
   const isMini = pathname === "/mini-nisc";
 
   const {
@@ -36,16 +35,15 @@ export default function Home() {
     exportData
   } = useNexCore();
 
-  // 🔐 AUTH CHECK
+  // 🔥 FIXED AUTH CHECK
   useEffect(() => {
     const checkUser = async () => {
-      const supabase = getSupabaseClient(); 
-      if (!supabase) return;
+      const supabase = getSupabaseClient();
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { user } } = await supabase.auth.getUser();
 
-      if (!session) {
-        console.warn("No session found - redirecting to login");
+      if (!user) {
+        setIsAuthenticated(false); // 🔥 CRITICAL FIX
         router.replace("/login");
       } else {
         setIsAuthenticated(true);
@@ -55,7 +53,7 @@ export default function Home() {
     checkUser();
   }, [router]);
 
-  // Load tab preference from session storage
+  // Load tab preference
   useEffect(() => {
     const savedTab = sessionStorage.getItem("nexengine_active_tab");
     if (savedTab) setActiveTab(savedTab);
@@ -67,11 +65,16 @@ export default function Home() {
     sessionStorage.setItem("nexengine_active_tab", tab);
   };
 
-  // 🎨 Professional Loading State
-  if (isAuthenticated === null || !mounted || !isStateLoaded) {
+  // 🔥 DEBUG SAFE LOADER
+  if (
+    isAuthenticated === null ||
+    isAuthenticated === false ||
+    !mounted ||
+    !isStateLoaded
+  ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-pulse text-gray-400 text-sm font-semibold tracking-wide uppercase">
+        <div className="text-gray-400 text-sm font-semibold uppercase">
           Initializing Workspace...
         </div>
       </div>
@@ -80,7 +83,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 text-gray-900">
-      
+
       <Navbar
         meta={state.meta}
         setMonthYear={setMonthYear}
