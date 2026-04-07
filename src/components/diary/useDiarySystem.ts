@@ -3,18 +3,45 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { DiaryEntry, Task, getLocalDate, DEFAULT_ENTRY } from './types';
 import { useNotificationSystem } from '@/notifications/useNotificationSystem'; 
-import { handleDiary } from '@/notifications/nexNotificationBrain'; // ✅ IMPORTED THE BRAIN
+import { handleDiary } from '@/notifications/nexNotificationBrain'; 
+import { getSupabaseClient } from "@/lib/supabase";
 
 const STORAGE_PREFIX = 'nextask_diary_';
 
-// --- SAFE DATE PARSER ---
+// --- STRICT DB TYPE ---
+type DBDiaryEntry = {
+  id?: string;
+  user_id?: string;
+  entry_date: string;
+  morning: string;
+  afternoon: string;
+  evening: string;
+  learning: string;
+  tomorrow: string;
+  mood: string;
+  energy: string;
+  tags: string[];
+  is_missed: boolean;
+  related_dates: string[];
+  focus_area: string;
+  goal_alignment: number;
+  frictions: string[];
+  identity: string;
+  chapter: string;
+  is_locked: boolean;
+  versions: any;
+  morning_time: string;
+  afternoon_time: string;
+  evening_time: string;
+  updated_at?: string;
+};
+
 const parseLocalDate = (dateStr: string) => {
   if (!dateStr) return new Date();
   const [year, month, day] = dateStr.split('-').map(Number);
   return new Date(year, month - 1, day);
 };
 
-// 🔥 HELPER: Persistent Locks (Prevents Notification Spam for UI Events)
 const acquireLock = (lockKey: string, cooldownMs: number): boolean => {
   if (typeof window === "undefined") return false;
   const last = Number(localStorage.getItem(lockKey) || 0);
@@ -28,6 +55,7 @@ const acquireLock = (lockKey: string, cooldownMs: number): boolean => {
 
 export function useDiarySystem() {
   const { addNotification } = useNotificationSystem();
+  const supabase = getSupabaseClient();
 
   const actualToday = getLocalDate(new Date());
   const actualYesterday = getLocalDate(new Date(Date.now() - 86400000));
@@ -44,6 +72,8 @@ export function useDiarySystem() {
   
   // --- UI & Feature State ---
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(''); // 🔥 FIX 4: Throttled Search
+  
   const [moodFilter, setMoodFilter] = useState<'good' | 'neutral' | 'bad' | null>(null);
   const [energyFilter, setEnergyFilter] = useState<'high' | 'medium' | 'low' | null>(null);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
@@ -54,25 +84,84 @@ export function useDiarySystem() {
   const [showVersions, setShowVersions] = useState(false);
   const [passwordAttempt, setPasswordAttempt] = useState('');
   const [showWipPopup, setShowWipPopup] = useState(false);
+  
   const recognitionRef = useRef<any>(null);
+  const isInitializing = useRef(false);
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null); // 🔥 FIX 1: Save Debouncer
 
-  // --- Live Sync State ---
+  // 🔥 FIX 5: Safe Notification Wrapper
+  const safeNotify = useCallback((key: string, cooldownMs: number, fn: () => void) => {
+    if (acquireLock(key, cooldownMs)) fn();
+  }, []);
+
+  // --- DB SYNC HELPERS ---
+  const getUser = async () => {
+    if (!supabase) return null;
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user || null;
+  };
+
+  const syncEntryToDB = async (dateStr: string, entry: DiaryEntry) => {
+    try {
+      const user = await getUser();
+      if (!user || !supabase) return;
+
+      const payload: DBDiaryEntry = {
+        user_id: user.id,
+        entry_date: dateStr,
+        morning: entry.morning || '',
+        afternoon: entry.afternoon || '',
+        evening: entry.evening || '',
+        learning: entry.learning || '',
+        tomorrow: entry.tomorrow || '',
+        mood: entry.mood || 'neutral',
+        energy: entry.energy || 'medium',
+        tags: entry.tags || [],
+        is_missed: entry.isMissed || false,
+        related_dates: entry.relatedDates || [],
+        focus_area: entry.focusArea || 'None',
+        goal_alignment: entry.goalAlignment || 50,
+        frictions: entry.frictions || [],
+        identity: entry.identity || '',
+        chapter: entry.chapter || '',
+        is_locked: entry.isLocked || false,
+        versions: entry.versions || [],
+        morning_time: entry.morningTime || '',
+        afternoon_time: entry.afternoonTime || '',
+        evening_time: entry.eveningTime || '',
+        updated_at: new Date().toISOString()
+      };
+
+      await supabase.from('diary_entries').upsert(payload, { onConflict: 'user_id, entry_date' });
+    } catch (err) { console.error("Diary DB Sync Exception:", err); }
+  };
+
   const [writingActivity, setWritingActivity] = useState({
     lastEdit: Date.now(),
     isSyncing: false,
     totalEdits: 0
   });
 
-  // --- Popup Init ---
+  // --- Popup Init & Voice Cleanup ---
   useEffect(() => {
     const hasSeenPopup = sessionStorage.getItem('nexengine_diary_wip_seen');
     if (!hasSeenPopup) {
       setShowWipPopup(true);
       sessionStorage.setItem('nexengine_diary_wip_seen', 'true');
     }
+    
+    // 🔥 FIX 8: Voice Input Cleanup
+    return () => {
+      if (recognitionRef.current) recognitionRef.current.stop();
+    };
   }, []);
 
-  // --- Voice Input ---
+  // 🔥 FIX 4: Debounce Search Query (300ms)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
   const startVoiceInput = (field: keyof DiaryEntry) => {
     if (currentEntry.isLocked) return; 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -96,79 +185,101 @@ export function useDiarySystem() {
     recognitionRef.current = recognition;
   };
 
-  // --- Initial Load & Timeline Integrity ---
+  // --- INITIAL LOAD FROM SUPABASE ---
   useEffect(() => {
-    const storedTasks = localStorage.getItem('nextask_tasks');
-    if (storedTasks) setTasks(JSON.parse(storedTasks));
+    if (isInitializing.current || typeof window === "undefined") return;
+    isInitializing.current = true;
 
-    const entriesMap: Record<string, DiaryEntry> = {};
-    let oldestDate = actualToday;
-    
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(STORAGE_PREFIX)) {
-        const dateStr = key.replace(STORAGE_PREFIX, '');
-        try {
-          const parsed = JSON.parse(localStorage.getItem(key) || '{}');
-          entriesMap[dateStr] = {
-            ...DEFAULT_ENTRY, ...parsed,
-            tags: parsed.tags || [], frictions: parsed.frictions || [],
-            relatedDates: parsed.relatedDates || [], versions: parsed.versions || []
-          };
-          if (dateStr < oldestDate) oldestDate = dateStr;
-        } catch (e) { console.error("Parse error for", key); }
+    const initDiary = async () => {
+      const storedTasks = localStorage.getItem('nextask_tasks');
+      if (storedTasks) setTasks(JSON.parse(storedTasks));
+
+      const entriesMap: Record<string, DiaryEntry> = {};
+      let oldestDate = actualToday;
+
+      try {
+        const user = await getUser();
+        if (user && supabase) {
+          const { data, error } = await supabase
+            .from('diary_entries')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('entry_date', { ascending: false })
+            .limit(30); // 🔥 FIX 10: Limit to 30 days to prevent mass payload lag
+
+          if (data && !error) {
+            (data as DBDiaryEntry[]).forEach(row => {
+              entriesMap[row.entry_date] = {
+                ...DEFAULT_ENTRY,
+                morning: row.morning, afternoon: row.afternoon, evening: row.evening,
+                learning: row.learning, tomorrow: row.tomorrow,
+                mood: row.mood as any, energy: row.energy as any, tags: row.tags,
+                isMissed: row.is_missed, relatedDates: row.related_dates,
+                focusArea: row.focus_area as any, goalAlignment: row.goal_alignment,
+                frictions: row.frictions, identity: row.identity, chapter: row.chapter,
+                isLocked: row.is_locked, versions: row.versions,
+                morningTime: row.morning_time, afternoonTime: row.afternoon_time, eveningTime: row.evening_time
+              };
+              if (row.entry_date < oldestDate) oldestDate = row.entry_date;
+              localStorage.setItem(`${STORAGE_PREFIX}${row.entry_date}`, JSON.stringify(entriesMap[row.entry_date]));
+            });
+          }
+        }
+      } catch (err) { console.error("Failed to load DB", err); }
+
+      let currDate = parseLocalDate(oldestDate);
+      const todayObj = parseLocalDate(actualToday);
+      let newMissedCount = 0;
+      
+      while (currDate <= todayObj) {
+        const dStr = getLocalDate(currDate);
+        if (!entriesMap[dStr]) {
+          const missedEntry: DiaryEntry = { ...DEFAULT_ENTRY, isMissed: true, morning: "No entry written." };
+          entriesMap[dStr] = missedEntry;
+          localStorage.setItem(`${STORAGE_PREFIX}${dStr}`, JSON.stringify(missedEntry));
+          syncEntryToDB(dStr, missedEntry); 
+          
+          newMissedCount++;
+          handleDiary("missed", dStr);
+        }
+        currDate.setDate(currDate.getDate() + 1);
       }
-    }
 
-    let currDate = parseLocalDate(oldestDate);
-    const todayObj = parseLocalDate(actualToday);
-    let newMissedCount = 0;
-    
-    while (currDate <= todayObj) {
-      const dStr = getLocalDate(currDate);
-      if (!entriesMap[dStr]) {
-        const missedEntry: DiaryEntry = { ...DEFAULT_ENTRY, isMissed: true, morning: "No entry written." };
-        entriesMap[dStr] = missedEntry;
-        localStorage.setItem(`${STORAGE_PREFIX}${dStr}`, JSON.stringify(missedEntry));
-        
-        newMissedCount++;
-        
-        // 🧠 Let Brain handle the missed notification
-        handleDiary("missed", dStr);
+      if (newMissedCount >= 2) {
+        safeNotify('diary_consecutive_missed', 24 * 60 * 60 * 1000, () => {
+          setTimeout(() => addNotification('diary', 'Consistency Broken 🚨', 'Multiple missed days detected.', 'high', '/diary'), 4000);
+        });
       }
-      currDate.setDate(currDate.getDate() + 1);
-    }
 
-    // CONSECUTIVE MISSED DAYS
-    if (newMissedCount >= 2 && acquireLock('diary_consecutive_missed', 24 * 60 * 60 * 1000)) {
-      setTimeout(() => addNotification('diary', 'Consistency Broken 🚨', 'Multiple missed days detected. Recalibrate today.', 'high', '/diary'), 4000);
-    }
+      if (!entriesMap[actualTomorrow]) {
+        entriesMap[actualTomorrow] = DEFAULT_ENTRY;
+      }
 
-    if (!localStorage.getItem(`${STORAGE_PREFIX}${actualTomorrow}`)) {
-      localStorage.setItem(`${STORAGE_PREFIX}${actualTomorrow}`, JSON.stringify(DEFAULT_ENTRY));
-    }
+      setAllEntries(entriesMap);
+      setCurrentEntry(entriesMap[actualToday] || DEFAULT_ENTRY);
+      setIsLoaded(true);
+    };
 
-    setAllEntries(entriesMap);
-    setCurrentEntry(entriesMap[actualToday] || DEFAULT_ENTRY);
-    setIsLoaded(true);
+    initDiary();
+
+    return () => { isInitializing.current = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actualToday, actualTomorrow]);
+  }, []);
 
   // --- Switch Date Effect ---
   useEffect(() => {
     if (!isLoaded) return;
-    const stored = localStorage.getItem(`${STORAGE_PREFIX}${selectedDate}`);
+    const stored = allEntries[selectedDate] || JSON.parse(localStorage.getItem(`${STORAGE_PREFIX}${selectedDate}`) || 'null');
     if (stored) {
-      const parsed = JSON.parse(stored);
       setCurrentEntry({
-        ...DEFAULT_ENTRY, ...parsed,
-        tags: parsed.tags || [], frictions: parsed.frictions || [],
-        relatedDates: parsed.relatedDates || [], versions: parsed.versions || []
+        ...DEFAULT_ENTRY, ...stored,
+        tags: stored.tags || [], frictions: stored.frictions || [],
+        relatedDates: stored.relatedDates || [], versions: stored.versions || []
       });
     } else {
       setCurrentEntry(DEFAULT_ENTRY);
     }
-  }, [selectedDate, isLoaded]);
+  }, [selectedDate, isLoaded, allEntries]);
 
   // --- Live Task Stats ---
   const { doneCount, totalCount, consistency, missedTasks } = useMemo(() => {
@@ -188,13 +299,15 @@ export function useDiarySystem() {
     return "Maintain current momentum.";
   }, []);
 
-  // --- Auto-Save & Tomorrow Bridge Engine ---
+  // --- 🔥 FIX 1, 2, 6: DEBOUNCED DB & LOCAL AUTO-SAVE ---
   useEffect(() => {
     if (!isLoaded) return;
     setSaveStatus('saving');
     setWritingActivity(prev => ({ ...prev, isSyncing: true }));
 
-    const timer = setTimeout(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+    saveTimerRef.current = setTimeout(() => {
       const insightSnapshot = {
         consistency, doneCount, totalCount, mood: currentEntry.mood, energy: currentEntry.energy, timestamp: new Date().toISOString()
       };
@@ -204,40 +317,49 @@ export function useDiarySystem() {
         delete entryToSave.isMissed;
       }
       
+      // 🔥 FIX 2 & 6: Update LocalStorage and allEntries ONLY here
       localStorage.setItem(`${STORAGE_PREFIX}${selectedDate}`, JSON.stringify(entryToSave));
       setAllEntries(prev => ({ ...prev, [selectedDate]: entryToSave }));
 
+      syncEntryToDB(selectedDate, entryToSave);
+
       if (selectedDate === actualToday) {
         const tomorrowKey = `${STORAGE_PREFIX}${actualTomorrow}`;
-        const existingTomorrow = JSON.parse(localStorage.getItem(tomorrowKey) || 'null');
+        const existingTomorrow = allEntries[actualTomorrow] || JSON.parse(localStorage.getItem(tomorrowKey) || 'null');
         
         if (!existingTomorrow || existingTomorrow.morning === "") {
-          localStorage.setItem(tomorrowKey, JSON.stringify({
+          const tmrwEntry = {
             ...DEFAULT_ENTRY, suggestedAction: getTomorrowAdaptation(insightSnapshot),
             focusArea: currentEntry.focusArea, carryOver: { prevEnergy: currentEntry.energy, prevConsistency: consistency }
-          }));
+          };
+          localStorage.setItem(tomorrowKey, JSON.stringify(tmrwEntry));
+          syncEntryToDB(actualTomorrow, tmrwEntry);
+          setAllEntries(prev => ({ ...prev, [actualTomorrow]: tmrwEntry }));
           
-          if (acquireLock(`diary_tomorrow_plan_${actualToday}`, 12 * 60 * 60 * 1000)) {
+          safeNotify(`diary_tomorrow_plan_${actualToday}`, 12 * 60 * 60 * 1000, () => {
             addNotification('diary', 'Tomorrow Plan Ready 📅', 'Suggested action prepared for tomorrow.', 'low', '/diary');
-          }
+          });
         }
       }
 
       setSaveStatus('saved');
       setWritingActivity(prev => ({ ...prev, isSyncing: false, lastEdit: Date.now() }));
 
-      if (acquireLock(`diary_saved_${selectedDate}`, 30 * 60 * 1000)) {
+      safeNotify(`diary_saved_${selectedDate}`, 60000, () => {
         addNotification('diary', 'Entry Saved', 'Your reflection is secured.', 'low', '/diary');
+      });
+
+      if (writingActivity.totalEdits >= 30) {
+        safeNotify(`diary_reflection_complete_${selectedDate}`, 12 * 60 * 60 * 1000, () => {
+          addNotification('diary', 'Reflection Complete 📖', 'You captured your thoughts well.', 'low', '/diary');
+        });
       }
 
-      // 🔥 LONG WRITING SESSION COMPLETE
-      if (writingActivity.totalEdits >= 30 && acquireLock(`diary_reflection_complete_${selectedDate}`, 12 * 60 * 60 * 1000)) {
-        addNotification('diary', 'Reflection Complete 📖', 'You captured your thoughts well.', 'low', '/diary');
-      }
+    }, 2000); // 🔥 FIX 1: 2000ms delay stops keystroke lag
 
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [currentEntry, selectedDate, isLoaded, consistency, doneCount, totalCount, actualToday, actualTomorrow, getTomorrowAdaptation, addNotification, writingActivity.totalEdits]);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentEntry]); // Only trigger on currentEntry change
 
   // --- ACTIONS ---
   const updateEntry = (updates: Partial<DiaryEntry>) => {
@@ -245,23 +367,25 @@ export function useDiarySystem() {
     setWritingActivity(prev => {
       const newCount = prev.totalEdits + 1;
       
-      // 🔥 A. ENTRY STARTED & RECOVERY DETECTION
       if (prev.totalEdits === 0) {
         const yesterdayEntry = allEntries[actualYesterday];
         const isRecovery = yesterdayEntry && yesterdayEntry.isMissed && selectedDate === actualToday;
 
-        if (isRecovery && acquireLock(`diary_recovery_${actualToday}`, 24 * 60 * 60 * 1000)) {
-          addNotification('diary', 'Back on Track 📈', 'Consistency resumed. Welcome back.', 'medium', '/diary');
-        } else if (acquireLock(`diary_started_${selectedDate}`, 12 * 60 * 60 * 1000)) {
-          addNotification('diary', 'Entry Started ✍️', 'Capture your day before it fades.', 'low', '/diary');
+        if (isRecovery) {
+          safeNotify(`diary_recovery_${actualToday}`, 24 * 60 * 60 * 1000, () => {
+            addNotification('diary', 'Back on Track 📈', 'Consistency resumed.', 'medium', '/diary');
+          });
+        } else {
+          safeNotify(`diary_started_${selectedDate}`, 12 * 60 * 60 * 1000, () => {
+            addNotification('diary', 'Entry Started ✍️', 'Capture your day.', 'low', '/diary');
+          });
         }
       }
 
-      // 🔥 G. DEEP REFLECTION MODE
       if (newCount === 30) {
-        if (acquireLock(`diary_deep_focus_${selectedDate}`, 12 * 60 * 60 * 1000)) {
-          addNotification('diary', 'Deep Reflection Mode 🧠', 'You are thinking deeply. Keep writing.', 'low', '/diary');
-        }
+        safeNotify(`diary_deep_focus_${selectedDate}`, 12 * 60 * 60 * 1000, () => {
+          addNotification('diary', 'Deep Reflection Mode 🧠', 'You are thinking deeply.', 'low', '/diary');
+        });
       }
       return { ...prev, totalEdits: newCount };
     });
@@ -270,9 +394,9 @@ export function useDiarySystem() {
 
   const lockCurrentDay = () => {
     const updated = { ...currentEntry, isLocked: true };
-    localStorage.setItem(`${STORAGE_PREFIX}${selectedDate}`, JSON.stringify(updated));
     setCurrentEntry(updated);
     setAllEntries(prev => ({ ...prev, [selectedDate]: updated }));
+    syncEntryToDB(selectedDate, updated);
     addNotification('diary', 'Day Locked 🔒', 'This day is now final and immutable.', 'high', '/diary');
   };
 
@@ -281,13 +405,14 @@ export function useDiarySystem() {
     updateEntry({ tags: newTags });
   };
 
-  // 🔥 HIGH FRICTION IMMEDIATE ALERT
   const handleFrictionToggle = (friction: string) => {
     const newFrictions = currentEntry.frictions?.includes(friction) ? currentEntry.frictions.filter(f => f !== friction) : [...(currentEntry.frictions || []), friction];
     updateEntry({ frictions: newFrictions });
 
-    if (newFrictions.length >= 4 && acquireLock(`diary_high_friction_${selectedDate}`, 12 * 60 * 60 * 1000)) {
-      addNotification('diary', 'High Friction Detected ⚠️', 'Remove blockers now to restore momentum.', 'high', '/diary');
+    if (newFrictions.length >= 4) {
+      safeNotify(`diary_high_friction_${selectedDate}`, 12 * 60 * 60 * 1000, () => {
+        addNotification('diary', 'High Friction Detected ⚠️', 'Remove blockers now.', 'high', '/diary');
+      });
     }
   };
 
@@ -304,7 +429,8 @@ export function useDiarySystem() {
     const timestamp = new Date().toISOString();
     const snapshot = { ...currentEntry };
     delete snapshot.versions;
-    updateEntry({ versions: [...(currentEntry.versions || []), { timestamp, snapshot }] });
+    // 🔥 FIX 3: Only save last 5 versions
+    updateEntry({ versions: [...(currentEntry.versions || []), { timestamp, snapshot }].slice(-5) });
   };
 
   const changeDate = (days: number) => {
@@ -315,7 +441,7 @@ export function useDiarySystem() {
     if (newD <= actualToday) setSelectedDate(newD);
   };
 
-  // --- DEEP FILTERING ENGINE ---
+  // --- 🔥 DEEP FILTERING ENGINE (Using Debounced Search) ---
   const filteredHistory = useMemo(() => {
     let dates = Object.keys(allEntries).filter(d => d <= actualToday).sort().reverse();
     if (rangeFilter === '7d') dates = dates.slice(0, 7);
@@ -323,24 +449,24 @@ export function useDiarySystem() {
 
     return dates.filter(date => {
       const entry = allEntries[date];
-      if (entry.isMissed && (searchQuery || moodFilter || energyFilter || tagFilter)) return false;
+      // 🔥 FIX 4: Use debouncedSearch instead of searchQuery
+      if (entry.isMissed && (debouncedSearch || moodFilter || energyFilter || tagFilter)) return false;
       if (moodFilter && entry.mood !== moodFilter) return false;
       if (energyFilter && entry.energy !== energyFilter) return false;
       if (tagFilter && !(entry.tags || []).includes(tagFilter)) return false;
 
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+      if (debouncedSearch.trim()) {
+        const q = debouncedSearch.toLowerCase();
         const content = `${entry.morning||''} ${entry.afternoon||''} ${entry.evening||''} ${entry.learning||''} ${entry.tomorrow||''} ${(entry.tags||[]).join(' ')} ${(entry.frictions||[]).join(' ')} ${entry.focusArea||''} ${entry.chapter||''}`.toLowerCase();
         if (!content.includes(q)) return false;
       }
       return true;
     });
-  }, [allEntries, actualToday, searchQuery, moodFilter, energyFilter, tagFilter, rangeFilter]);
+  }, [allEntries, actualToday, debouncedSearch, moodFilter, energyFilter, tagFilter, rangeFilter]);
 
   const historyDates = Object.keys(allEntries).filter(d => d <= actualToday).sort().reverse().slice(0, 14);
   const searchResults: any[] = []; 
 
-  // --- Complex Memos ---
   const { aiInsight, detectedPatterns, futurePrediction, energyOutputCorrelation } = useMemo(() => {
     if (currentEntry.isMissed) return { aiInsight: "Day skipped. System integrity broken.", detectedPatterns: [], futurePrediction: "No data for prediction.", energyOutputCorrelation: "Insufficient data" };
     
@@ -425,74 +551,72 @@ export function useDiarySystem() {
     return { currentStreak: streak, badges: earnedBadges };
   }, [allEntries, actualToday, consistency]);
 
-  // --- 🔥 BEHAVIORAL NOTIFICATION ENGINE (Watches the Memos) ---
+  // --- BEHAVIORAL NOTIFICATION ENGINE ---
   useEffect(() => {
     if (!isLoaded) return;
 
-    if (consistency >= 80 && acquireLock('diary_peak_performance', 24 * 60 * 60 * 1000)) {
-      setTimeout(() => addNotification('diary', 'Peak Performance ⚡', 'You are operating at high efficiency.', 'medium', '/diary'), 4000);
+    if (consistency >= 80) {
+      safeNotify('diary_peak_performance', 24 * 60 * 60 * 1000, () => {
+        setTimeout(() => addNotification('diary', 'Peak Performance ⚡', 'You are operating at high efficiency.', 'medium', '/diary'), 4000);
+      });
     }
 
     detectedPatterns.forEach((pattern, index) => {
       const safeKey = pattern.replace(/\s+/g, '_').toLowerCase();
-      if (acquireLock(`diary_pattern_${safeKey}`, 2 * 24 * 60 * 60 * 1000)) {
+      safeNotify(`diary_pattern_${safeKey}`, 2 * 24 * 60 * 60 * 1000, () => {
         setTimeout(() => addNotification('diary', 'Behavior Pattern 🧠', pattern, 'medium', '/diary'), 5000 + (index * 1000));
-      }
+      });
     });
 
     activeAlerts.forEach((alertStr, index) => {
       const safeKey = alertStr.replace(/\s+/g, '_').toLowerCase();
-      if (acquireLock(`diary_alert_${safeKey}`, 24 * 60 * 60 * 1000)) {
+      safeNotify(`diary_alert_${safeKey}`, 24 * 60 * 60 * 1000, () => {
         setTimeout(() => addNotification('diary', 'System Alert ⚠️', alertStr, 'high', '/diary'), 6000 + (index * 1000));
-      }
+      });
     });
 
     if (currentStreak > 0 && currentStreak % 7 === 0) {
-      if (acquireLock(`diary_streak_${currentStreak}`, 7 * 24 * 60 * 60 * 1000)) {
+      safeNotify(`diary_streak_${currentStreak}`, 7 * 24 * 60 * 60 * 1000, () => {
         setTimeout(() => addNotification('diary', `🔥 ${currentStreak} Day Streak`, 'Consistency is building.', 'high', '/diary'), 7000);
-      }
+      });
     }
 
     badges.forEach((badge, index) => {
       const safeKey = badge.replace(/\s+/g, '_').toLowerCase();
-      if (acquireLock(`diary_badge_${safeKey}`, 7 * 24 * 60 * 60 * 1000)) {
+      safeNotify(`diary_badge_${safeKey}`, 7 * 24 * 60 * 60 * 1000, () => {
         setTimeout(() => addNotification('diary', 'Achievement Unlocked 🏆', badge, 'medium', '/diary'), 8000 + (index * 1000));
-      }
+      });
     });
 
-  }, [isLoaded, consistency, detectedPatterns, activeAlerts, currentStreak, badges, addNotification]);
+  }, [isLoaded, consistency, detectedPatterns, activeAlerts, currentStreak, badges, addNotification, safeNotify]);
 
-  // --- 🔥 REFLECTION REMINDER INTERVAL (Morning / Evening) ---
+  // --- REFLECTION REMINDER INTERVAL ---
   useEffect(() => {
     const reminderInterval = setInterval(() => {
       const hour = new Date().getHours();
       const hasWritten = !!(currentEntry.morning || currentEntry.afternoon || currentEntry.evening);
       
       if (!hasWritten) {
-        // Morning Reminder
         if (hour >= 9 && hour <= 12) {
-          if (acquireLock('diary_morning_reminder', 12 * 60 * 60 * 1000)) {
+          safeNotify('diary_morning_reminder', 12 * 60 * 60 * 1000, () => {
             addNotification('diary', 'No Reflection Yet 🌅', 'Start your day with clarity.', 'medium', '/diary');
-          }
+          });
         } 
-        // Evening Reminder
         else if (hour >= 20 && hour <= 23) {
-          // 🧠 Let Brain handle the evening reminder
           handleDiary("reminder");
         }
       }
-    }, 30 * 60 * 1000); // Check every 30 mins
+    }, 30 * 60 * 1000); 
     
     return () => clearInterval(reminderInterval);
-  }, [currentEntry, addNotification]);
-
+  }, [currentEntry, addNotification, safeNotify]);
 
   const generateAutoSummary = () => {
     const summary = `Today was a ${currentEntry.mood} mood, ${currentEntry.energy} energy day.\nFocus area: ${currentEntry.focusArea}. Goal alignment: ${currentEntry.goalAlignment}%.\nKey friction: ${currentEntry.frictions?.[0] || 'none'}.\nIdentity: ${currentEntry.identity || 'not reflected'}.\n${currentEntry.learning ? `Breakthrough: ${currentEntry.learning}` : ''}`;
     
-    if (acquireLock('diary_summary_gen', 5 * 60 * 1000)) {
+    safeNotify('diary_summary_gen', 5 * 60 * 1000, () => {
       addNotification('diary', 'Insight Generated 📊', 'Your daily pattern is ready for review.', 'low', '/diary');
-    }
+    });
 
     alert(summary);
     return summary;

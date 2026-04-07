@@ -14,11 +14,11 @@ interface MatrixProps {
   tasks: Task[];
   meta: Meta;
   addTask: (name: string, group: string) => void;
-  deleteTask: (id: number) => void;
-  toggleTask: (id: number, date: string) => void;
+  deleteTask: (id: string) => void; // 🔴 1. Fixed type syntax
+  toggleTask: (id: string, date: string) => void;
   lockToday: () => void;
   setMonthYear: (value: string) => void;
-  addAuditLog: (detail: string) => void;
+  // 🟡 7. Removed unused addAuditLog
 }
 
 export default function MatrixView({ 
@@ -30,22 +30,39 @@ export default function MatrixView({
   const [weekOffset, setWeekOffset] = useState(0); 
   const todayRef = useRef<HTMLTableCellElement | null>(null);
 
+  // 🔴 5. ERROR TIMEOUT MEMORY LEAK FIX
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   const showError = useCallback((msg: string) => { 
     setError(msg); 
-    setTimeout(() => setError(''), 3000); 
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setError(''), 3000); 
   }, []);
 
+  // 🔴 3. PERFORMANCE FIX: PRECOMPUTED COMPLETION MAP (O(1) lookups)
+  const completionMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    tasks.forEach(t => {
+      Object.entries(t.history || {}).forEach(([date, done]) => {
+        if (done) {
+          map[date] = (map[date] || 0) + 1;
+        }
+      });
+    });
+    return map;
+  }, [tasks]);
+
   // --- 1. DATA ENGINE ---
-  const { todayData, yesterdayData } = useMemo(() => {
+  const { todayDataLength, yesterdayDataLength } = useMemo(() => {
     const d = parseLocalDate(actualToday);
     d.setDate(d.getDate() - 1);
     const yesterday = getLocalDate(d);
 
     return {
-      todayData: tasks.filter(t => t.history?.[actualToday]),
-      yesterdayData: tasks.filter(t => t.history?.[yesterday]),
+      todayDataLength: completionMap[actualToday] || 0,
+      yesterdayDataLength: completionMap[yesterday] || 0,
     };
-  }, [tasks, actualToday]);
+  }, [completionMap, actualToday]);
 
   const [year, month] = meta.currentMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -109,7 +126,7 @@ export default function MatrixView({
         date: dateStr,
         label: d.toLocaleDateString('en-US', { weekday: 'short' }),
         dayNum: dateStr.slice(8),
-        count: tasks.filter(t => t.history?.[dateStr]).length
+        count: completionMap[dateStr] || 0 // 🚀 O(1) Lookup
       };
     });
 
@@ -119,12 +136,12 @@ export default function MatrixView({
       const prevDateStr = getLocalDate(d);
       return {
         date: prevDateStr,
-        count: tasks.filter(t => t.history?.[prevDateStr]).length
+        count: completionMap[prevDateStr] || 0 // 🚀 O(1) Lookup
       };
     });
 
     return { compareCurrentWeek: currentWk, comparePrevWeek: prevWk };
-  }, [tasks, weekOffset, actualToday]);
+  }, [completionMap, weekOffset, actualToday]);
 
   // --- 4. ADVANCED ANALYTICS ---
   const { totalCurrent, totalPrev, consistencyScore, validDays, weekAvg, momentumScore } = useMemo(() => {
@@ -185,10 +202,9 @@ export default function MatrixView({
       if (parseLocalDate(dateStr) > parseLocalDate(actualToday)) break; 
 
       const isoDay = getISODay(new Date(year, month - 1, i)) - 1; 
-      tasks.forEach(t => {
-        dayStats[isoDay].possible++;
-        if (t.history?.[dateStr]) dayStats[isoDay].done++;
-      });
+      // 🚀 O(1) Replacement
+      dayStats[isoDay].possible += tasks.length;
+      dayStats[isoDay].done += completionMap[dateStr] || 0;
     }
 
     let worstDay = null;
@@ -205,7 +221,7 @@ export default function MatrixView({
       return `Critical slip pattern on ${dayNames[worstDay]}s. Adjust routine.`;
     }
     return "Momentum is stable across the board. Keep the chain.";
-  }, [tasks, daysInMonth, actualToday, meta.currentMonth, year, month]);
+  }, [tasks.length, completionMap, daysInMonth, actualToday, meta.currentMonth, year, month]);
 
   const globalWeekStats = useMemo(() => {
     if (tasks.length === 0) return { best: null, worst: null };
@@ -213,14 +229,19 @@ export default function MatrixView({
       const validD = week.days.filter(Boolean).length;
       const possible = validD * tasks.length;
       let done = 0;
-      tasks.forEach(t => { week.days.forEach(d => { if (d && t.history?.[`${meta.currentMonth}-${d}`]) done++; }); });
+      
+      // 🚀 O(1) Replacement
+      week.days.forEach(d => { 
+        if (d) done += completionMap[`${meta.currentMonth}-${d}`] || 0; 
+      });
+      
       return { label: week.weekLabel, pct: possible ? (done / possible) * 100 : 0 };
     });
     return { 
       best: stats.reduce((max, w) => w.pct > max.pct ? w : max, stats[0]), 
       worst: stats.reduce((min, w) => w.pct < min.pct ? w : min, stats[0]) 
     };
-  }, [weeksInMonth, tasks, meta.currentMonth]);
+  }, [weeksInMonth, tasks.length, completionMap, meta.currentMonth]);
 
   const visibleDays = weeksInMonth.flatMap(w => w.days);
 
@@ -229,11 +250,16 @@ export default function MatrixView({
     const todayDate = parseLocalDate(actualToday);
   
     if (selected > todayDate) return showError(`Can't edit the future`);
-    if (selected < todayDate) return showError(`Past days are locked`);
+    
+    // 🟡 6. UX Improvement: Check rollback dates before locking
+    if (selected < todayDate && !(meta.rollbackUsedDates || []).includes(dateStr)) {
+      return showError(`Past days are locked`);
+    }
+    
     if (meta.lockedDates?.includes(dateStr)) return showError(`Date is locked`);
   
     toggleTask(task.id, dateStr);
-  }, [actualToday, meta.lockedDates, showError, toggleTask]);
+  }, [actualToday, meta.lockedDates, meta.rollbackUsedDates, showError, toggleTask]);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-[#F9FAFB] text-gray-800 pb-24 relative pt-0 overscroll-y-contain">
@@ -244,8 +270,8 @@ export default function MatrixView({
       )}
 
       <Header 
-        todayDataLength={todayData.length}
-        yesterdayDataLength={yesterdayData.length}
+        todayDataLength={todayDataLength}
+        yesterdayDataLength={yesterdayDataLength}
         tasksLength={tasks.length}
         globalWeekStats={globalWeekStats}
         meta={meta}
@@ -259,7 +285,7 @@ export default function MatrixView({
       <div className="flex-1 flex flex-col xl:flex-row p-4 md:p-8 max-w-[1500px] mx-auto w-full gap-8">
         <div className="flex-1 flex flex-col gap-6 overflow-hidden">
           <Decisions 
-            todayDataLength={todayData.length}
+            todayDataLength={todayDataLength}
             weekAvg={weekAvg}
             tasksLength={tasks.length}
             momentumScore={momentumScore}

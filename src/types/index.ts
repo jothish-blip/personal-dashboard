@@ -1,5 +1,5 @@
 export interface Task {
-  id: number;
+  id: string; // ✅ FIXED (was number → now string for UUID)
   name: string;
   group: string;
   history: Record<string, boolean>;
@@ -17,7 +17,7 @@ export interface Meta {
   currentMonth: string;
   isFocus: boolean;
   theme: 'light' | 'dark';
-  lockedDates: string[]; // ✅ New: Stores ISO date strings that are read-only
+  lockedDates: string[];
   rollbackUsedDates: string[];
 }
 

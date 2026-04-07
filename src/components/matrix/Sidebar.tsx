@@ -1,4 +1,6 @@
-import React from 'react';
+"use client";
+
+import React, { useMemo } from 'react';
 import { Activity, Flame, BarChart2, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import { parseLocalDate } from './utils';
 
@@ -22,6 +24,10 @@ export default function Sidebar({
   globalWeekStats, compareCurrentWeek, comparePrevWeek, weekOffset, setWeekOffset,
   totalCurrent, actualToday
 }: SidebarProps) {
+  
+  // 🔴 1. PRECOMPUTE TODAY DATE (Avoid expensive parsing in loops)
+  const todayDateObj = useMemo(() => parseLocalDate(actualToday), [actualToday]);
+
   return (
     <div className="w-full xl:w-[340px] flex-shrink-0 flex flex-col gap-6">
       {/* ANALYTICS HUD */}
@@ -45,8 +51,10 @@ export default function Sidebar({
         <div className="w-full mt-2">
           <div className="flex items-end justify-between h-20 gap-1.5 bg-gray-50 rounded-xl p-2 border border-gray-100">
             {validDays.map((d, i) => {
-              const heightPct = (d.count / chartMaxCount) * 100;
+              // 🔴 2. POTENTIAL DIVIDE-BY-ZERO FIX
+              const heightPct = chartMaxCount === 0 ? 0 : (d.count / chartMaxCount) * 100;
               const isToday = d.date === actualToday;
+              
               return (
                 <div key={i} className="flex flex-col items-center flex-1 gap-2 group">
                   <div className="w-full relative flex-1 flex items-end rounded-sm overflow-hidden bg-gray-200">
@@ -83,16 +91,21 @@ export default function Sidebar({
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xs font-bold text-gray-800 uppercase tracking-widest flex items-center gap-2"><BarChart2 size={16} className="text-gray-500" /> Comparison</h2>
           <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1 border border-gray-200">
-            <button onClick={() => setWeekOffset(o => o - 1)} className="p-1 text-gray-400 hover:text-gray-800 hover:bg-white rounded transition-colors"><ChevronLeft size={14}/></button>
+            {/* 🟡 4. WEEK OFFSET BUTTON SPAM FIX (Clamped ranges) */}
+            <button onClick={() => setWeekOffset(o => Math.max(o - 1, -52))} className="p-1 text-gray-400 hover:text-gray-800 hover:bg-white rounded transition-colors"><ChevronLeft size={14}/></button>
             <span className="text-[10px] font-bold w-16 text-center text-gray-600">{weekOffset === 0 ? 'THIS WEEK' : weekOffset < 0 ? `${Math.abs(weekOffset)}W AGO` : `${weekOffset}W NEXT`}</span>
-            <button onClick={() => setWeekOffset(o => o + 1)} className="p-1 text-gray-400 hover:text-gray-800 hover:bg-white rounded transition-colors"><ChevronRight size={14}/></button>
+            <button onClick={() => setWeekOffset(o => Math.min(o + 1, 12))} className="p-1 text-gray-400 hover:text-gray-800 hover:bg-white rounded transition-colors"><ChevronRight size={14}/></button>
           </div>
         </div>
 
         <div className="space-y-3">
           {compareCurrentWeek.map((day, i) => {
-            const prevCount = comparePrevWeek[i].count;
-            const isFuture = parseLocalDate(day.date) > parseLocalDate(actualToday);
+            // 🔴 3. UNSAFE ARRAY ACCESS FIX
+            const prevCount = comparePrevWeek[i]?.count ?? 0;
+            
+            // 🔴 1. Using precomputed todayDateObj
+            const isFuture = parseLocalDate(day.date) > todayDateObj;
+            
             const diff = isFuture ? null : day.count - prevCount;
             const isToday = day.date === actualToday;
             

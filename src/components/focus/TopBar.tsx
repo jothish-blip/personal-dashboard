@@ -40,8 +40,6 @@ export default function TopBar() {
   };
 
   const status = getStatus();
-
-  // ✅ Read the intent accurately based on the new architecture
   const displayTask = isActive && currentSession ? currentSession.taskTitle : (activeTaskId || "Unbound Session");
 
   const toggleFullscreen = () => {
@@ -53,57 +51,41 @@ export default function TopBar() {
   };
 
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
+    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
   const handleModeSelect = (newMode: FocusMode) => {
     setMode(newMode);
-    
     if (newMode === "custom" && setTimeRemaining) {
-      if (typeof customMinutes === "number" && customMinutes > 0) {
-        setTimeRemaining(customMinutes * 60);
-      } else {
-        setTimeRemaining(0); 
-      }
+      const minutes = typeof customMinutes === "number" ? customMinutes : 0;
+      setTimeRemaining(minutes * 60);
     }
   };
 
   const handleCustomTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-
     if (val === "") {
       setCustomMinutes("");
       if (setTimeRemaining) setTimeRemaining(0);
       return;
     }
-
-    let num = parseInt(val);
-    if (isNaN(num)) return;
-
-    if (num < 1) num = 1;
-    if (num > 600) num = 600;
-
+    let num = Math.min(600, Math.max(1, parseInt(val) || 1));
     setCustomMinutes(num);
-
-    if (mode === "custom" && setTimeRemaining) {
-      setTimeRemaining(num * 60);
-    }
-  };
-
-  const applyPreset = (minutes: number) => {
-    setCustomMinutes(minutes);
-    if (setTimeRemaining) setTimeRemaining(minutes * 60);
+    if (mode === "custom" && setTimeRemaining) setTimeRemaining(num * 60);
   };
 
   return (
-    <div className="flex flex-col gap-3 md:flex-row md:items-center justify-between bg-white border border-gray-200 p-3 md:p-4 rounded-xl shadow-sm transition-all">
+    <div className="
+      flex flex-row items-center justify-between flex-wrap gap-2
+      bg-white border border-gray-200 
+      px-2 py-2 md:p-4 
+      rounded-xl shadow-sm transition-all
+    ">
       
       {/* LEFT: MODE SWITCH & CUSTOM CONTROLS */}
-      <div className="flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <div className="flex items-center gap-2 overflow-x-auto max-w-full no-scrollbar">
         {MODES.map((m) => {
           const isSelected = mode === m.key;
 
@@ -113,7 +95,7 @@ export default function TopBar() {
                 disabled={isActive}
                 onClick={() => handleModeSelect(m.key as FocusMode)}
                 className={`
-                  px-4 py-2 text-sm font-medium rounded-md transition-all border whitespace-nowrap
+                  px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-medium rounded-md transition-all border whitespace-nowrap shrink-0
                   ${isSelected ? m.activeClass : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}
                   ${isActive && !isSelected ? "opacity-50 cursor-not-allowed hidden sm:block" : ""}
                 `}
@@ -123,34 +105,28 @@ export default function TopBar() {
 
               {/* CUSTOM SETTINGS (Input + Presets) */}
               {isSelected && m.key === "custom" && !isActive && (
-                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-200 ml-1">
-                  
-                  {/* Input */}
-                  <div className="flex items-center bg-red-50 border border-red-200 rounded-md px-2 py-1.5">
+                <div className="flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2 duration-200 ml-1 shrink-0">
+                  <div className="flex items-center bg-red-50 border border-red-200 rounded-md px-1.5 py-1">
                     <input
                       type="number"
-                      min="1"
-                      max="600"
                       value={customMinutes}
                       onChange={handleCustomTimeChange}
                       placeholder="min"
-                      className="w-12 bg-transparent text-sm text-red-700 font-semibold text-center focus:outline-none appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-red-300 placeholder:font-normal"
+                      className="w-10 bg-transparent text-xs text-red-700 font-semibold text-center focus:outline-none placeholder:text-red-300"
                     />
                   </div>
 
-                  {/* Presets */}
-                  <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-md p-1">
+                  <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-md p-0.5">
                     {PRESETS.map((p) => (
                       <button
                         key={p}
-                        onClick={() => applyPreset(p)}
-                        className="px-2 py-1 text-xs font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded transition-colors"
+                        onClick={() => { setCustomMinutes(p); if (setTimeRemaining) setTimeRemaining(p * 60); }}
+                        className="px-1.5 py-0.5 text-[10px] font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded transition-colors"
                       >
                         {p}
                       </button>
                     ))}
                   </div>
-
                 </div>
               )}
             </div>
@@ -158,52 +134,51 @@ export default function TopBar() {
         })}
       </div>
 
-      {/* CENTER: SESSION INFO */}
+      {/* CENTER: SESSION INFO (Desktop Only) */}
       {isActive && (
-        <div className="flex-1 hidden sm:flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">
+        <div className="hidden sm:flex flex-1 flex-col items-center animate-in fade-in zoom-in-95 duration-200">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
             Current Target
           </div>
-          {/* ✅ FIX: Properly rendering the string-based Intent */}
-          <div className="text-sm font-medium text-gray-900 truncate max-w-[200px] md:max-w-[300px]">
+          <div className="text-xs font-medium text-gray-900 truncate max-w-[120px] md:max-w-[250px]">
             {displayTask}
           </div>
         </div>
       )}
 
       {/* RIGHT: CONTROLS & STATUS */}
-      <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto shrink-0">
+      <div className="flex items-center gap-2 md:gap-3 shrink-0">
         
         {isActive && (
-          <div className="flex gap-2">
+          <div className="flex gap-1.5 shrink-0">
             <button 
               onClick={isPaused ? startSession : pauseSession}
-              className={`px-4 py-2 text-sm font-medium rounded-md border transition-all active:scale-95 ${
+              className={`px-3 py-1.5 text-xs md:text-sm font-medium rounded-md border transition-all active:scale-95 shrink-0 ${
                 isPaused 
                   ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" 
                   : "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
               }`}
             >
-              {isPaused ? "▶ Resume" : "⏸ Pause"}
+              {isPaused ? "▶" : "⏸"}
             </button>
             <button 
-              onClick={() => stopSession(false)} // ✅ FIX: Prevents passing the React MouseEvent
-              className="px-4 py-2 text-sm font-medium rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-all active:scale-95"
+              onClick={() => stopSession(false)} 
+              className="px-3 py-1.5 text-xs md:text-sm font-medium rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-all active:scale-95 shrink-0"
             >
-              ⏹ End
+              ⏹
             </button>
           </div>
         )}
 
-        <div className="flex items-center gap-3 border-l border-gray-200 pl-3 md:pl-4">
-          <div className="font-medium flex items-center gap-2 text-gray-500">
-            <span className={`w-2 h-2 rounded-full transition-colors shrink-0 ${status.color}`}></span>
-            <span className="text-xs sm:text-sm whitespace-nowrap">{status.label}</span>
+        <div className="flex items-center gap-2 border-l border-gray-200 pl-2 md:pl-4 shrink-0">
+          <div className="font-medium flex items-center gap-1.5 text-gray-500">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${status.color}`}></span>
+            <span className="text-[10px] md:text-xs whitespace-nowrap uppercase tracking-tighter font-bold">{status.label}</span>
           </div>
 
           <button 
             onClick={toggleFullscreen}
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors shrink-0"
+            className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors shrink-0"
             title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
           >
             {isFullscreen ? "↙️" : "↗️"} 

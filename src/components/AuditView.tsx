@@ -182,4 +182,4 @@ export default function AuditView({ logs, meta, clearLogs, deleteLog }: AuditPro
       `}} />
     </div>
   );
-}
+} 
