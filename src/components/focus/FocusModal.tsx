@@ -1,117 +1,149 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-
-// Versioning allows us to force users to re-read rules if we fundamentally change the system later.
-const ONBOARDING_VERSION = "focus_onboarding_v1";
+import { getSupabaseClient } from "@/lib/supabase";
 
 export default function FocusModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [canAgree, setCanAgree] = useState(false);
 
+  const supabase = getSupabaseClient();
+
+  // ✅ CHECK FROM DATABASE (ONCE PER USER)
   useEffect(() => {
-    const hasSeen = localStorage.getItem(ONBOARDING_VERSION);
+    const checkSeen = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
 
-    if (!hasSeen) {
-      setIsOpen(true);
+      if (!user) return;
 
-      // 🔥 Prevent background scroll while modal is open
-      document.body.style.overflow = "hidden";
+      const { data } = await supabase
+        .from("profiles")
+        .select("focus_guide_seen")
+        .eq("id", user.id)
+        .single();
 
-      // ⏳ Force intentional reading time (2.5 seconds)
-      const timer = setTimeout(() => {
-        setCanAgree(true);
-      }, 2500);
+      if (!data?.focus_guide_seen) {
+        setIsOpen(true);
 
-      return () => clearTimeout(timer);
-    }
+        // prevent scroll
+        document.body.style.overflow = "hidden";
+
+        // intentional delay
+        const timer = setTimeout(() => {
+          setCanAgree(true);
+        }, 2500);
+
+        return () => clearTimeout(timer);
+      }
+    };
+
+    checkSeen();
   }, []);
 
-  const handleAgree = () => {
-    localStorage.setItem(ONBOARDING_VERSION, "true");
-    setIsOpen(false);
+  // ✅ SAVE TO DATABASE
+  const handleAgree = async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
 
-    // 🔥 Restore scroll when they enter the dashboard
+    if (user) {
+      await supabase
+        .from("profiles")
+        .update({ focus_guide_seen: true })
+        .eq("id", user.id);
+    }
+
+    setIsOpen(false);
     document.body.style.overflow = "auto";
   };
 
-  // If they've already onboarded, render absolutely nothing
   if (!isOpen) return null;
 
   return (
-    // Backdrop: Blurs the dashboard, completely blocking interaction
-    <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 md:p-6 transition-all duration-500">
-      
-      {/* Modal Container */}
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 sm:p-8 space-y-7 animate-in fade-in zoom-in-95 duration-500">
-        
+    <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-sm flex items-center justify-center p-4 md:p-6 transition-all">
+
+      {/* CONTAINER */}
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 sm:p-8 space-y-7 animate-in fade-in zoom-in-95 duration-300">
+
         {/* HEADER */}
         <div className="text-center space-y-3">
-          <div className="text-5xl mb-2 animate-pulse">🧠</div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-            The Focus Engine
+          <div className="text-5xl">🧠</div>
+
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
+            Focus Engine
           </h2>
-          <p className="text-sm text-gray-500 max-w-[280px] mx-auto leading-relaxed">
-            Execute with clarity. Track your discipline. Master your attention.
+
+          <p className="text-sm text-slate-500 max-w-[280px] mx-auto">
+            Execute with clarity. Track discipline. Build attention control.
           </p>
         </div>
 
-        {/* RULES OF EXECUTION */}
-        <div className="bg-gray-50 p-5 rounded-xl border border-gray-100 text-sm text-gray-800 space-y-4">
-          <p className="font-bold text-gray-900 uppercase tracking-widest text-[10px]">
+        {/* SYSTEM MESSAGE */}
+        <div className="text-center text-xs text-slate-400">
+          Your focus sessions are tracked and synced across your system.
+        </div>
+
+        {/* RULES */}
+        <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 text-sm text-slate-700 space-y-4">
+
+          <p className="font-bold text-slate-900 uppercase tracking-widest text-[10px]">
             Rules of Execution
           </p>
 
           <ul className="space-y-3.5">
-            <li className="flex items-start gap-3">
-              <span className="text-lg leading-none">🎯</span>
-              <span className="leading-snug"><strong>Declare Intent:</strong> Define a single, clear target before starting the timer.</span>
+
+            <li className="flex gap-3">
+              <span>🎯</span>
+              <span><b>Declare Intent:</b> Define one clear target.</span>
             </li>
-            <li className="flex items-start gap-3">
-              <span className="text-lg leading-none">🔒</span>
-              <span className="leading-snug"><strong>Lock In:</strong> No task switching allowed during an active session.</span>
+
+            <li className="flex gap-3">
+              <span>🔒</span>
+              <span><b>Lock In:</b> No switching during session.</span>
             </li>
-            <li className="flex items-start gap-3">
-              <span className="text-lg leading-none">⚠️</span>
-              <span className="leading-snug"><strong>Log Breaks:</strong> If your focus breaks, you must track the distraction honestly.</span>
+
+            <li className="flex gap-3">
+              <span>⚠️</span>
+              <span><b>Log Breaks:</b> Track distractions honestly.</span>
             </li>
-            <li className="flex items-start gap-3">
-              <span className="text-lg leading-none">📊</span>
-              <span className="leading-snug"><strong>Review:</strong> Analyze your behavior patterns after the session ends.</span>
+
+            <li className="flex gap-3">
+              <span>📊</span>
+              <span><b>Review:</b> Analyze patterns after completion.</span>
             </li>
+
           </ul>
         </div>
 
-        {/* FOOTER ACTION AREA */}
+        {/* FOOTER */}
         <div className="space-y-3 pt-2">
-          
-          {/* PROGRESS / LOCK STATE INDICATOR */}
-          <div className="text-center text-[11px] font-bold uppercase tracking-widest text-gray-400 h-4">
+
+          <div className="text-center text-[11px] font-bold uppercase tracking-widest text-slate-400 h-4">
             {!canAgree ? "Initializing focus environment..." : "System Ready"}
           </div>
 
-          {/* ACTION BUTTON */}
           <button
             onClick={handleAgree}
             disabled={!canAgree}
-            className={`w-full py-4 text-sm font-bold rounded-xl transition-all shadow-md flex justify-center items-center gap-2
+            className={`w-full py-4 text-sm font-semibold rounded-xl transition-all flex justify-center items-center gap-2
               ${
                 canAgree
-                  ? "bg-gray-900 text-white hover:bg-black active:scale-[0.98]"
-                  : "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
+                  ? "bg-orange-500 text-white hover:bg-orange-600 active:scale-[0.98]"
+                  : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
               }
             `}
           >
-            {canAgree ? "I Understand, Enter Dashboard" : (
+            {canAgree ? (
+              "Enter Focus Mode"
+            ) : (
               <>
-                <span className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin"></span>
+                <span className="w-4 h-4 border-2 border-slate-300 border-t-slate-500 rounded-full animate-spin"></span>
                 Please wait...
               </>
             )}
           </button>
-          
-        </div>
 
+        </div>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { PlannerEvent, SystemLog, SystemPayload, TaskType, Priority, EventStatus } from "./types";
 import { useNotificationSystem } from "@/notifications/useNotificationSystem"; 
 import { getSupabaseClient } from "@/lib/supabase";
+import { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const SYSTEM_VERSION = 1.2;
 const STORAGE_KEY = "taskflow_planner_v1";
@@ -24,22 +25,42 @@ type DBPlannerEvent = {
   created_at: number;
 };
 
-// 🔥 FIX 9: Optimized time-sorting helper
+// Optimized time-sorting helper
 const timeToMinutes = (t: string) => {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
 };
 
+// Universal Row Mapper
+const mapRow = (row: DBPlannerEvent): PlannerEvent => ({
+  id: row.id,
+  title: row.title,
+  date: row.event_date,
+  time: row.event_time.substring(0, 5),
+  type: row.event_type as TaskType,
+  priority: row.priority as Priority,
+  status: row.status as EventStatus,
+  history: row.history || {},
+  createdAt: row.created_at
+});
+
 export function usePlannerSystem() {
-  const { addNotification } = useNotificationSystem();
   const supabase = getSupabaseClient();
 
+  // --- AUTH STATE (Moved up to support Notification Hook) ---
+  const [currentUser, setCurrentUser] = useState<any>(null); 
+  const userRef = useRef<any>(null); 
+
+  // --- NOTIFICATION HOOK (Updated to pass userId) ---
+  const { addNotification } = useNotificationSystem(currentUser?.id);
+
+  // --- APP STATE ---
   const [events, setEvents] = useState<PlannerEvent[]>([]);
   const [logs, setLogs] = useState<SystemLog[]>([]);
   
   const [activeTab, setActiveTab] = useState<TabType>("today");
   const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState(""); // 🔥 FIX 3: Throttled Search
+  const [debouncedSearch, setDebouncedSearch] = useState(""); 
   
   const [isReady, setIsReady] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -49,11 +70,9 @@ export function usePlannerSystem() {
     id: "", title: "", date: new Date().toISOString().split('T')[0], time: "09:00", type: "Work", priority: "medium"
   });
 
-  const isInitializing = useRef(false);
-  const saveRef = useRef<NodeJS.Timeout | null>(null); // 🔥 FIX 7: Local Storage Debounce
-  const userRef = useRef<any>(null); // 🔥 FIX 5: User Cache
+  const saveRef = useRef<NodeJS.Timeout | null>(null); 
 
-  // --- 🔥 FIX 6: NOTIFICATION SPAM FIX ---
+  // --- NOTIFICATION SPAM FIX ---
   const safeNotify = useCallback((key: string, fn: () => void) => {
     if (!localStorage.getItem(key)) {
       localStorage.setItem(key, "1");
@@ -61,14 +80,13 @@ export function usePlannerSystem() {
     }
   }, []);
 
-  // --- 🔥 FIX 3: THROTTLE SEARCH EFFECT ---
+  // --- THROTTLE SEARCH EFFECT ---
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
   // --- DB SYNC HELPERS (BATCHED) ---
-  // 🔥 FIX 1: Batch DB Sync (Accepts array of events)
   const syncEventsToDB = async (eventsToSync: PlannerEvent[]) => {
     try {
       const user = userRef.current;
@@ -106,10 +124,24 @@ export function usePlannerSystem() {
     } catch (e) { console.error("Log Sync Error", e); }
   };
 
-  // --- BOOT-UP & DATA FETCH ---
+  // --- FIX 1: AUTH RE-SYNC (Single Source of Truth) ---
   useEffect(() => {
-    if (isInitializing.current || typeof window === "undefined") return;
-    isInitializing.current = true;
+    if (!supabase) return;
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (_event: AuthChangeEvent, session: Session | null) => {
+        const user = session?.user ?? null;
+        userRef.current = user;
+        setCurrentUser(user);
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, [supabase]);
+
+  // --- FIX 2: BOOT-UP & DATA FETCH (Driven by currentUser) ---
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
     const hasSeenStatus = sessionStorage.getItem("app_status_seen");
     if (!hasSeenStatus) setIsStatusModalOpen(true);
@@ -119,88 +151,133 @@ export function usePlannerSystem() {
       let loadedLogs: SystemLog[] = [];
 
       try {
-        if (supabase) {
-          const { data: { session } } = await supabase.auth.getSession();
-          const user = session?.user;
-          userRef.current = user; // 🔥 Prime the cache
+        const user = userRef.current; 
 
-          if (user) {
-            const [eventsRes, logsRes] = await Promise.all([
-              supabase.from('planner_events').select('*').eq('user_id', user.id).order('event_date', { ascending: false }),
-              supabase.from('planner_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }).limit(50)
-            ]);
+        if (user && supabase) {
+          const [eventsRes, logsRes] = await Promise.all([
+            supabase.from('planner_events').select('*').eq('user_id', user.id).order('event_date', { ascending: false }),
+            supabase.from('planner_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }).limit(50)
+          ]);
 
-            if (eventsRes.data) {
-              loadedEvents = (eventsRes.data as DBPlannerEvent[]).map(row => ({
-                id: row.id, title: row.title, date: row.event_date,
-                time: row.event_time.substring(0, 5), type: row.event_type as TaskType,
-                priority: row.priority as Priority, status: row.status as EventStatus,
-                history: row.history || {}, createdAt: row.created_at
-              }));
-            }
+          if (eventsRes.data) {
+            loadedEvents = (eventsRes.data as DBPlannerEvent[]).map(mapRow);
+          }
 
-            if (logsRes.data) {
-              loadedLogs = (logsRes.data as any[]).map(row => ({
-                id: row.id, action: row.action, details: row.details, timestamp: row.timestamp
-              }));
-            }
+          if (logsRes.data) {
+            loadedLogs = (logsRes.data as any[]).map((row) => ({
+              id: row.id, action: row.action, details: row.details, timestamp: row.timestamp
+            }));
+          }
+        } else if (!user) {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const payload: SystemPayload = JSON.parse(raw);
+            loadedEvents = payload.events || [];
+            loadedLogs = payload.logs || [];
           }
         }
       } catch (err) {
-        console.error("DB Load failed, falling back to local", err);
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const payload: SystemPayload = JSON.parse(raw);
-          loadedEvents = payload.events || [];
-          loadedLogs = payload.logs || [];
-        }
-      }
+        console.error("DB Load failed", err);
+      } finally {
+        setEvents(loadedEvents);
+        setLogs(loadedLogs);
+        setIsReady(true); 
 
-      setEvents(loadedEvents);
-      setLogs(loadedLogs);
-      setIsReady(true);
+        // Notifications logic
+        if (!sessionStorage.getItem("planner_behavior_scanned") && loadedEvents.length > 0) {
+          sessionStorage.setItem("planner_behavior_scanned", "true");
+          const todayStr = new Date().toISOString().split('T')[0];
+          const todayEvents = loadedEvents.filter(e => e.date === todayStr);
 
-      if (!sessionStorage.getItem("planner_behavior_scanned")) {
-        sessionStorage.setItem("planner_behavior_scanned", "true");
-        const todayStr = new Date().toISOString().split('T')[0];
-        const todayEvents = loadedEvents.filter(e => e.date === todayStr);
-
-        if (todayEvents.length === 0) {
-          setTimeout(() => addNotification('planner', 'No Plan Today', 'Your schedule is empty.', 'high', '/calender-event'), 4000);
-        } else if (todayEvents.length > 8) {
-          setTimeout(() => addNotification('planner', 'Overload Warning', `You have ${todayEvents.length} events scheduled today.`, 'high', '/calender-event'), 4000);
+          if (todayEvents.length === 0) {
+            setTimeout(() => addNotification('planner', 'No Plan Today', 'Your schedule is empty.', 'high', '/calender-event'), 4000);
+          } else if (todayEvents.length > 8) {
+            setTimeout(() => addNotification('planner', 'Overload Warning', `You have ${todayEvents.length} events scheduled today.`, 'high', '/calender-event'), 4000);
+          }
         }
       }
     };
 
     initPlanner();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUser, addNotification]); 
 
-  // --- 🔥 FIX 10: REALTIME SYNC ENGINE ---
+  // --- FIX 3: REALTIME ENGINE (Strictly tied to currentUser) ---
   useEffect(() => {
-    if (!supabase) return;
-    const channel = supabase.channel("planner-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "planner_events" }, async () => {
-        const user = userRef.current;
-        if (!user) return;
-        const { data, error } = await supabase.from('planner_events').select('*').eq('user_id', user.id).order('event_date', { ascending: false });
-        if (data && !error) {
-          const refreshed = (data as DBPlannerEvent[]).map(row => ({
-            id: row.id, title: row.title, date: row.event_date,
-            time: row.event_time.substring(0, 5), type: row.event_type as TaskType,
-            priority: row.priority as Priority, status: row.status as EventStatus,
-            history: row.history || {}, createdAt: row.created_at
-          }));
-          setEvents(refreshed);
+    if (!supabase || !currentUser) return;
+
+    const channel = supabase
+      .channel(`planner-${currentUser.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "planner_events",
+          filter: `user_id=eq.${currentUser.id}`
+        },
+        (payload: any) => {
+          if (payload.eventType === "INSERT") {
+            setEvents(prev => [mapRow(payload.new), ...prev]);
+          } else if (payload.eventType === "UPDATE") {
+            setEvents(prev =>
+              prev.map(e => e.id === payload.new.id ? mapRow(payload.new) : e)
+            );
+          } else if (payload.eventType === "DELETE") {
+            setEvents(prev =>
+              prev.filter(e => e.id !== payload.old.id)
+            );
+          }
         }
-      }).subscribe();
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "planner_logs",
+          filter: `user_id=eq.${currentUser.id}`
+        },
+        (payload: any) => {
+          if (payload.eventType === "INSERT") {
+            setLogs(prev => [{
+              id: payload.new.id, 
+              action: payload.new.action, 
+              details: payload.new.details, 
+              timestamp: payload.new.timestamp 
+            }, ...prev]);
+          }
+        }
+      )
+      .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, currentUser]);
 
-  // --- 🔥 FIX 2: AUTO-UPDATE MISSED TASKS (Optimized) ---
+  // --- RECOVERY SYNC ---
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!navigator.onLine) return;
+
+      const user = userRef.current;
+      if (!user || !supabase) return;
+
+      supabase
+        .from('planner_events')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('event_date', { ascending: false })
+        .then((res: { data: DBPlannerEvent[] | null }) => {
+          const data = res.data;
+          if (data) setEvents(data.map(mapRow));
+        });
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [supabase]);
+
+  // --- AUTO-UPDATE MISSED TASKS ---
   useEffect(() => {
     if (!isReady || events.length === 0) return;
 
@@ -213,7 +290,6 @@ export function usePlannerSystem() {
         const newlyMissed: PlannerEvent[] = [];
 
         const updated = prev.map(event => {
-          // 🔥 Check only pending events from today or earlier
           if (event.status === "pending" && event.date <= todayStr) {
             const eventDateTime = new Date(`${event.date}T${event.time}`);
             if (eventDateTime < now) {
@@ -232,20 +308,19 @@ export function usePlannerSystem() {
         });
 
         if (stateChanged && newlyMissed.length > 0) {
-          syncEventsToDB(newlyMissed); // 🔥 Batch DB push
+          syncEventsToDB(newlyMissed); 
         }
 
-        return stateChanged ? updated : prev; // 🔥 Prevents unnecessary re-renders
+        return stateChanged ? updated : prev; 
       });
     };
 
     checkMissedTasks();
     const timer = setInterval(checkMissedTasks, 60000); 
     return () => clearInterval(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady, events.length, addNotification, safeNotify]);
 
-  // --- 🔥 FIX 7: THROTTLED LOCAL PERSISTENCE ---
+  // --- THROTTLED LOCAL PERSISTENCE ---
   useEffect(() => {
     if (!isReady) return;
     if (saveRef.current) clearTimeout(saveRef.current);
@@ -404,7 +479,7 @@ export function usePlannerSystem() {
       });
       
       if (count > 0) {
-        syncEventsToDB(recovered); // 🔥 Batch save all recovered events
+        syncEventsToDB(recovered); 
         createLog("RESCHEDULE", `Auto-recovered ${count} tasks`);
         addNotification('planner', 'Tasks Recovered', `${count} missed tasks have been auto-rescheduled.`, 'medium', '/calender-event');
       }
@@ -413,7 +488,7 @@ export function usePlannerSystem() {
     });
   };
 
-  // --- 🔥 FIX 3 & 9: FILTER & SORT OPTIMIZATION ---
+  // --- FILTER & SORT OPTIMIZATION ---
   const filteredEvents = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];
     return events.filter(e => {
@@ -422,7 +497,7 @@ export function usePlannerSystem() {
       if (activeTab === "today") return e.date === today;
       if (activeTab === "all") return true;
       return false; 
-    }).sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time)); // Optimized Sorting
+    }).sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time)); 
   }, [events, activeTab, debouncedSearch]);
 
   const analytics = useMemo(() => {

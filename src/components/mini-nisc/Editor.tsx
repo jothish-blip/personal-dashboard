@@ -1,10 +1,10 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import TextAlign from '@tiptap/extension-text-align';
-import Link from '@tiptap/extension-link';
+// Removed duplicate Link import since StarterKit handles basic marks, keeping configuration explicit if needed
 import CharacterCount from '@tiptap/extension-character-count';
 import Color from '@tiptap/extension-color';
 import { TextStyle } from '@tiptap/extension-text-style';
@@ -19,31 +19,56 @@ import {
   Heading1, Heading2, List, Terminal, Minus, Plus, Eye, EyeOff
 } from 'lucide-react';
 
-// --- Font Size Extension ---
-const FontSize = TextStyle.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      fontSize: {
-        default: null,
-        parseHTML: element => element.style.fontSize,
-        renderHTML: attributes => {
-          if (!attributes.fontSize) return {};
-          return { style: `font-size: ${attributes.fontSize}` };
+const FontSize = Extension.create({
+  name: 'fontSize',
+  addOptions() {
+    return { types: ['textStyle'] };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: element => element.style.fontSize || null,
+            renderHTML: attributes => {
+              if (!attributes.fontSize) return {};
+              return { style: `font-size: ${attributes.fontSize}` };
+            },
+          },
         },
       },
-    };
+    ];
   },
   addCommands() {
     return {
       setFontSize: (size: string) => ({ chain }: any) => {
-        return chain()
-          .setMark('textStyle', { fontSize: size })
-          .run();
+        return chain().setMark('textStyle', { fontSize: size }).run();
       },
     };
   },
 });
+
+const editorExtensions = [
+  StarterKit.configure({
+    heading: { levels: [1, 2, 3] },
+    bulletList: { keepMarks: true },
+    orderedList: { keepMarks: true },
+  }),
+  TextStyle,
+  FontSize, 
+  Color,
+  FontFamily,
+  Subscript,
+  Superscript,
+  Highlight.configure({ multicolor: true }),
+  TaskList,
+  TaskItem.configure({ nested: true }),
+  Placeholder.configure({ placeholder: "Type '/' for commands or start writing..." }),
+  TextAlign.configure({ types: ['heading', 'paragraph'] }),
+  CharacterCount,
+];
 
 const ToolbarButton = ({ children, onClick, isActive, title, className = "" }: any) => (
   <button
@@ -75,37 +100,25 @@ export default function Editor({ system }: any) {
     updateDocumentContent,
     removeTag,
     saveState,
-    lastSavedTime
+    lastSavedTime,
+    editingDocRef
   } = system;
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [showFocusMode, setShowFocusMode] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
 
-  const saveTimeout = useRef<NodeJS.Timeout | null>(null);
+  const activeDocIdRef = useRef(activeDocId);
+  useEffect(() => {
+    activeDocIdRef.current = activeDocId;
+  }, [activeDocId]);
 
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-        bulletList: { keepMarks: true },
-        orderedList: { keepMarks: true },
-      }),
-      TextStyle,
-      FontSize as any,
-      Color,
-      FontFamily,
-      Subscript,
-      Superscript,
-      Highlight.configure({ multicolor: true }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      Placeholder.configure({ placeholder: "Type '/' for commands or start writing..." }),
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Link.configure({ openOnClick: false }),
-      CharacterCount,
-    ],
+    extensions: editorExtensions, 
     content: activeDocument?.content || '',
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
@@ -113,50 +126,44 @@ export default function Editor({ system }: any) {
       const textBefore = editor.state.doc.textBetween(Math.max(0, from - 1), from);
       setShowSlashMenu(textBefore === '/');
 
-      if (saveTimeout.current) clearTimeout(saveTimeout.current);
-      saveTimeout.current = setTimeout(() => {
-        updateDocumentContent(activeDocId, html);
-      }, 600);
+      if (activeDocIdRef.current) {
+        updateDocumentContent(activeDocIdRef.current, html);
+      }
     },
   });
 
+  const prevDocId = useRef(activeDocId);
+
   useEffect(() => {
-    if (editor && activeDocument && editor.getHTML() !== activeDocument.content) {
+    if (!editor || !activeDocument) return;
+
+    // Detect if user swapped documents in sidebar
+    if (prevDocId.current !== activeDocId) {
+      editor.commands.setContent(activeDocument.content || "<p></p>");
+      prevDocId.current = activeDocId;
+      return; 
+    }
+
+    // Do NOT overwrite editor content if the user is currently typing
+    if (editor.isFocused || editingDocRef.current === activeDocId) return;
+
+    const currentHTML = editor.getHTML();
+    if (currentHTML !== activeDocument.content) {
       editor.commands.setContent(activeDocument.content || "<p></p>");
     }
-  }, [activeDocId, editor, activeDocument?.content]);
+  }, [activeDocId, editor, activeDocument?.content, editingDocRef]);
 
-  if (!activeDocument || !editor) return null;
+  if (!mounted || !activeDocument || !editor) return null;
 
   const handleSlashCommand = (command: string) => {
     const chain = editor.chain().focus();
     switch (command) {
-      case 'h1':
-        chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from })
-             .toggleHeading({ level: 1 }).run();
-        break;
-      case 'h2':
-        chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from })
-             .toggleHeading({ level: 2 }).run();
-        break;
-      case 'todo':
-        chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from })
-             .toggleTaskList().run();
-        break;
-      case 'quote':
-        chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from })
-             .toggleBlockquote().run();
-        break;
-      case 'divider':
-        chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from })
-             .setHorizontalRule().run();
-        break;
-      case 'code':
-        chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from })
-             .toggleCodeBlock().run();
-        break;
-      default:
-        break;
+      case 'h1': chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from }).toggleHeading({ level: 1 }).run(); break;
+      case 'h2': chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from }).toggleHeading({ level: 2 }).run(); break;
+      case 'todo': chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from }).toggleTaskList().run(); break;
+      case 'quote': chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from }).toggleBlockquote().run(); break;
+      case 'divider': chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from }).setHorizontalRule().run(); break;
+      case 'code': chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from }).toggleCodeBlock().run(); break;
     }
     setShowSlashMenu(false);
   };
@@ -165,8 +172,7 @@ export default function Editor({ system }: any) {
 
   return (
     <div className={`min-h-screen transition-all duration-300 ${showFocusMode ? 'bg-zinc-950' : 'bg-gray-50'}`}>
-
-      {/* DOCUMENT HEADER - Improved Tags */}
+      {/* DOCUMENT HEADER */}
       <div className={`max-w-5xl mx-auto px-4 pt-6 pb-8 ${showFocusMode ? 'hidden' : ''}`}>
         <div className="bg-white border border-gray-200 rounded-[2.5rem] shadow-sm p-8">
           <input
@@ -177,20 +183,11 @@ export default function Editor({ system }: any) {
             placeholder="Untitled Note"
           />
           
-          {/* Improved Tag System */}
           <div className="flex flex-wrap gap-2 mt-6">
             {activeDocument.tags?.map((tag: string) => (
-              <span 
-                key={tag} 
-                className="px-4 py-1.5 bg-green-50 text-green-700 text-sm font-semibold rounded-2xl border border-green-100 flex items-center gap-2 shadow-sm"
-              >
+              <span key={tag} className="px-4 py-1.5 bg-green-50 text-green-700 text-sm font-semibold rounded-2xl border border-green-100 flex items-center gap-2 shadow-sm">
                 #{tag}
-                <button 
-                  onClick={() => removeTag(activeDocument.id, tag)} 
-                  className="ml-1 text-green-600 hover:text-red-500 font-bold text-lg leading-none"
-                >
-                  ×
-                </button>
+                <button onClick={() => removeTag(activeDocument.id, tag)} className="ml-1 text-green-600 hover:text-red-500 font-bold text-lg leading-none">×</button>
               </span>
             ))}
             {(!activeDocument.tags || activeDocument.tags.length === 0) && (
@@ -255,7 +252,7 @@ export default function Editor({ system }: any) {
 
           <div className="flex-1" />
 
-          {/* Right Controls - Fixed Undo/Redo */}
+          {/* Right Controls */}
           <div className="flex items-center gap-2">
             <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Undo"><Undo size={20}/></ToolbarButton>
             <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Redo"><Redo size={20}/></ToolbarButton>
@@ -314,14 +311,11 @@ export default function Editor({ system }: any) {
 
       {/* ==================== MOBILE COMBINED TOOLBAR ==================== */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-2xl">
-        {/* Toolbar Row */}
         <div className="flex items-center gap-1 p-2 overflow-x-auto border-b border-gray-100">
-          {/* Formatting */}
           <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')}><Bold size={20}/></ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')}><Italic size={20}/></ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} isActive={editor.isActive('strike')}><Strikethrough size={20}/></ToolbarButton>
 
-          {/* Compact Color + Highlight */}
           <div className="flex items-center gap-1 border-l border-r border-gray-200 px-2 mx-1">
             <input
               type="color"
@@ -334,7 +328,6 @@ export default function Editor({ system }: any) {
             </ToolbarButton>
           </div>
 
-          {/* Font Family & Size */}
           <select
             className="bg-white border border-gray-200 text-sm font-medium rounded-xl px-3 py-2 outline-none cursor-pointer text-gray-700 flex-shrink-0"
             onChange={(e) => editor.chain().focus().setFontFamily(e.target.value).run()}
@@ -355,7 +348,6 @@ export default function Editor({ system }: any) {
             <option value="32px">32</option>
           </select>
 
-          {/* Blocks */}
           <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} isActive={editor.isActive('heading', { level: 1 })}>H1</ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} isActive={editor.isActive('heading', { level: 2 })}>H2</ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive('bulletList')}><List size={20}/></ToolbarButton>
@@ -363,7 +355,6 @@ export default function Editor({ system }: any) {
 
           <div className="flex-1 min-w-4" />
 
-          {/* Undo / Redo / Focus - Now clearly visible */}
           <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Undo"><Undo size={21}/></ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Redo"><Redo size={21}/></ToolbarButton>
           <ToolbarButton onClick={() => setShowFocusMode(!showFocusMode)} title="Focus Mode">
@@ -371,7 +362,6 @@ export default function Editor({ system }: any) {
           </ToolbarButton>
         </div>
 
-        {/* Status Bar */}
         <div className="flex justify-between items-center px-6 py-2.5 text-xs font-medium bg-white">
           <div className="font-mono text-gray-400">
             {wordCount} words
@@ -380,7 +370,7 @@ export default function Editor({ system }: any) {
             {saveState === 'saving' ? (
               <>⟳ Saving...</>
             ) : (
-              <>✓ Saved {lastSavedTime}</>
+              <>✓ Saved {lastSavedTime || "just now"}</>
             )}
           </div>
         </div>

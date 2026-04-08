@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
 import { FaGithub } from "react-icons/fa";
+import { Loader2, ShieldCheck } from "lucide-react";
 
 // Official Google SVG Icon
 const GoogleIcon = () => (
@@ -15,7 +16,7 @@ const GoogleIcon = () => (
   </svg>
 );
 
-export default function RegisterPage() {
+function RegisterContent() {
   const router = useRouter();
   const supabase = getSupabaseClient();
   
@@ -33,16 +34,16 @@ export default function RegisterPage() {
     checkUser();
   }, [router, supabase]);
 
-  // Progressive enhancement: accepts any string provider
+  // Progressive enhancement: OAuth handles both Sign Up and Sign In automatically
   const handleSocialLogin = async (provider: string) => {
-    if (loadingProvider) return; // Prevent double clicks / race conditions
+    if (loadingProvider) return; 
     
     setLoadingProvider(provider);
     setError("");
     
     try {
       const { error: authError } = await supabase.auth.signInWithOAuth({ 
-        provider: provider as any, // Typecast for supabase
+        provider: provider as any, 
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         }
@@ -50,124 +51,171 @@ export default function RegisterPage() {
       
       if (authError) throw authError;
     } catch (err: any) {
-      // Improved Error Messaging
       if (err.message?.toLowerCase().includes("popup_closed")) {
-        setError("Login cancelled.");
+        setError("Registration cancelled.");
       } else {
-        setError("Connection failed. Check your internet or try again.");
+        setError("Connection failed. Please try again.");
       }
       setLoadingProvider(null);
     }
   };
 
   return (
-    <div className="relative min-h-screen flex items-start justify-center pt-12 pb-[env(safe-area-inset-bottom)] bg-gradient-to-br from-white via-gray-50 to-gray-100 px-4 overflow-hidden">
+    <div className="min-h-screen flex bg-[#FAFAFA] text-gray-900 relative overflow-hidden selection:bg-indigo-100">
       
-      {/* Subtle Background Motion - Hidden on mobile for performance */}
-      <div className="hidden sm:block absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-gray-200/40 rounded-full blur-3xl animate-pulse" />
-      <div className="hidden sm:block absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-gray-200/30 rounded-full blur-3xl animate-pulse delay-1000" />
+      {/* 🌌 DEPTH LAYERS: Ambient Light Background Orbs */}
+      <div className="absolute top-[-10%] left-[-5%] w-[40vw] h-[40vw] rounded-full bg-indigo-200/40 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-5%] w-[30vw] h-[30vw] rounded-full bg-blue-200/40 blur-[100px] pointer-events-none" />
+      <div className="absolute top-[40%] left-[60%] w-[20vw] h-[20vw] rounded-full bg-orange-100/50 blur-[80px] pointer-events-none" />
 
-      {/* Main Card */}
-      <div className="relative z-10 w-full max-w-md bg-white border border-gray-200 rounded-3xl px-4 py-6 sm:px-5 sm:py-8 shadow-sm transition-all duration-300 animate-in fade-in">
+      {/* 🖥️ LEFT SIDE: Brand & Emotion (Hidden on Mobile) */}
+      <div className="hidden lg:flex w-1/2 flex-col justify-between p-16 relative z-10">
         
-        {/* Branding Identity */}
-        <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 text-center">
-          NexTask OS
-        </div>
-
-        {/* Header Section */}
-        <div className="text-center">
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-gray-900">
-            Welcome to NexTask
-          </h2>
-          <p className="text-sm text-gray-500 mt-3 leading-relaxed max-w-xs mx-auto">
-            Your personal execution system for focus, tasks, and growth.
-          </p>
-          
-          {/* Focus Cue */}
-          <div className="mt-3 text-center">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
-              Enter Focus Mode
-            </span>
+        {/* Brand Header */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-white shadow-sm border border-gray-200 rounded-xl flex items-center justify-center">
+            <span className="font-bold text-lg text-gray-900">Nx</span>
           </div>
-        </div>
-
-        {/* Divider */}
-        <div className="flex items-center gap-4 my-6">
-          <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-            Sign in
+          <span className="font-semibold tracking-wide text-xl text-gray-900">
+            NexTask <span className="text-orange-500 font-black text-sm">OS</span>
           </span>
-          <div className="flex-1 h-px bg-gray-200" />
         </div>
 
-        {/* Provider Grid */}
-        <div className="mt-8 flex flex-col gap-3.5">
-          {/* Google - INDUSTRY STANDARD ACTION */}
-          <button
-            onClick={() => handleSocialLogin('google')}
-            onKeyDown={(e) => e.key === "Enter" && handleSocialLogin('google')}
-            disabled={!!loadingProvider}
-            className="flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl bg-white border border-gray-300 text-gray-800 hover:bg-gray-50 hover:shadow-md hover:-translate-y-[1px] transition-all font-semibold text-base active:scale-[0.97] focus:outline-none focus:ring-2 focus:ring-black/10 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
-          >
-            {loadingProvider === 'google' ? (
-              <>
-                <span className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-                <span>Connecting to Google...</span>
-              </>
-            ) : (
-              <>
-                <GoogleIcon />
-                <span>Continue with Google</span>
-              </>
-            )}
-          </button>
-
-          {/* GitHub - IDENTITY DRIVEN ACTION */}
-          <button
-            onClick={() => handleSocialLogin('github')}
-            disabled={!!loadingProvider}
-            className="flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl bg-gray-900 text-white hover:bg-black hover:shadow-md hover:-translate-y-[1px] transition-all font-semibold text-base active:scale-[0.97] focus:outline-none focus:ring-2 focus:ring-black/10 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
-          >
-            {loadingProvider === 'github' ? (
-              <>
-                <span className="w-4 h-4 border-2 border-gray-600 border-t-white rounded-full animate-spin" />
-                <span>Connecting to GitHub...</span>
-              </>
-            ) : (
-              <>
-                <FaGithub className="text-xl" />
-                <span>Continue with GitHub</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Error Handling UI */}
-        {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 shadow-sm rounded-lg flex items-center justify-center gap-2 text-red-600 text-sm sm:text-xs font-medium animate-in fade-in">
-            <span className="text-base">⚠️</span> {error}
-          </div>
-        )}
-
-        {/* Trust Builder */}
-        <div className="mt-8">
-          <p className="text-[11px] text-gray-400 text-center">
-            We use secure sign-in. No passwords required.
-          </p>
-        </div>
-
-        {/* Footer / Trust Signals */}
-        <div className="mt-6 pt-6 border-t border-gray-100">
-          <p className="text-[11px] text-gray-400 text-center flex flex-col items-center gap-1.5">
-            <span>End-to-end encrypted session</span>
-            <span className="flex items-center gap-1">
-              Secured by <span className="font-bold text-emerald-600">Supabase Auth</span>
+        {/* Emotional Copy */}
+        <div className="max-w-xl">
+          <h1 className="text-5xl xl:text-6xl font-black tracking-tight leading-[1.1] mb-6 text-gray-900">
+            Build your system.<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-gray-400 to-gray-600">
+              Not just your tasks.
             </span>
+          </h1>
+          <p className="text-lg text-gray-500 leading-relaxed font-light">
+            Your personal execution engine designed for deep work, relentless focus, and compounding daily growth. 
           </p>
         </div>
+
+        {/* Trust Footer */}
+        <div className="flex items-center gap-3 text-sm text-gray-500 font-medium">
+          <ShieldCheck size={18} className="text-emerald-500" />
+          Enterprise-grade encryption by Supabase
+        </div>
+      </div>
+
+      {/* 📱 RIGHT SIDE / MOBILE: Auth Actions */}
+      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 sm:p-12 relative z-10">
+        
+        {/* Mobile Header (Only visible on small screens) */}
+        <div className="lg:hidden flex flex-col items-center text-center mb-10 mt-8">
+          <div className="w-12 h-12 bg-white shadow-sm border border-gray-200 rounded-2xl flex items-center justify-center mb-6">
+            <span className="font-bold text-xl text-gray-900">Nx</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight leading-[1.1] mb-3 text-gray-900">
+            Build your system.
+          </h1>
+          <p className="text-sm text-gray-500 px-4">
+            Your execution engine for focus and growth.
+          </p>
+        </div>
+
+        {/* ✨ PREMIUM LIGHT GLASS CARD */}
+        <div className="w-full max-w-[420px] bg-white/70 backdrop-blur-2xl border border-white rounded-3xl p-8 sm:p-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+          
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 mb-2">Initialize Your Account</h2>
+            <p className="text-sm text-gray-500">Create your account to start building.</p>
+          </div>
+
+          {/* Provider Grid */}
+          <div className="flex flex-col gap-4">
+            
+            {/* Google - Clean White */}
+            <button
+              onClick={() => handleSocialLogin('google')}
+              disabled={!!loadingProvider}
+              className="group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
+            >
+              {loadingProvider === 'google' ? (
+                <Loader2 size={18} className="animate-spin text-gray-500" />
+              ) : (
+                <>
+                  <GoogleIcon />
+                  <span>Continue with Google</span>
+                </>
+              )}
+            </button>
+
+            {/* Facebook - Solid brand color */}
+            <button
+              onClick={() => handleSocialLogin('facebook')}
+              disabled={!!loadingProvider}
+              className="group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl bg-[#1877F2] text-white hover:bg-[#1877F2]/90 hover:shadow-[0_4px_14px_rgba(24,119,242,0.3)] transition-all duration-200 font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
+            >
+              {loadingProvider === 'facebook' ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <>
+                  <span className="font-bold text-xl leading-none">f</span>
+                  <span>Continue with Facebook</span>
+                </>
+              )}
+            </button>
+
+            {/* GitHub - Solid Dark */}
+            <button
+              onClick={() => handleSocialLogin('github')}
+              disabled={!!loadingProvider}
+              className="group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl bg-gray-900 border border-gray-900 text-white hover:bg-black hover:shadow-[0_4px_14px_rgba(0,0,0,0.2)] transition-all duration-200 font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
+            >
+              {loadingProvider === 'github' ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <>
+                  <FaGithub className="text-xl" />
+                  <span>Continue with GitHub</span>
+                </>
+              )}
+            </button>
+
+          </div>
+
+          {/* Error UI */}
+          {error && (
+            <div className="mt-6 p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm font-medium flex items-center gap-3 animate-in fade-in">
+              <span>⚠️</span> {error}
+            </div>
+          )}
+
+          {/* Mobile Trust Signals */}
+          <div className="lg:hidden mt-8 flex justify-center items-center gap-2 text-[11px] text-gray-500 font-medium">
+            <ShieldCheck size={14} className="text-emerald-500" />
+            Secured by Supabase Auth
+          </div>
+        </div>
+
+        {/* Login Link */}
+        <p className="mt-8 text-sm text-gray-500 font-medium">
+          Already have a system?{" "}
+          <button
+            onClick={() => router.push("/login")}
+            className="text-gray-900 font-bold hover:text-orange-500 transition-colors underline decoration-gray-300 underline-offset-4 hover:decoration-orange-500"
+          >
+            Sign in
+          </button>
+        </p>
 
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
+        <Loader2 className="w-8 h-8 text-gray-900 animate-spin" />
+      </div>
+    }>
+      <RegisterContent />
+    </Suspense>
   );
 }

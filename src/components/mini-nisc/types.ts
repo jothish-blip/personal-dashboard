@@ -20,6 +20,7 @@ export interface Document {
   mediaIds: string[];
   createdAt: number;
   updatedAt: number;
+  version: number;
 }
 
 export interface Media {

@@ -8,7 +8,8 @@ export interface NexNotification {
   timestamp: number;
   read: boolean;
   priority: 'low' | 'medium' | 'high';
-  actionUrl?: string; // Where to go when clicked
+  actionUrl: string; // Made consistent with DB action_url
+  archived: boolean; // ✅ Required for the soft-delete/clear logic
 }
 
 export interface NotificationState {

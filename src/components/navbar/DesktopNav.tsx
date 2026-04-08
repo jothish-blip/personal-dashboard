@@ -7,8 +7,6 @@ import {
   BookOpen, 
   Brain, 
   CalendarDays, 
-  Download, 
-  Upload, 
   PanelLeftClose, 
   PanelLeftOpen, 
   Bell,
@@ -24,16 +22,12 @@ interface DesktopNavProps {
   handleNav: (path: string) => void;
   y: string; m: string; years: number[];
   setMonthYear: (val: string) => void;
-  handleImportClick: () => void;
-  exportData: () => void;
-  // ✅ Notification Props
   notifications: NexNotification[];
   unreadCount: number;
   markAsRead: (id: string) => void;
   clearAll: () => void;
   isNoteOpen: boolean;
   setIsNoteOpen: (v: boolean) => void;
-  // ✅ Auth & Profile Props
   handleLogout: () => void;
   userProfile?: any;
 }
@@ -52,12 +46,12 @@ const NAV_ITEMS = [
 ];
 
 export default function DesktopNav({
-  activePaths, handleNav, y, m, years, setMonthYear, handleImportClick, exportData,
+  activePaths, handleNav, y, m, years, setMonthYear,
   notifications, unreadCount, markAsRead, clearAll, isNoteOpen, setIsNoteOpen,
   handleLogout, userProfile
 }: DesktopNavProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false); // ✅ Profile Dropdown State
+  const [isProfileOpen, setIsProfileOpen] = useState(false); 
 
   return (
     <div className="hidden md:flex h-[64px] items-center px-6 max-w-[1500px] mx-auto w-full relative">
@@ -126,37 +120,17 @@ export default function DesktopNav({
 
         <div className="h-5 w-[1px] bg-gray-200 mx-1" />
 
-        {/* DATA ACTIONS */}
-        <div className="flex gap-1">
-          <button 
-            onClick={handleImportClick} 
-            className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-orange-50 hover:text-orange-600 transition-all active:scale-90"
-            title="Import JSON"
-          >
-            <Download size={14} />
-          </button>
-          <button 
-            onClick={exportData} 
-            className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-green-50 hover:text-green-600 transition-all active:scale-90"
-            title="Export JSON"
-          >
-            <Upload size={14} />
-          </button>
-        </div>
-
-        <div className="h-5 w-[1px] bg-gray-200 mx-1" />
-
-        {/* ✅ BELL ICON & NOTIFICATION DROPDOWN */}
+        {/* ✅ NOTIFICATION CENTER */}
         <div className="relative">
           <button 
             onClick={() => setIsNoteOpen(!isNoteOpen)}
             className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-all relative ${
               unreadCount > 0 
-                ? "border-orange-200 bg-orange-50 text-orange-600 animate-in fade-in scale-105" 
+                ? "border-orange-200 bg-orange-50 text-orange-600" 
                 : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
             }`}
           >
-            <Bell size={15} className={unreadCount > 0 ? "animate-swing" : ""} />
+            <Bell size={15} className={unreadCount > 0 ? "animate-pulse" : ""} />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-gray-900 text-white text-[9px] font-bold rounded-full flex items-center justify-center ring-2 ring-white">
                 {unreadCount}
@@ -164,6 +138,7 @@ export default function DesktopNav({
             )}
           </button>
 
+          {/* Render the dropdown center */}
           <NotificationCenter 
             isOpen={isNoteOpen}
             onClose={() => setIsNoteOpen(false)}
@@ -174,12 +149,11 @@ export default function DesktopNav({
           />
         </div>
 
-        {/* ✅ USER PROFILE DROPDOWN */}
+        {/* ACCOUNT SETTINGS */}
         <div className="relative">
           <button 
             onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 bg-white hover:bg-gray-50 transition-all active:scale-95 overflow-hidden"
-            title="Account Settings"
+            className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 bg-white hover:bg-gray-50 transition-all overflow-hidden"
           >
             {userProfile?.avatar_url ? (
               <img src={userProfile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
@@ -190,39 +164,20 @@ export default function DesktopNav({
 
           {isProfileOpen && (
             <>
-              {/* Invisible backdrop to close dropdown when clicking outside */}
               <div className="fixed inset-0 z-40" onClick={() => setIsProfileOpen(false)} />
-              
               <div className="absolute right-0 mt-3 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-2 z-50 animate-in fade-in zoom-in-95 origin-top-right">
                 <div className="px-4 py-2 border-b border-gray-100 mb-1">
                   <p className="text-sm font-bold text-gray-900 truncate">
                     {userProfile?.full_name || "User"}
                   </p>
-                  <p className="text-[10px] text-green-600 font-bold uppercase tracking-widest mt-0.5">
-                    Online & Synced
-                  </p>
+                  <p className="text-[10px] text-green-600 font-bold uppercase mt-0.5">Online</p>
                 </div>
-                
                 <div className="px-2">
-                  <button 
-                    onClick={() => {
-                      handleNav("/settings");
-                      setIsProfileOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <Settings size={15} className="text-gray-400" />
-                    Settings
+                  <button onClick={() => { handleNav("/settings"); setIsProfileOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                    <Settings size={15} /> Settings
                   </button>
-                  <button 
-                    onClick={() => {
-                      handleLogout();
-                      setIsProfileOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors mt-1"
-                  >
-                    <LogOut size={15} className="text-red-400" />
-                    Sign Out
+                  <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors mt-1">
+                    <LogOut size={15} /> Sign Out
                   </button>
                 </div>
               </div>
@@ -230,10 +185,9 @@ export default function DesktopNav({
           )}
         </div>
 
-        {/* SIDEBAR COLLAPSE TOGGLE */}
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="text-gray-400 hover:text-gray-900 transition-colors p-1 active:scale-90 ml-1"
+          className="text-gray-400 hover:text-gray-900 transition-colors p-1"
         >
           {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
         </button>

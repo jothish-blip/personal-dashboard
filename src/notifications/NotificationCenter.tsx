@@ -4,14 +4,13 @@ import React, { useRef, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Bell, Trash2, X, Info, Calendar, Brain, 
-  Book, ListTodo, Search, LayoutGrid, AlertCircle
+  Book, ListTodo, Search, LayoutGrid, AlertCircle, FileText
 } from 'lucide-react';
 import { NexNotification, NexModule } from './types';
 
-// ✅ Re-added unreadCount to the interface
 interface NotificationCenterProps {
   notifications: NexNotification[];
-  unreadCount: number; // <--- Re-added
+  unreadCount: number;
   markAsRead: (id: string) => void;
   clearAll: () => void;
   isOpen: boolean;
@@ -28,13 +27,15 @@ const formatTimeAgo = (timestamp: number): string => {
   return `${Math.floor(hours / 24)}d`;
 };
 
-const ModuleIcon = ({ module }: { module: NexModule }) => {
+const ModuleIcon = ({ module }: { module: string }) => {
   switch (module) {
-    case 'task': return <ListTodo size={14} className="text-blue-500" />;
-    case 'planner': return <Calendar size={14} className="text-purple-500" />;
-    case 'focus': return <Brain size={14} className="text-orange-500" />;
-    case 'diary': return <Book size={14} className="text-green-500" />;
-    default: return <Info size={14} className="text-gray-500" />;
+    case 'task': return <ListTodo size={14} className="text-emerald-500" />;
+    case 'planner': return <Calendar size={14} className="text-blue-500" />;
+    case 'focus': return <Brain size={14} className="text-purple-500" />;
+    case 'diary': return <Book size={14} className="text-indigo-500" />;
+    case 'mini': return <FileText size={14} className="text-amber-500" />;
+    case 'system': return <Bell size={14} className="text-gray-600" />;
+    default: return <Info size={14} className="text-gray-400" />;
   }
 };
 
@@ -44,7 +45,7 @@ export default function NotificationCenter({
   const scrollRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   
-  const [filter, setFilter] = useState<NexModule | 'all'>('all');
+  const [filter, setFilter] = useState<NexModule | 'all' | 'mini' | 'system'>('all');
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredNotifications = useMemo(() => {
@@ -55,6 +56,7 @@ export default function NotificationCenter({
         n.body.toLowerCase().includes(searchQuery.toLowerCase())
       )
       .sort((a, b) => {
+        // Unread first, then newest first
         if (a.read !== b.read) return a.read ? 1 : -1;
         return b.timestamp - a.timestamp;
       });
@@ -64,7 +66,7 @@ export default function NotificationCenter({
 
   const handleNotificationClick = (n: NexNotification) => {
     markAsRead(n.id);
-    if (n.actionUrl) {
+    if (n.actionUrl && n.actionUrl !== "#" && n.actionUrl !== "/") {
       router.push(n.actionUrl);
       onClose(); 
     }
@@ -88,7 +90,11 @@ export default function NotificationCenter({
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Active System Logs</p>
           </div>
           <div className="flex gap-1.5">
-            <button onClick={clearAll} className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-xl transition-all">
+            <button 
+              onClick={(e) => { e.stopPropagation(); clearAll(); }} 
+              className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-xl transition-all"
+              title="Clear All"
+            >
               <Trash2 size={16} />
             </button>
             <button onClick={onClose} className="p-2 hover:bg-gray-200 text-gray-400 rounded-xl transition-all">
@@ -105,28 +111,28 @@ export default function NotificationCenter({
             placeholder="Search intelligence..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none transition-all"
+            className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-black/5 transition-all shadow-sm"
           />
         </div>
 
         {/* Filter Tabs */}
         <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1">
-          {['all', 'task', 'planner', 'focus', 'diary'].map((m) => (
+          {['all', 'task', 'planner', 'focus', 'diary', 'mini', 'system'].map((m) => (
             <button
               key={m}
               onClick={() => setFilter(m as any)}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-tighter transition-all ${
-                filter === m ? 'bg-black text-white' : 'bg-white text-gray-500 border border-gray-100'
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-tighter transition-all whitespace-nowrap ${
+                filter === m ? 'bg-black text-white' : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-50'
               }`}
             >
-              {m}
+              {m === 'mini' ? 'Notes' : m}
             </button>
           ))}
         </div>
       </div>
 
       {/* List */}
-      <div ref={scrollRef} className="overflow-y-auto flex-1 p-3 space-y-2 bg-white custom-scrollbar min-h-[300px]">
+      <div ref={scrollRef} className="overflow-y-auto flex-1 p-3 space-y-2 bg-white min-h-[300px] scrollbar-hide">
         {filteredNotifications.length === 0 ? (
           <div className="py-20 flex flex-col items-center justify-center text-center">
             <LayoutGrid size={24} className="text-gray-200 mb-4" />
@@ -138,7 +144,7 @@ export default function NotificationCenter({
               key={n.id} 
               onClick={() => handleNotificationClick(n)}
               className={`group relative p-4 rounded-2xl border transition-all duration-200 cursor-pointer border-l-4 ${getPriorityClass(n.priority)} ${
-                n.read ? 'opacity-60 border-transparent bg-gray-50/50' : 'border-gray-100'
+                n.read ? 'opacity-60 border-transparent bg-gray-50/50 hover:opacity-100' : 'border-gray-100 hover:shadow-md'
               }`}
             >
               <div className="flex gap-4">
@@ -152,7 +158,7 @@ export default function NotificationCenter({
                     <h4 className={`text-xs font-black truncate ${n.read ? 'text-gray-500' : 'text-gray-900'}`}>
                       {n.title}
                     </h4>
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter shrink-0">
                       {formatTimeAgo(n.timestamp)}
                     </span>
                   </div>
@@ -160,7 +166,7 @@ export default function NotificationCenter({
                     {n.body}
                   </p>
                 </div>
-                {!n.read && <div className="w-2 h-2 rounded-full bg-orange-500 mt-1 animate-pulse" />}
+                {!n.read && <div className="w-2 h-2 rounded-full bg-orange-500 mt-1 animate-pulse shrink-0" />}
               </div>
             </div>
           ))
@@ -173,9 +179,25 @@ export default function NotificationCenter({
           <AlertCircle size={12} />
           {unreadCount} New Signals
         </div>
-        <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-black text-gray-900 hover:bg-gray-50 transition-colors uppercase tracking-widest">
-          Dismiss Hub
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={onClose} 
+            className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-black text-gray-900 hover:bg-gray-50 transition-colors uppercase tracking-widest"
+          >
+            Dismiss
+          </button>
+          
+          {/* ✅ The New Button linking to our dedicated page */}
+          <button 
+            onClick={() => {
+              router.push('/notifications');
+              onClose();
+            }} 
+            className="px-4 py-2 bg-black border border-black rounded-xl text-[10px] font-black text-white hover:bg-gray-800 transition-colors uppercase tracking-widest shadow-sm"
+          >
+            View Full Hub
+          </button>
+        </div>
       </div>
     </div>
   );
