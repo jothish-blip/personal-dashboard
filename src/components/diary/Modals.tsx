@@ -1,102 +1,166 @@
-import React from 'react';
-import { Lock, BookOpen } from 'lucide-react';
+"use client";
+
+import React, { useEffect } from "react";
+import { Lock, BookOpen } from "lucide-react";
+import { getSupabaseClient } from "@/lib/supabase";
+
+/* ================= LOCKED SCREEN ================= */
 
 export function LockedScreen({ passwordAttempt, setPasswordAttempt }: any) {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full mx-auto bg-white p-8 rounded-[24px] shadow-xl text-center border border-gray-100">
-        <div className="bg-red-50 w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 text-slate-900">
+      <div className="max-w-md w-full bg-white border border-gray-200 p-8 rounded-3xl shadow-xl shadow-gray-200/50 text-center">
+        
+        <div className="bg-red-50/80 w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6">
           <Lock className="text-red-500" size={32} />
         </div>
-        <h2 className="text-2xl font-bold mb-2 text-gray-900 tracking-tight">Entry is Locked</h2>
-        <p className="text-sm font-medium text-gray-500 mb-8">Enter your password to view this private memory</p>
-        
+
+        <h2 className="text-2xl font-bold mb-2 text-slate-800">
+          Locked Entry
+        </h2>
+
+        <p className="text-sm text-gray-500 mb-8">
+          This memory is private and secured.
+        </p>
+
         <div className="space-y-4">
-          <input 
-            type="password" 
-            value={passwordAttempt} 
-            onChange={(e) => setPasswordAttempt(e.target.value)} 
-            placeholder="Password" 
-            className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-center text-sm font-bold outline-none focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-500/5 transition-all shadow-sm" 
+          <input
+            type="password"
+            value={passwordAttempt}
+            onChange={(e) => setPasswordAttempt(e.target.value)}
+            placeholder="Enter password"
+            className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-center text-sm font-semibold outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition"
           />
-          <button className="w-full py-3.5 bg-gray-900 hover:bg-black transition-colors text-white font-bold text-sm rounded-xl shadow-md active:scale-[0.98]">
-            Unlock Memory
+
+          <button className="w-full py-3.5 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 hover:scale-[1.01] active:scale-[0.98] transition shadow-lg shadow-orange-500/20">
+            Unlock
           </button>
         </div>
-        
-        <p className="text-[10px] font-bold text-gray-400 mt-8 uppercase tracking-widest">
-          Demo password: <span className="font-mono text-orange-500">nex</span>
+
+        <p className="text-[10px] text-gray-400 mt-8 uppercase tracking-widest font-medium">
+          Demo: <span className="text-orange-600">nex</span>
         </p>
       </div>
     </div>
   );
 }
 
-export function WipPopup({ showWipPopup, setShowWipPopup }: { showWipPopup: boolean, setShowWipPopup: (val: boolean) => void }) {
+/* ================= DIARY GUIDE POPUP ================= */
+
+export function WipPopup({
+  showWipPopup,
+  setShowWipPopup,
+}: {
+  showWipPopup: boolean;
+  setShowWipPopup: (val: boolean) => void;
+}) {
+  const supabase = getSupabaseClient();
+
+  useEffect(() => {
+    const checkSeen = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("diary_guide_seen")
+        .eq("id", user.id)
+        .single();
+
+      if (data?.diary_guide_seen) {
+        setShowWipPopup(false);
+      }
+    };
+
+    if (showWipPopup) checkSeen();
+  }, [showWipPopup, setShowWipPopup, supabase]);
+
+  const handleClose = async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+
+    if (user) {
+      await supabase
+        .from("profiles")
+        .update({ diary_guide_seen: true })
+        .eq("id", user.id);
+    }
+
+    setShowWipPopup(false);
+  };
+
   if (!showWipPopup) return null;
-  
+
   return (
-    <div className="fixed inset-0 z-[200] flex items-start md:items-center justify-center bg-gray-900/40 backdrop-blur-sm px-4 overflow-y-auto">
-      <div className="mt-12 md:mt-0 mb-8 bg-white p-6 sm:p-8 rounded-[24px] shadow-2xl max-w-md w-full relative animate-in fade-in zoom-in-95 duration-300">
-        
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-2">
-          <div className="bg-orange-100 p-2.5 rounded-xl text-orange-600 shadow-sm shrink-0">
-            <BookOpen size={24} />
+    <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-slate-900/20 backdrop-blur-sm px-4">
+      <div className="w-full max-w-md bg-white border border-gray-100 rounded-t-[2rem] md:rounded-3xl shadow-2xl p-6 md:p-8 animate-in slide-in-from-bottom-8 md:zoom-in-95">
+
+        {/* HEADER */}
+        <div className="flex items-center gap-3 mb-3">
+          <div className="bg-orange-50 p-2.5 rounded-xl text-orange-600">
+            <BookOpen size={22} />
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">How to use your Diary</h2>
+          <h2 className="text-xl font-bold text-slate-800">
+            Your Diary System
+          </h2>
         </div>
-        
-        <p className="text-gray-500 text-sm font-medium leading-relaxed mb-8">
-          This is not just a diary — it tracks your behavior, patterns, and progress over time.
+
+        <p className="text-gray-600 text-sm mb-2">
+          Your diary is synced, private, and builds insights from your daily behavior.
         </p>
-        
-        {/* Step-by-Step Guide */}
-        <div className="text-left space-y-5 text-sm text-gray-700 mb-8">
-          <div className="flex gap-4 items-start">
-            <span className="text-xl leading-none pt-0.5">🔹</span>
+
+        <p className="text-xs text-gray-400 mb-6 font-medium">
+          Your data follows your account — not your device.
+        </p>
+
+        {/* CONTENT */}
+        <div className="space-y-5 text-sm text-gray-600 mb-8">
+          <div className="flex gap-3">
+            <span className="font-bold text-orange-600">1.</span>
             <div>
-              <p className="font-bold text-gray-900">1. Set your state</p>
-              <p className="text-gray-500 font-medium mt-1 leading-relaxed">Select your mood, energy, and focus before writing.</p>
+              <p className="font-semibold text-slate-800">Capture your state</p>
+              <p className="text-gray-500">Select mood, energy, and focus before writing.</p>
             </div>
           </div>
 
-          <div className="flex gap-4 items-start">
-            <span className="text-xl leading-none pt-0.5">✍️</span>
+          <div className="flex gap-3">
+            <span className="font-bold text-orange-600">2.</span>
             <div>
-              <p className="font-bold text-gray-900">2. Write your day</p>
-              <p className="text-gray-500 font-medium mt-1 leading-relaxed">Fill morning, afternoon, and evening to capture your real day.</p>
+              <p className="font-semibold text-slate-800">Write your day</p>
+              <p className="text-gray-500">Track morning, afternoon, and evening clearly.</p>
             </div>
           </div>
 
-          <div className="flex gap-4 items-start">
-            <span className="text-xl leading-none pt-0.5">🔒</span>
+          <div className="flex gap-3">
+            <span className="font-bold text-orange-600">3.</span>
             <div>
-              <p className="font-bold text-gray-900">3. Close your day</p>
-              <p className="text-gray-500 font-medium mt-1 leading-relaxed">Click “Close Day” to lock the entry and generate insights.</p>
+              <p className="font-semibold text-slate-800">Close the day</p>
+              <p className="text-gray-500">Lock entries to generate structured insights.</p>
             </div>
           </div>
 
-          <div className="flex gap-4 items-start">
-            <span className="text-xl leading-none pt-0.5">📜</span>
+          <div className="flex gap-3">
+            <span className="font-bold text-orange-600">4.</span>
             <div>
-              <p className="font-bold text-gray-900">4. Review history</p>
-              <p className="text-gray-500 font-medium mt-1 leading-relaxed">Scroll down to the timeline to revisit and replay your past days.</p>
+              <p className="font-semibold text-slate-800">Review patterns</p>
+              <p className="text-gray-500">Understand behavior trends over time.</p>
             </div>
           </div>
         </div>
-        
-        {/* Call to Action */}
-        <button 
-          onClick={() => setShowWipPopup(false)} 
-          className="w-full py-3.5 bg-orange-500 text-white font-bold text-sm rounded-xl hover:bg-orange-600 transition-all shadow-md active:scale-[0.98]"
+
+        {/* CTA */}
+        <button
+          onClick={handleClose}
+          className="w-full py-3.5 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 hover:scale-[1.01] active:scale-[0.98] transition shadow-lg shadow-orange-500/20"
         >
-          Start Using Diary
+          Start Writing
         </button>
 
-        {/* Privacy Trust Signal */}
-        <p className="text-[10px] font-bold text-gray-400 text-center mt-5 uppercase tracking-wider">
-          Your entries are saved automatically and stay private on your device.
+        {/* TRUST */}
+        <p className="text-[10px] text-gray-400 text-center mt-6 uppercase tracking-widest font-bold">
+          Secure • Synced • Private
         </p>
       </div>
     </div>

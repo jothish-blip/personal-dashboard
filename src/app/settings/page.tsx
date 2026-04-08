@@ -140,7 +140,12 @@ export default function SettingsPage() {
             <Shield size={18} />
             Security
           </button>
-          <button className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-500 hover:bg-gray-100 hover:text-black rounded-lg font-medium text-sm transition-colors cursor-not-allowed opacity-50">
+          
+          {/* ✅ UPDATED: Notifications Button now routes to Notification Center */}
+          <button 
+            onClick={() => router.push('/notifications')}
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-500 hover:bg-gray-100 hover:text-black rounded-lg font-medium text-sm transition-colors"
+          >
             <Bell size={18} />
             Notifications
           </button>
@@ -279,6 +284,16 @@ export default function SettingsPage() {
                     </>
                   )}
                 </button>
+                {/* 🚧 TEMPORARY DEV BUTTON - REMOVE BEFORE LAUNCH 🚧 */}
+<button 
+  onClick={() => {
+    localStorage.removeItem("nextask_onboarding_seen");
+    window.location.href = "/"; // Reloads the dashboard
+  }}
+  className="mt-8 px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-100 transition-colors"
+>
+  Dev Mode: Reset Onboarding
+</button>
               </div>
 
             </div>

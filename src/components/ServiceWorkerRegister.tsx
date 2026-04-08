@@ -1,37 +1,63 @@
 "use client";
 
-import { useEffect } from "react";
-import { startInactivityEngine } from "@/notifications/inactivityEngine";
-import { sendToServiceWorker } from "@/notifications/useNotificationSystem"; // Import the OS trigger
-
-// Helper: Timestamp-based lock for the planner notifications
-const acquireLock = (lockKey: string): boolean => {
-  const last = Number(localStorage.getItem(lockKey) || 0);
-  const now = Date.now();
-  if (now - last > 2 * 60 * 60 * 1000) {
-    localStorage.setItem(lockKey, now.toString());
-    return true;
-  }
-  return false;
-};
+import { useEffect, useState } from "react";
+import { AuthChangeEvent, Session } from "@supabase/supabase-js";
+import { startInactivityEngine, initActivityTracker } from "@/notifications/inactivityEngine"; // ✅ Added initActivityTracker
+import { useNotificationSystem } from "@/notifications/useNotificationSystem";
+import { handlePlannerEvent } from "@/notifications/nexNotificationBrain";
+import { getSupabaseClient } from "@/lib/supabase";
 
 export default function ServiceWorkerRegister() {
+  const supabase = getSupabaseClient();
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // 1. Initialize the notification system
+  const { addNotification } = useNotificationSystem(userId);
+
+  // 2. Auth Listener with explicit types to satisfy TS
   useEffect(() => {
-    // 1. REGISTER OS SERVICE WORKER
+    const checkUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUserId(data.user?.id || null);
+    };
+    checkUser();
+
+    // ✅ Added explicit types for _event and session
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => {
+        setUserId(session?.user?.id || null);
+      }
+    );
+
+    return () => authListener.subscription.unsubscribe();
+  }, [supabase]);
+
+  useEffect(() => {
+    // 3. REGISTER OS SERVICE WORKER
     if ("serviceWorker" in navigator) {
       const registerSW = async () => {
-        try { await navigator.serviceWorker.register("/sw.js"); } 
-        catch (err) { console.error("Service Worker registration failed:", err); }
+        try {
+          await navigator.serviceWorker.register("/sw.js");
+        } catch (err) {
+          console.error("Service Worker registration failed:", err);
+        }
       };
 
-      if (document.readyState === "complete") { registerSW(); } 
-      else { window.addEventListener("load", registerSW); }
+      if (document.readyState === "complete") {
+        registerSW();
+      } else {
+        window.addEventListener("load", registerSW);
+      }
     }
 
-    // 2. START INACTIVITY ENGINE (Tasks)
-    startInactivityEngine();
+    // ✅ Wait for user to be logged in before starting intelligent tracking
+    if (!userId) return;
 
-    // 3. START PLANNER ENGINE (Directly inline, no extra file needed)
+    // 4. START INACTIVITY ENGINE & TRACKER
+    initActivityTracker(); // 🔥 Listens to mouse/keyboard to track idle time
+    startInactivityEngine(addNotification); // 🔥 Passes DB link so it can push UI notifications
+
+    // 5. START PLANNER ENGINE
     const plannerTimer = setInterval(() => {
       try {
         const raw = localStorage.getItem("taskflow_planner_v1");
@@ -47,38 +73,24 @@ export default function ServiceWorkerRegister() {
           const eventTime = new Date(`${event.date}T${event.time}`).getTime();
           const diff = eventTime - now;
 
-          const lock1h = `notified_1h_${event.id}`;
-          const lock10m = `notified_10m_${event.id}`;
-          const lockNow = `notified_now_${event.id}`;
-
-          // 🔥 1 HOUR REMINDER (60 to 40 minutes)
+          // 🔥 Reminders delegated to centralized Brain
           if (diff <= 3600000 && diff > 2400000) {
-            if (acquireLock(lock1h)) {
-              sendToServiceWorker("Plan Ahead ⏳", `${event.title} begins in 1 hour.`, "/calender-event");
-            }
+            handlePlannerEvent(addNotification, event, "1h");
           }
-          // 🔥 10 MINUTE REMINDER (10 to 5 minutes)
           else if (diff <= 600000 && diff > 300000) {
-            if (acquireLock(lock10m)) {
-              sendToServiceWorker("Upcoming Event ⏰", `${event.title} begins in 10 minutes.`, "/calender-event");
-            }
+            handlePlannerEvent(addNotification, event, "10m");
           }
-          // 🔥 EVENT STARTING NOW (1 min before to 5 mins after)
           else if (diff <= 60000 && diff > -300000) {
-            if (acquireLock(lockNow)) {
-              sendToServiceWorker("Event Starting ▶️", `${event.title} is starting now.`, "/calender-event");
-            }
+            handlePlannerEvent(addNotification, event, "now");
           }
         });
       } catch (e) {
         console.error("Planner Engine Failed:", e);
       }
-    }, 60000); // Check every 60 seconds
+    }, 60000);
 
-    // Cleanup timer if the bootstrapper ever unmounts
     return () => clearInterval(plannerTimer);
-
-  }, []);
+  }, [userId, addNotification]);
 
   return null;
 }

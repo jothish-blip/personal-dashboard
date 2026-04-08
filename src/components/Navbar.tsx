@@ -6,6 +6,7 @@ import { Meta } from "../types";
 
 import DesktopNav from "./navbar/DesktopNav";
 import MobileNav from "./navbar/MobileNav";
+
 import { 
   Search, 
   LayoutGrid, 
@@ -14,10 +15,10 @@ import {
   Brain, 
   CalendarDays, 
   LogOut,
-  User // Added User icon
+  User 
 } from "lucide-react";
 import { useNotificationSystem } from "@/notifications/useNotificationSystem";
-import { getSupabaseClient } from "@/lib/supabase"; // Correct client import
+import { getSupabaseClient } from "@/lib/supabase";
 
 interface NavbarProps {
   meta: Meta;
@@ -32,7 +33,7 @@ const COMMAND_ROUTES = [
   { label: "Go to Diary", path: "/diary", icon: BookOpen },
   { label: "Go to Focus Engine", path: "/focus", icon: Brain },
   { label: "Go to Planner", path: "/calender-event", icon: CalendarDays },
-  { label: "Settings", path: "/settings", icon: User }, // Added Settings Route
+  { label: "Settings", path: "/settings", icon: User },
 ];
 
 export default function Navbar({ 
@@ -41,24 +42,27 @@ export default function Navbar({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const pathname = usePathname() || ""; 
-
-  // Safely instantiate supabase
   const supabase = getSupabaseClient();
 
-  const { notifications, unreadCount, markAsRead, clearAll } = useNotificationSystem();
+  // 🔥 User State
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  // 🔥 Notification Hook (Requires userId)
+  const { notifications, unreadCount, markAsRead, clearAll } = useNotificationSystem(currentUser?.id);
+
   const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [isCmdKOpen, setIsCmdKOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // 🔥 Add User Profile State
-  const [userProfile, setUserProfile] = useState<any>(null);
-
-  // 🔥 Fetch Profile on Mount
+  // 🔥 Sync Auth User & Profile
   useEffect(() => {
     const fetchProfile = async () => {
       if (!supabase) return;
 
       const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+
       if (!user) return;
 
       const { data } = await supabase
@@ -131,7 +135,7 @@ export default function Navbar({
     clearAll,
     isNoteOpen,
     setIsNoteOpen,
-    userProfile // Passed down in case child components need it
+    userProfile 
   };
 
   const filteredCommands = COMMAND_ROUTES.filter(route => 
@@ -157,6 +161,7 @@ export default function Navbar({
         />
       </nav>
 
+      {/* Cmd + K Command Menu */}
       {isCmdKOpen && (
         <div className="fixed inset-0 z-[9999] bg-gray-900/50 backdrop-blur-sm flex items-start justify-center pt-[15vh] px-4">
           <div className="absolute inset-0" onClick={() => setIsCmdKOpen(false)} />
@@ -194,7 +199,6 @@ export default function Navbar({
                   ))}
                   
                   <div className="mt-2 pt-2 border-t border-gray-100">
-                    {/* 🔥 User Profile displayed right above logout */}
                     {userProfile && (
                       <div className="flex items-center gap-3 px-4 py-3 mb-1">
                         <img 

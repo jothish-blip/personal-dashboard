@@ -78,4 +78,8 @@ export interface FocusState {
   // Environment Controls
   enterFocusMode: () => void;
   exitFocusMode: () => void;
+
+  // ✅ ADD THESE
+  getElapsedTime: () => number;
+  getRemainingTime: () => number;
 }

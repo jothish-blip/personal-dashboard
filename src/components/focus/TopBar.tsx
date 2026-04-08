@@ -27,7 +27,7 @@ const PRESETS = [10, 25, 45, 90];
 export default function TopBar() {
   const { 
     mode, setMode, isActive, isPaused, activeTaskId, currentSession,
-    startSession, pauseSession, stopSession, setTimeRemaining 
+    startSession, pauseSession, stopSession, setTimeRemaining, setInitialSessionTime 
   } = useFocusSystem();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -58,9 +58,10 @@ export default function TopBar() {
 
   const handleModeSelect = (newMode: FocusMode) => {
     setMode(newMode);
-    if (newMode === "custom" && setTimeRemaining) {
+    if (newMode === "custom" && setTimeRemaining && setInitialSessionTime) {
       const minutes = typeof customMinutes === "number" ? customMinutes : 0;
       setTimeRemaining(minutes * 60);
+      setInitialSessionTime(minutes * 60); // ✅ FIX: Setting both
     }
   };
 
@@ -69,11 +70,15 @@ export default function TopBar() {
     if (val === "") {
       setCustomMinutes("");
       if (setTimeRemaining) setTimeRemaining(0);
+      if (setInitialSessionTime) setInitialSessionTime(0); // ✅ FIX: Setting both
       return;
     }
     let num = Math.min(600, Math.max(1, parseInt(val) || 1));
     setCustomMinutes(num);
-    if (mode === "custom" && setTimeRemaining) setTimeRemaining(num * 60);
+    if (mode === "custom" && setTimeRemaining && setInitialSessionTime) {
+      setTimeRemaining(num * 60);
+      setInitialSessionTime(num * 60); // ✅ FIX: Setting both
+    }
   };
 
   return (
@@ -120,7 +125,11 @@ export default function TopBar() {
                     {PRESETS.map((p) => (
                       <button
                         key={p}
-                        onClick={() => { setCustomMinutes(p); if (setTimeRemaining) setTimeRemaining(p * 60); }}
+                        onClick={() => { 
+                          setCustomMinutes(p); 
+                          if (setTimeRemaining) setTimeRemaining(p * 60); 
+                          if (setInitialSessionTime) setInitialSessionTime(p * 60); // ✅ FIX: Setting both
+                        }}
                         className="px-1.5 py-0.5 text-[10px] font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded transition-colors"
                       >
                         {p}

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { User } from '@supabase/supabase-js'; // 🔥 Added Supabase types
+import { User, Session, AuthChangeEvent } from '@supabase/supabase-js'; 
 import { Task, Log, Meta, NexState } from '../types';
 import { useNotificationSystem } from '@/notifications/useNotificationSystem'; 
-import { handleTaskUpdate } from '@/notifications/nexNotificationBrain';
+import { handleTaskUpdate, handleGlobalState } from '@/notifications/nexNotificationBrain';
 import { getSupabaseClient } from "@/lib/supabase";
 
 const KEY = 'NEXTASK_V12_PRO_FINAL';
@@ -34,7 +34,11 @@ const checkMomentum = (tasks: Task[], dateStr: string) => {
 };
 
 export function useNexCore() {
-  const { addNotification } = useNotificationSystem();
+  // 🔹 AUTH STATE
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // 🔹 NOTIFICATION SYSTEM (Requires currentUser?.id)
+  const { addNotification } = useNotificationSystem(currentUser?.id);
 
   const [state, setState] = useState<NexState>({
     tasks: [],
@@ -55,26 +59,15 @@ export function useNexCore() {
   const cleanupRef = useRef<(() => void) | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const realtimeRef = useRef<NodeJS.Timeout | null>(null);
-  const isRealtimeStarted = useRef(false);
-  
-  // 🔥 FIX: Properly typed user reference
   const userRef = useRef<User | null>(null); 
 
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (realtimeRef.current) clearTimeout(realtimeRef.current);
+      if (cleanupRef.current) cleanupRef.current();
     };
   }, []);
-
-  // 🔥 FIX: Non-destructured typed fetch to avoid 'any' error
-  useEffect(() => {
-  const supabase = getSupabaseClient();
-
-  supabase.auth.getUser().then((res: { data: { user: User | null } }) => {
-    userRef.current = res.data.user;
-  });
-}, []);
 
   const debouncedSave = (key: string, data: any) => {
     if (!debounceRef.current) {
@@ -147,7 +140,6 @@ export function useNexCore() {
 
   // 🔹 FETCH TASKS
   const fetchTasksFromDB = async () => {
-    // 🔥 FIX: Use cached user instead of duplicate network call
     const user = userRef.current;
     if (!user) return;
 
@@ -168,14 +160,6 @@ export function useNexCore() {
         history: t.history || {}
       }));
       
-      if (prev.tasks.length === newTasks.length && 
-          prev.tasks.every((t, i) => 
-            t.id === newTasks[i].id && 
-            Object.keys(t.history).length === Object.keys(newTasks[i].history).length
-          )) {
-        return prev;
-      }
-
       const newState = { ...prev, tasks: newTasks };
       debouncedSave(KEY, newState);
       return newState;
@@ -183,61 +167,23 @@ export function useNexCore() {
   };
 
   // 🔹 REALTIME ENGINE
-  const setupRealtime = async () => {
-    if (isRealtimeStarted.current) return null; 
-    isRealtimeStarted.current = true;
-
-    // 🔥 FIX: Use cached user instead of duplicate network call
+  const setupRealtime = () => {
     const user = userRef.current;
-    if (!user) {
-      isRealtimeStarted.current = false;
-      return null;
-    }
+    if (!user) return null; 
 
     const supabase = getSupabaseClient();
-    const channel = supabase.channel("tasks-realtime");
+    
+    if (cleanupRef.current) cleanupRef.current();
+
+    const channel = supabase.channel(`tasks-${user.id}`);
 
     channel.on(
       "postgres_changes",
       { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` },
-      (payload: any) => {
+      () => {
         if (realtimeRef.current) clearTimeout(realtimeRef.current);
         realtimeRef.current = setTimeout(() => {
-          setState(prev => {
-            let updatedTasks = prev.tasks;
-            let changed = false;
-            
-            if (payload.eventType === 'INSERT') {
-              if (!prev.tasks.find(t => t.id === payload.new.id)) {
-                updatedTasks = [...prev.tasks, { 
-                  id: payload.new.id, 
-                  name: payload.new.name, 
-                  group: payload.new.group_name, 
-                  history: payload.new.history || {} 
-                }];
-                changed = true;
-              }
-            } else if (payload.eventType === 'UPDATE') {
-              const exists = prev.tasks.some(t => t.id === payload.new.id);
-              if (exists) {
-                updatedTasks = prev.tasks.map(t => 
-                  t.id === payload.new.id 
-                    ? { ...t, name: payload.new.name, group: payload.new.group_name, history: payload.new.history || {} } 
-                    : t
-                );
-                changed = true;
-              }
-            } else if (payload.eventType === 'DELETE') {
-              const exists = prev.tasks.some(t => t.id === payload.old.id);
-              if (exists) {
-                updatedTasks = prev.tasks.filter(t => t.id !== payload.old.id);
-                changed = true;
-              }
-            }
-            
-            if (!changed) return prev;
-            return { ...prev, tasks: updatedTasks };
-          });
+          fetchTasksFromDB();
         }, 100);
       }
     );
@@ -245,18 +191,57 @@ export function useNexCore() {
     channel.subscribe((status: any) => {
       if (status === 'SUBSCRIBED') {
         console.log("Realtime connected.");
+        fetchTasksFromDB(); 
       }
     });
 
-    return () => {
+    const cleanup = () => {
       supabase.removeChannel(channel);
     };
+
+    cleanupRef.current = cleanup;
+    return cleanup;
   };
+
+  // 🔹 AUTHENTICATION STATE LISTENER
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+
+    const handleAuthChange = (session: Session | null) => {
+      const newUser = session?.user ?? null;
+      
+      if (newUser?.id !== userRef.current?.id) {
+        userRef.current = newUser;
+        setCurrentUser(newUser); 
+        
+        if (newUser) {
+          fetchTasksFromDB();
+          setupRealtime(); 
+        } else {
+          if (cleanupRef.current) cleanupRef.current();
+          setState(prev => ({ ...prev, tasks: [] })); 
+        }
+      }
+    };
+
+    supabase.auth.getSession().then((res: { data: { session: Session | null } }) => {
+      const session = res.data.session;
+      handleAuthChange(session);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+      handleAuthChange(session);
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
   // 🔹 INITIAL LOAD & EVENT LISTENERS
   useEffect(() => {
     const init = async () => {
-      if (typeof window === "undefined" || isRealtimeStarted.current) return;
+      if (typeof window === "undefined") return;
       setLoading(true);
       
       const saved = localStorage.getItem(KEY);
@@ -273,21 +258,7 @@ export function useNexCore() {
       }
 
       setMounted(true);
-
-      // 🔥 FIX: Guard against init race condition. Wait max ~1s for userRef to populate.
-      let retries = 0;
-      while (!userRef.current && retries < 20) {
-        await new Promise(res => setTimeout(res, 50));
-        retries++;
-      }
-
-      await fetchTasksFromDB();   
       setLoading(false);
-      
-      const cleanup = await setupRealtime();
-      if (cleanup) {
-        cleanupRef.current = cleanup; 
-      }
       
       if (navigator.onLine) processQueue();
     };
@@ -304,23 +275,42 @@ export function useNexCore() {
       addNotification("system", "Offline", "No internet connection. Actions will be queued.", "high");
     };
 
+    const handleFocus = () => fetchTasksFromDB();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") fetchTasksFromDB();
+    };
+
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       cleanupRef.current?.(); 
-      isRealtimeStarted.current = false;
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 🔹 PERIODIC SYNC FALLBACK
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (navigator.onLine && userRef.current) {
+        // Updated logic call with addNotification context
+        handleGlobalState(addNotification, state.tasks, []);
+        fetchTasksFromDB(); 
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [state.tasks, addNotification]);
 
   // 🔹 ACTIONS
   const addTask = async (name: string, group: string) => {
     if (!name.trim()) return;
     
-    // 🔥 FIX: Handle null user gracefully
     const user = userRef.current;
     if (!user) {
       addNotification("system", "Auth Error", "User not ready. Try again.", "high");
@@ -363,7 +353,6 @@ export function useNexCore() {
       return;
     }
     
-    // 🔥 FIX: Handle null user gracefully
     const user = userRef.current;
     if (!user) {
       addNotification("system", "Auth Error", "User not ready. Try again.", "high");
@@ -388,7 +377,8 @@ export function useNexCore() {
       return newState;
     });
     
-    if (status) handleTaskUpdate(updatedTasksArray, dateStr); 
+    // ✅ FIX: Added addNotification as the first argument
+    if (status) handleTaskUpdate(addNotification, updatedTasksArray, dateStr); 
 
     if (!navigator.onLine) {
       addToQueue({ type: "UPDATE", id, payload: { history: updatedHistory } });
@@ -405,7 +395,6 @@ export function useNexCore() {
   const deleteTask = async (id: string) => {
     if (!window.confirm("Delete objective?")) return;
     
-    // 🔥 FIX: Handle null user gracefully
     const user = userRef.current;
     if (!user) {
       addNotification("system", "Auth Error", "User not ready. Try again.", "high");
@@ -520,6 +509,7 @@ export function useNexCore() {
     setMonthYear,
     exportData,
     checkMomentum,
-    addAuditLog
+    addAuditLog,
+    currentUser
   };
 }

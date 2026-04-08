@@ -5,6 +5,7 @@ import { Document, Folder, Media, View, HistoryEntry } from "./types";
 import { useNotificationSystem } from "@/notifications/useNotificationSystem";
 import { handleWorkspaceAction, handleGlobalState } from "@/notifications/nexNotificationBrain";
 import { getSupabaseClient } from "@/lib/supabase"; 
+import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 // 🔥 HELPER: Persistent Behavioral Locks
 const acquireLock = (lockKey: string, cooldownMs: number): boolean => {
@@ -29,10 +30,43 @@ const pingActivity = () => {
   }
 };
 
+// ✅ SAFE DB MAPPERS
+const mapDoc = (d: any): Document => ({
+  id: d.id,
+  title: d.title,
+  content: d.content,
+  folderId: d.folder_id ?? null,
+  tags: d.tags || [],
+  pinned: d.pinned ?? false,
+  history: d.history || [],
+  mediaIds: d.media_ids || [],
+  createdAt: new Date(d.created_at).getTime(),
+  updatedAt: new Date(d.updated_at).getTime(),
+  version: d.version ?? 0 
+});
+
+const mapFolder = (f: any): Folder => ({
+  id: f.id, 
+  name: f.name 
+});
+
+const mapMedia = (m: any): Media => ({
+  id: m.id, 
+  type: m.type as "image"|"video", 
+  url: m.url, 
+  name: m.name, 
+  folderId: m.folder_id ?? null, 
+  createdAt: new Date(m.created_at).getTime()
+});
+
 export function useWorkspaceSystem() {
-  const { addNotification } = useNotificationSystem();
   const supabase = getSupabaseClient();
 
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const userRef = useRef<any>(null);
+
+  const { addNotification } = useNotificationSystem(currentUser?.id);
+  
   const [documents, setDocuments] = useState<Document[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [media, setMedia] = useState<Media[]>([]);
@@ -58,31 +92,60 @@ export function useWorkspaceSystem() {
   const firstLoadDone = useRef(false);
   
   const dbSyncTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const editingDocRef = useRef<string | null>(null);
+  const editingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const markEditing = useCallback((docId: string) => {
+    editingDocRef.current = docId;
+    if (editingTimeoutRef.current) {
+      clearTimeout(editingTimeoutRef.current);
+    }
+    editingTimeoutRef.current = setTimeout(() => {
+      editingDocRef.current = null;
+    }, 5000); 
+  }, []);
+
+  const documentsRef = useRef<Document[]>(documents);
+  useEffect(() => {
+    documentsRef.current = documents;
+  }, [documents]);
+
+  // AUTH LISTENER
+  useEffect(() => {
+    if (!supabase) return;
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => {
+        const user = session?.user ?? null;
+        userRef.current = user;
+        setCurrentUser(user);
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, [supabase]);
 
   // --- SUPABASE SYNC HELPERS ---
-  const getUser = async () => {
-    if (!supabase) return null;
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.user || null;
-  };
-
   const syncDocToDB = async (doc: Document) => {
     try {
-      const user = await getUser();
+      const user = userRef.current;
       if (!user || !supabase) return;
-      await supabase.from('workspace_documents').upsert({
+      const { error } = await supabase.from('workspace_documents').upsert({
         id: doc.id,
         user_id: user.id,
-        folder_id: doc.folderId || null,
+        folder_id: doc.folderId ?? null,
         title: doc.title,
         content: doc.content,
         tags: doc.tags || [],
-        pinned: doc.pinned || false,
+        pinned: doc.pinned ?? false,
         history: doc.history || [],
         media_ids: doc.mediaIds || [],
-        updated_at: new Date(doc.updatedAt).toISOString(),
-        created_at: new Date(doc.createdAt).toISOString()
+        version: doc.version ?? 0, 
+        updated_at: new Date(doc.updatedAt).toISOString(), 
+        created_at: new Date(doc.createdAt).toISOString()  
       }, { onConflict: 'id' });
+
+      if (error) console.error("❌ DB Upsert Error:", error.message);
     } catch (e) { console.error("Doc Sync Error", e); }
   };
 
@@ -94,21 +157,20 @@ export function useWorkspaceSystem() {
         setSaveState('saved');
         setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       });
-    }, 1500); 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, 500); 
   }, []);
 
   const syncFolderToDB = async (folder: Folder) => {
-    const user = await getUser();
+    const user = userRef.current;
     if (!user || !supabase) return;
     await supabase.from('workspace_folders').upsert({ id: folder.id, user_id: user.id, name: folder.name });
   };
 
   const syncMediaToDB = async (mediaItem: Media) => {
-    const user = await getUser();
+    const user = userRef.current;
     if (!user || !supabase) return;
     await supabase.from('workspace_media').upsert({
-      id: mediaItem.id, user_id: user.id, folder_id: mediaItem.folderId || null,
+      id: mediaItem.id, user_id: user.id, folder_id: mediaItem.folderId ?? null,
       type: mediaItem.type, url: mediaItem.url, name: mediaItem.name
     });
   };
@@ -122,8 +184,8 @@ export function useWorkspaceSystem() {
     }
 
     const initWorkspace = async () => {
-      const user = await getUser();
-      if (!user || !supabase) return;
+      if (!currentUser || !supabase) return;
+      const user = currentUser;
 
       const [docsRes, foldersRes, mediaRes] = await Promise.all([
         supabase.from('workspace_documents').select('*').eq('user_id', user.id).order('updated_at', { ascending: false }),
@@ -133,8 +195,7 @@ export function useWorkspaceSystem() {
 
       let loadedFolders: Folder[] = [];
       if (foldersRes.data && foldersRes.data.length > 0) {
-        // 🔥 FIX: Explicitly typed 'f' as any
-        loadedFolders = foldersRes.data.map((f: any) => ({ id: f.id, name: f.name }));
+        loadedFolders = foldersRes.data.map(mapFolder);
         setFolders(loadedFolders);
       } else {
         const defaultFolders = [{ id: crypto.randomUUID(), name: "Work" }, { id: crypto.randomUUID(), name: "Personal" }];
@@ -143,25 +204,17 @@ export function useWorkspaceSystem() {
         loadedFolders = defaultFolders;
       }
 
-      if (mediaRes.data) {
-        // 🔥 FIX: Explicitly typed 'm' as any
-        setMedia(mediaRes.data.map((m: any) => ({
-          id: m.id, type: m.type as "image"|"video", url: m.url, name: m.name, folderId: m.folder_id, createdAt: new Date(m.created_at).getTime()
-        })));
-      }
+      if (mediaRes.data) setMedia(mediaRes.data.map(mapMedia));
 
       if (docsRes.data && docsRes.data.length > 0) {
-        // 🔥 FIX: Explicitly typed 'd' as any
-        const loadedDocs: Document[] = docsRes.data.map((d: any) => ({
-          id: d.id, title: d.title, content: d.content, folderId: d.folder_id, tags: d.tags, pinned: d.pinned, history: d.history,
-          mediaIds: d.media_ids, createdAt: new Date(d.created_at).getTime(), updatedAt: new Date(d.updated_at).getTime()
-        }));
+        const loadedDocs: Document[] = docsRes.data.map(mapDoc);
         setDocuments(loadedDocs);
         if (!activeDocId) setActiveDocId(loadedDocs[0].id);
       } else {
         const welcome: Document = {
           id: crypto.randomUUID(), title: "Welcome to Nextask Workspace", content: "<p>This is your personal workspace...</p>",
-          folderId: null, tags: ["welcome"], pinned: true, history: [], mediaIds: [], createdAt: Date.now(), updatedAt: Date.now()
+          folderId: null, tags: ["welcome"], pinned: true, history: [], mediaIds: [], 
+          createdAt: Date.now(), updatedAt: Date.now(), version: 1
         };
         setDocuments([welcome]);
         setActiveDocId(welcome.id);
@@ -173,18 +226,106 @@ export function useWorkspaceSystem() {
 
     initWorkspace();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUser]); 
 
-  // --- LOCAL AUTO-SAVE (Runs parallel to DB debounce) ---
+  // --- REALTIME ENGINE ---
+  useEffect(() => {
+    if (!supabase || !currentUser) return;
+  
+    const channel = supabase
+      .channel(`workspace-${currentUser.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "workspace_documents", filter: `user_id=eq.${currentUser.id}` },
+        (payload: any) => {
+          if (payload.eventType === "INSERT") {
+            setDocuments(prev => {
+              if (prev.some(d => d.id === payload.new.id)) return prev;
+              return [mapDoc(payload.new), ...prev];
+            });
+          }
+  
+          if (payload.eventType === "UPDATE") {
+            const incomingDoc = mapDoc(payload.new);
+            if (editingDocRef.current === incomingDoc.id) return; 
+            setDocuments(prev => prev.map(d => {
+              if (d.id !== incomingDoc.id) return d;
+              return incomingDoc.version > (d.version ?? 0) ? incomingDoc : d;
+            }));
+          }
+  
+          if (payload.eventType === "DELETE") {
+            setDocuments(prev => prev.filter(d => d.id !== payload.old.id));
+          }
+        }
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "workspace_folders", filter: `user_id=eq.${currentUser.id}` },
+        (payload: any) => {
+          if (payload.eventType === "INSERT") setFolders(prev => prev.some(f => f.id === payload.new.id) ? prev : [...prev, mapFolder(payload.new)]);
+          if (payload.eventType === "UPDATE") setFolders(prev => prev.map(f => f.id === payload.new.id ? mapFolder(payload.new) : f));
+          if (payload.eventType === "DELETE") setFolders(prev => prev.filter(f => f.id !== payload.old.id));
+        }
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "workspace_media", filter: `user_id=eq.${currentUser.id}` },
+        (payload: any) => {
+          if (payload.eventType === "INSERT") setMedia(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, mapMedia(payload.new)]);
+          if (payload.eventType === "UPDATE") setMedia(prev => prev.map(m => m.id === payload.new.id ? mapMedia(payload.new) : m));
+          if (payload.eventType === "DELETE") setMedia(prev => prev.filter(m => m.id !== payload.old.id));
+        }
+      )
+      .subscribe();
+  
+    return () => { supabase.removeChannel(channel); };
+  }, [supabase, currentUser]);
+
+  // --- FALLBACK SYNC ---
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (!navigator.onLine) return;
+      const user = userRef.current;
+      if (!user || !supabase) return;
+  
+      const [docs, foldersRes, mediaRes] = await Promise.all([
+        supabase.from("workspace_documents").select("*").eq("user_id", user.id),
+        supabase.from("workspace_folders").select("*").eq("user_id", user.id),
+        supabase.from("workspace_media").select("*").eq("user_id", user.id),
+      ]);
+      
+      if (docs.data) {
+        setDocuments(prev => {
+          const incoming: Document[] = docs.data.map(mapDoc);
+          const prevIds = new Set(prev.map((d: Document) => d.id));
+          const newDocs = incoming.filter((d: Document) => !prevIds.has(d.id));
+
+          return [
+            ...prev.map((localDoc: Document) => {
+              const dbDoc = incoming.find((d: Document) => d.id === localDoc.id);
+              if (!dbDoc) return localDoc;
+              if (editingDocRef.current === localDoc.id) return localDoc;
+              return dbDoc.version > (localDoc.version ?? 0) ? dbDoc : localDoc;
+            }),
+            ...newDocs 
+          ];
+        });
+      }
+
+      if (foldersRes.data) setFolders(foldersRes.data.map(mapFolder)); 
+      if (mediaRes.data) setMedia(mediaRes.data.map(mapMedia)); 
+    }, 15000);
+  
+    return () => clearInterval(interval);
+  }, [supabase]);
+
+  // --- LOCAL AUTO-SAVE ---
   useEffect(() => {
     if (!firstLoadDone.current || documents.length === 0) return;
     const timer = setTimeout(() => {
       localStorage.setItem("nextask-workspace-v6", JSON.stringify({ documents, folders }));
       localStorage.setItem("nextask-media-v6", JSON.stringify(media));
-      handleWorkspaceAction('save');
+      handleWorkspaceAction(addNotification, 'save');
     }, 1000);
     return () => clearTimeout(timer);
-  }, [documents, folders, media]);
+  }, [documents, folders, media, addNotification]);
 
   // --- IDLE ACTIVITY TRACKER ---
   useEffect(() => {
@@ -193,14 +334,14 @@ export function useWorkspaceSystem() {
       if (!lastActiveStr) return;
       const diff = Date.now() - Number(lastActiveStr);
       if (diff > 3 * 60 * 60 * 1000 && diff < 3.5 * 60 * 60 * 1000) {
-        handleGlobalState(documents);
+        handleGlobalState(addNotification, documentsRef.current);
         if (acquireLock('workspace_idle_notified', 6 * 60 * 60 * 1000)) {
           addNotification('mini', 'Workspace Idle 🧠', 'Capture your thoughts before they fade.', 'medium', '/mini-nisc');
         }
       }
     }, 15 * 60 * 1000);
     return () => clearInterval(idleTimer);
-  }, [documents, addNotification]);
+  }, [addNotification]);
 
   // --- KEYBOARD SHORTCUTS ---
   useEffect(() => {
@@ -214,7 +355,7 @@ export function useWorkspaceSystem() {
       
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") {
         e.preventDefault();
-        createDocument(activeFolderId || undefined);
+        createDocument(activeFolderId ?? undefined);
       }
     };
     window.addEventListener("keydown", handler);
@@ -247,7 +388,7 @@ export function useWorkspaceSystem() {
     return docs.sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
-      return b.updatedAt - a.updatedAt;
+      return b.updatedAt - a.updatedAt; 
     });
   }, [documents, activeFolderId, activeTag, search]);
 
@@ -256,7 +397,7 @@ export function useWorkspaceSystem() {
     const term = globalSearchQuery.toLowerCase();
     return documents
       .filter(doc => doc.title.toLowerCase().includes(term) || doc.content.toLowerCase().includes(term) || doc.tags?.some(t => t.toLowerCase().includes(term)))
-      .sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8);
+      .sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8); 
   }, [documents, globalSearchQuery]);
 
   const filteredMedia = useMemo(() => {
@@ -270,6 +411,7 @@ export function useWorkspaceSystem() {
   }, [media, activeFolderId, search]);
 
   // --- ACTIONS ---
+
   const createFolder = () => {
     const name = prompt("Folder name:");
     if (!name) return;
@@ -283,7 +425,11 @@ export function useWorkspaceSystem() {
   const createDocument = (folderId?: string) => {
     const newDoc: Document = {
       id: crypto.randomUUID(), title: "Untitled Document", content: "<p>Start writing...</p>",
-      folderId: folderId || null, tags: [], mediaIds: [], pinned: false, createdAt: Date.now(), updatedAt: Date.now(), history: []
+      folderId: folderId ?? null, 
+      tags: [], mediaIds: [], pinned: false, 
+      createdAt: Date.now(), updatedAt: Date.now(), 
+      history: [],
+      version: 1 
     };
     setDocuments(prev => [newDoc, ...prev]);
     setActiveDocId(newDoc.id);
@@ -291,43 +437,53 @@ export function useWorkspaceSystem() {
     setIsSidebarOpen(false);
     syncDocToDB(newDoc);
     pingActivity();
-    handleWorkspaceAction('create');
+    addNotification('mini', 'Document Created', 'New workspace document initialized.', 'low', '/mini-nisc');
   };
 
   const deleteDocument = async (id: string) => {
     if (!confirm("Delete this document?")) return;
     setDocuments(prev => {
       const updated = prev.filter(doc => doc.id !== id);
-      if (activeDocId === id) setActiveDocId(updated[0]?.id || null);
+      if (activeDocId === id) setActiveDocId(updated[0]?.id ?? null);
       return updated;
     });
     if (supabase) await supabase.from('workspace_documents').delete().eq('id', id);
     pingActivity();
   };
 
+  // ✅ FIX: Extract targeted document FIRST to avoid async React bugs
   const togglePin = (id: string) => {
-    let updatedDoc: Document | undefined;
-    setDocuments(prev => prev.map(d => {
-      if (d.id === id) {
-        updatedDoc = { ...d, pinned: !d.pinned, updatedAt: Date.now() };
-        return updatedDoc;
-      }
-      return d;
-    }));
-    if (updatedDoc) queueDocDBSync(updatedDoc);
+    const target = documentsRef.current.find(d => d.id === id);
+    if (!target) return;
+
+    const updatedDoc: Document = { 
+      ...target, 
+      pinned: !target.pinned, 
+      updatedAt: Date.now(), 
+      version: (target.version ?? 0) + 1 
+    };
+
+    queueDocDBSync(updatedDoc);
+    setDocuments(prev => prev.map(d => d.id === id ? updatedDoc : d));
     pingActivity();
   };
 
   const updateDocumentTitle = (id: string, title: string) => {
-    let updatedDoc: Document | undefined;
-    setDocuments(prev => prev.map(d => {
-      if (d.id === id) {
-        updatedDoc = { ...d, title, updatedAt: Date.now() };
-        return updatedDoc;
-      }
-      return d;
-    }));
-    if (updatedDoc) queueDocDBSync(updatedDoc);
+    markEditing(id); 
+    if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
+
+    const target = documentsRef.current.find(d => d.id === id);
+    if (!target) return;
+
+    const updatedDoc: Document = { 
+      ...target, 
+      title, 
+      updatedAt: Date.now(), 
+      version: (target.version ?? 0) + 1 
+    };
+
+    queueDocDBSync(updatedDoc);
+    setDocuments(prev => prev.map(d => d.id === id ? updatedDoc : d));
     pingActivity();
   };
 
@@ -336,68 +492,76 @@ export function useWorkspaceSystem() {
     return text.split("\n")[0].slice(0, 60) || "Untitled Document";
   };
 
+  // ✅ FIX: Fixed the core closure anti-pattern preventing the database from saving
   const updateDocumentContent = useCallback((id: string, content: string) => {
-    let modifiedDoc: Document | undefined;
+    markEditing(id); 
+    if (dbSyncTimerRef.current) clearTimeout(dbSyncTimerRef.current);
 
-    setDocuments(prev => prev.map(doc => {
-      if (doc.id !== id) return doc;
-      
-      const shouldAutoTitle = doc.title === "Untitled Document" || doc.title.startsWith("Untitled");
-      const now = Date.now();
-      let newHistoryList = doc.history || [];
+    const target = documentsRef.current.find(d => d.id === id);
+    if (!target) return;
 
-      if (now - lastHistorySave.current > 5000) {
-        lastHistorySave.current = now;
-        newHistoryList = [...newHistoryList, { content, timestamp: now, title: doc.title }].slice(-20); 
-        
-        if (newHistoryList.length === 15) { 
-          handleWorkspaceAction('deepWork');
-        }
-      }
+    const shouldAutoTitle = target.title === "Untitled Document" || target.title.startsWith("Untitled");
+    const nowMs = Date.now(); 
+    let newHistoryList = target.history || [];
 
-      modifiedDoc = { 
-        ...doc, 
-        content, 
-        title: shouldAutoTitle ? extractTitle(content) : doc.title, 
-        updatedAt: now, 
-        history: newHistoryList 
-      };
-      return modifiedDoc;
-    }));
+    if (nowMs - lastHistorySave.current > 5000) {
+      lastHistorySave.current = nowMs;
+      newHistoryList = [...newHistoryList, { content, timestamp: nowMs, title: target.title }].slice(-20); 
+      if (newHistoryList.length === 15) handleWorkspaceAction(addNotification, 'deepWork');
+    }
 
-    if (modifiedDoc) queueDocDBSync(modifiedDoc);
+    const modifiedDoc: Document = { 
+      ...target, 
+      content, 
+      title: shouldAutoTitle ? extractTitle(content) : target.title, 
+      updatedAt: nowMs, 
+      version: (target.version ?? 0) + 1, 
+      history: newHistoryList 
+    };
+
+    // Queue with explicit object reference
+    queueDocDBSync(modifiedDoc);
+    setDocuments(prev => prev.map(d => d.id === id ? modifiedDoc : d));
     pingActivity();
-  }, [queueDocDBSync]);
+  }, [queueDocDBSync, markEditing, addNotification]);
 
   const addTag = (docId: string, tagName: string) => {
     const cleanTag = tagName.trim().toLowerCase();
     if (!cleanTag) return;
-    let updatedDoc: Document | undefined;
-    setDocuments(prev => prev.map(d => {
-      if (d.id === docId) {
-        updatedDoc = { ...d, tags: [...(d.tags || []).filter(t => t !== cleanTag), cleanTag], updatedAt: Date.now() };
-        return updatedDoc;
-      }
-      return d;
-    }));
-    if (updatedDoc) queueDocDBSync(updatedDoc);
+
+    const target = documentsRef.current.find(d => d.id === docId);
+    if (!target) return;
+
+    const updatedDoc: Document = { 
+      ...target, 
+      tags: [...(target.tags || []).filter(t => t !== cleanTag), cleanTag], 
+      updatedAt: Date.now(), 
+      version: (target.version ?? 0) + 1 
+    };
+
+    queueDocDBSync(updatedDoc);
+    setDocuments(prev => prev.map(d => d.id === docId ? updatedDoc : d));
     pingActivity();
   };
 
   const removeTag = (docId: string, tagName: string) => {
-    let updatedDoc: Document | undefined;
-    setDocuments(prev => prev.map(d => {
-      if (d.id === docId) {
-        updatedDoc = { ...d, tags: d.tags?.filter(t => t !== tagName), updatedAt: Date.now() };
-        return updatedDoc;
-      }
-      return d;
-    }));
-    if (updatedDoc) queueDocDBSync(updatedDoc);
+    const target = documentsRef.current.find(d => d.id === docId);
+    if (!target) return;
+
+    const updatedDoc: Document = { 
+      ...target, 
+      tags: target.tags?.filter(t => t !== tagName) || [], 
+      updatedAt: Date.now(), 
+      version: (target.version ?? 0) + 1 
+    };
+
+    queueDocDBSync(updatedDoc);
+    setDocuments(prev => prev.map(d => d.id === docId ? updatedDoc : d));
     pingActivity();
   };
 
-  const addMedia = (file: File, onInsert: (mediaItem: Media) => void) => {
+  // ✅ FIX: Made onInsert optional by adding '?' and checking if it's a function
+  const addMedia = (file: File, onInsert?: (mediaItem: Media) => void) => {
     if (!activeFolderId) {
       setMediaError("Select a folder first");
       setTimeout(() => setMediaError(""), 3000);
@@ -411,7 +575,12 @@ export function useWorkspaceSystem() {
       };
       setMedia(prev => [newMedia, ...prev]);
       syncMediaToDB(newMedia);
-      if (activeDocId) onInsert(newMedia);
+      
+      // ✅ FIX: Only call onInsert if it was actually provided
+      if (activeDocId && typeof onInsert === 'function') {
+        onInsert(newMedia);
+      }
+      
       pingActivity();
     };
     reader.readAsDataURL(file);
@@ -430,6 +599,6 @@ export function useWorkspaceSystem() {
     globalSearchQuery, setGlobalSearchQuery, saveState, lastSavedTime, mediaError, isSidebarOpen, setIsSidebarOpen,
     showWipPopup, setShowWipPopup, activeDocument, mediaCounts, visibleDocs, globalSearchResults, filteredMedia,
     createFolder, createDocument, deleteDocument, togglePin, updateDocumentTitle, updateDocumentContent,
-    addTag, removeTag, addMedia, deleteMedia
+    addTag, removeTag, addMedia, deleteMedia, editingDocRef
   };
 }

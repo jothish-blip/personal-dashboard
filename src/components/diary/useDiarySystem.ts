@@ -5,6 +5,7 @@ import { DiaryEntry, Task, getLocalDate, DEFAULT_ENTRY } from './types';
 import { useNotificationSystem } from '@/notifications/useNotificationSystem'; 
 import { handleDiary } from '@/notifications/nexNotificationBrain'; 
 import { getSupabaseClient } from "@/lib/supabase";
+import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 const STORAGE_PREFIX = 'nextask_diary_';
 
@@ -54,9 +55,9 @@ const acquireLock = (lockKey: string, cooldownMs: number): boolean => {
 };
 
 export function useDiarySystem() {
-  const { addNotification } = useNotificationSystem();
   const supabase = getSupabaseClient();
-
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const { addNotification } = useNotificationSystem(currentUser?.id);  
   const actualToday = getLocalDate(new Date());
   const actualYesterday = getLocalDate(new Date(Date.now() - 86400000));
   const actualTomorrow = getLocalDate(new Date(Date.now() + 86400000));
@@ -72,7 +73,7 @@ export function useDiarySystem() {
   
   // --- UI & Feature State ---
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState(''); // 🔥 FIX 4: Throttled Search
+  const [debouncedSearch, setDebouncedSearch] = useState(''); 
   
   const [moodFilter, setMoodFilter] = useState<'good' | 'neutral' | 'bad' | null>(null);
   const [energyFilter, setEnergyFilter] = useState<'high' | 'medium' | 'low' | null>(null);
@@ -87,23 +88,35 @@ export function useDiarySystem() {
   
   const recognitionRef = useRef<any>(null);
   const isInitializing = useRef(false);
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null); // 🔥 FIX 1: Save Debouncer
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null); 
+  
+  const userRef = useRef<any>(null);
+  const isEditingRef = useRef(false);
 
-  // 🔥 FIX 5: Safe Notification Wrapper
+  // Safe Notification Wrapper
   const safeNotify = useCallback((key: string, cooldownMs: number, fn: () => void) => {
     if (acquireLock(key, cooldownMs)) fn();
   }, []);
 
-  // --- DB SYNC HELPERS ---
-  const getUser = async () => {
-    if (!supabase) return null;
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.user || null;
-  };
+  // --- AUTH LISTENER ---
+  useEffect(() => {
+    if (!supabase) return;
 
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => {
+        const user = session?.user ?? null;
+        userRef.current = user;
+        setCurrentUser(user);
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, [supabase]);
+
+  // --- DB SYNC HELPERS ---
   const syncEntryToDB = async (dateStr: string, entry: DiaryEntry) => {
     try {
-      const user = await getUser();
+      const user = userRef.current; 
       if (!user || !supabase) return;
 
       const payload: DBDiaryEntry = {
@@ -118,6 +131,7 @@ export function useDiarySystem() {
         energy: entry.energy || 'medium',
         tags: entry.tags || [],
         is_missed: entry.isMissed || false,
+        // ✅ FIX: Changed entry.related_dates to entry.relatedDates
         related_dates: entry.relatedDates || [],
         focus_area: entry.focusArea || 'None',
         goal_alignment: entry.goalAlignment || 50,
@@ -150,13 +164,12 @@ export function useDiarySystem() {
       sessionStorage.setItem('nexengine_diary_wip_seen', 'true');
     }
     
-    // 🔥 FIX 8: Voice Input Cleanup
     return () => {
       if (recognitionRef.current) recognitionRef.current.stop();
     };
   }, []);
 
-  // 🔥 FIX 4: Debounce Search Query (300ms)
+  // Debounce Search Query
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
     return () => clearTimeout(t);
@@ -198,14 +211,14 @@ export function useDiarySystem() {
       let oldestDate = actualToday;
 
       try {
-        const user = await getUser();
+        const user = userRef.current; 
         if (user && supabase) {
           const { data, error } = await supabase
             .from('diary_entries')
             .select('*')
             .eq('user_id', user.id)
             .order('entry_date', { ascending: false })
-            .limit(30); // 🔥 FIX 10: Limit to 30 days to prevent mass payload lag
+            .limit(30);
 
           if (data && !error) {
             (data as DBDiaryEntry[]).forEach(row => {
@@ -240,7 +253,7 @@ export function useDiarySystem() {
           syncEntryToDB(dStr, missedEntry); 
           
           newMissedCount++;
-          handleDiary("missed", dStr);
+          handleDiary(addNotification, "missed", dStr);
         }
         currDate.setDate(currDate.getDate() + 1);
       }
@@ -263,8 +276,7 @@ export function useDiarySystem() {
     initDiary();
 
     return () => { isInitializing.current = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUser]); 
 
   // --- Switch Date Effect ---
   useEffect(() => {
@@ -299,7 +311,7 @@ export function useDiarySystem() {
     return "Maintain current momentum.";
   }, []);
 
-  // --- 🔥 FIX 1, 2, 6: DEBOUNCED DB & LOCAL AUTO-SAVE ---
+  // --- DEBOUNCED DB & LOCAL AUTO-SAVE ---
   useEffect(() => {
     if (!isLoaded) return;
     setSaveStatus('saving');
@@ -317,11 +329,12 @@ export function useDiarySystem() {
         delete entryToSave.isMissed;
       }
       
-      // 🔥 FIX 2 & 6: Update LocalStorage and allEntries ONLY here
       localStorage.setItem(`${STORAGE_PREFIX}${selectedDate}`, JSON.stringify(entryToSave));
       setAllEntries(prev => ({ ...prev, [selectedDate]: entryToSave }));
 
-      syncEntryToDB(selectedDate, entryToSave);
+      syncEntryToDB(selectedDate, entryToSave).then(() => {
+        isEditingRef.current = false; 
+      });
 
       if (selectedDate === actualToday) {
         const tomorrowKey = `${STORAGE_PREFIX}${actualTomorrow}`;
@@ -355,15 +368,17 @@ export function useDiarySystem() {
         });
       }
 
-    }, 2000); // 🔥 FIX 1: 2000ms delay stops keystroke lag
+    }, 2000); 
 
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentEntry]); // Only trigger on currentEntry change
+  }, [currentEntry]); 
 
   // --- ACTIONS ---
   const updateEntry = (updates: Partial<DiaryEntry>) => {
     if (currentEntry.isLocked) return; 
+    
+    isEditingRef.current = true; 
+
     setWritingActivity(prev => {
       const newCount = prev.totalEdits + 1;
       
@@ -429,7 +444,6 @@ export function useDiarySystem() {
     const timestamp = new Date().toISOString();
     const snapshot = { ...currentEntry };
     delete snapshot.versions;
-    // 🔥 FIX 3: Only save last 5 versions
     updateEntry({ versions: [...(currentEntry.versions || []), { timestamp, snapshot }].slice(-5) });
   };
 
@@ -441,7 +455,68 @@ export function useDiarySystem() {
     if (newD <= actualToday) setSelectedDate(newD);
   };
 
-  // --- 🔥 DEEP FILTERING ENGINE (Using Debounced Search) ---
+  // --- 🔥 REALTIME ENGINE ---
+  useEffect(() => {
+    if (!supabase || !currentUser) return;
+
+    const channel = supabase
+      .channel(`diary-${currentUser.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "diary_entries",
+          filter: `user_id=eq.${currentUser.id}`
+        },
+        (payload: any) => {
+          if (isEditingRef.current) return; 
+
+          const row = payload.new;
+          if (!row) return;
+
+          const mapped: DiaryEntry = {
+            ...DEFAULT_ENTRY,
+            morning: row.morning,
+            afternoon: row.afternoon,
+            evening: row.evening,
+            learning: row.learning,
+            tomorrow: row.tomorrow,
+            mood: row.mood,
+            energy: row.energy,
+            tags: row.tags,
+            isMissed: row.is_missed,
+            relatedDates: row.related_dates,
+            focusArea: row.focus_area,
+            goalAlignment: row.goal_alignment,
+            frictions: row.frictions,
+            identity: row.identity,
+            chapter: row.chapter,
+            isLocked: row.is_locked,
+            versions: row.versions,
+            morningTime: row.morning_time,
+            afternoonTime: row.afternoon_time,
+            eveningTime: row.evening_time
+          };
+
+          setAllEntries(prev => ({
+            ...prev,
+            [row.entry_date]: mapped
+          }));
+
+          if (row.entry_date === selectedDate) {
+            setCurrentEntry(mapped);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, currentUser, selectedDate]);
+
+  // --- DEEP FILTERING ENGINE ---
   const filteredHistory = useMemo(() => {
     let dates = Object.keys(allEntries).filter(d => d <= actualToday).sort().reverse();
     if (rangeFilter === '7d') dates = dates.slice(0, 7);
@@ -449,7 +524,6 @@ export function useDiarySystem() {
 
     return dates.filter(date => {
       const entry = allEntries[date];
-      // 🔥 FIX 4: Use debouncedSearch instead of searchQuery
       if (entry.isMissed && (debouncedSearch || moodFilter || energyFilter || tagFilter)) return false;
       if (moodFilter && entry.mood !== moodFilter) return false;
       if (energyFilter && entry.energy !== energyFilter) return false;
@@ -603,7 +677,7 @@ export function useDiarySystem() {
           });
         } 
         else if (hour >= 20 && hour <= 23) {
-          handleDiary("reminder");
+          handleDiary(addNotification, "reminder");
         }
       }
     }, 30 * 60 * 1000); 

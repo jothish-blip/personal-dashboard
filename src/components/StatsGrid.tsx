@@ -30,12 +30,12 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
   const [endDate, setEndDate] = useState(actualToday);
 
   useEffect(() => {
-    const hasInitialized = localStorage.getItem('nextask_workspace_init_v08');
+    // Check if onboarding has been seen/initialized
+    const hasInitialized = localStorage.getItem('nextask_onboarding_seen');
     if (!hasInitialized) setShowOnboarding(true);
   }, []);
 
   const handleInitialize = () => {
-    localStorage.setItem('nextask_workspace_init_v08', 'true');
     setShowOnboarding(false);
   };
 
@@ -159,7 +159,8 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
   return (
     <div className="flex-1 p-4 md:p-8 max-w-[1200px] mx-auto w-full flex flex-col gap-6 pb-24 relative">
       
-      {showOnboarding && <OnboardingFlow tasks={tasks} meta={meta} onComplete={handleInitialize} />}
+      {/* ✅ CORRECTED: Removed tasks and meta as they are no longer required props in OnboardingFlow */}
+      {showOnboarding && <OnboardingFlow onComplete={handleInitialize} />}
 
       {/* HEADER & SMART RANGE SELECTOR */}
       <div className="bg-white border border-gray-200 rounded-[20px] p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

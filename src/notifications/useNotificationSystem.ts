@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+// Import the necessary payload type from Supabase
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'; 
+import { getSupabaseClient } from "@/lib/supabase"; 
 import { NexNotification, NexModule } from './types';
 
 const recentNotifications = new Set<string>();
@@ -8,111 +11,135 @@ const recentNotifications = new Set<string>();
 export const sendToServiceWorker = async (title: string, body: string, url: string = "/") => {
   const signature = `${title}:${body}`;
   if (recentNotifications.has(signature)) return; 
-  
   recentNotifications.add(signature);
   setTimeout(() => recentNotifications.delete(signature), 2000); 
 
   if (!("Notification" in window)) return;
-
-  if (Notification.permission === "default") {
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") return; 
-  }
-
-  if (Notification.permission === "denied") return;
+  if (Notification.permission === "default") await Notification.requestPermission();
+  if (Notification.permission !== "granted") return;
 
   if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-    navigator.serviceWorker.controller.postMessage({
-      type: "SHOW_NOTIFICATION",
-      title,
-      body,
-      url
-    });
+    navigator.serviceWorker.controller.postMessage({ type: "SHOW_NOTIFICATION", title, body, url });
   } else {
     new Notification(title, { body, icon: "/favicon.ico" });
   }
 };
 
-export function useNotificationSystem() {
-  const [notifications, setNotifications] = useState<NexNotification[]>([]);
+const normalizeNotification = (n: any): NexNotification => ({
+  ...n,
+  actionUrl: n.action_url,
+  timestamp: new Date(n.created_at).getTime(),
+  archived: n.archived ?? false, 
+});
 
-  const syncFromStorage = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    
-    const saved = localStorage.getItem("nex_global_notifications");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // ✅ Fix: Use functional update to avoid unnecessary re-renders
-        setNotifications(prev => {
-          if (JSON.stringify(prev) === saved) return prev;
-          return parsed;
-        });
-      } catch (e) {
-        console.error("Failed to load notifications", e);
-      }
+export function useNotificationSystem(userId: string | null | undefined) {
+  const [notifications, setNotifications] = useState<NexNotification[]>([]);
+  const activeChannelRef = useRef<any>(null);
+  
+  const supabase = getSupabaseClient();
+
+  const fetchNotifications = useCallback(async () => {
+    if (!userId || !supabase) return;
+
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("archived", false)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("❌ [UI FETCH] Error:", error.message);
+    } else if (data) {
+      setNotifications(data.map(normalizeNotification));
     }
-  }, []);
+  }, [userId, supabase]);
 
   useEffect(() => {
-    syncFromStorage();
+    if (!userId || !supabase) return;
 
-    const handleGlobalUpdate = () => syncFromStorage();
-    window.addEventListener("nex_notification_update", handleGlobalUpdate);
-    window.addEventListener("storage", handleGlobalUpdate);
+    fetchNotifications();
+
+    const instanceId = Math.random().toString(36).substring(7);
+    const channelName = `notifications:${userId}:${instanceId}`;
+
+    const channel = supabase.channel(channelName);
+    activeChannelRef.current = channel;
+
+    channel
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        // ✅ Explicitly typed the payload to fix the build error
+        (payload: RealtimePostgresChangesPayload<any>) => {
+          if (payload.eventType === "INSERT") {
+            const newNote = normalizeNotification(payload.new);
+            if (!newNote.archived) {
+              setNotifications(prev => {
+                if (prev.some(n => n.id === newNote.id)) return prev;
+                return [newNote, ...prev].slice(0, 50);
+              });
+            }
+          } else {
+            fetchNotifications();
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
-      window.removeEventListener("nex_notification_update", handleGlobalUpdate);
-      window.removeEventListener("storage", handleGlobalUpdate);
+      if (activeChannelRef.current) {
+        supabase.removeChannel(activeChannelRef.current);
+        activeChannelRef.current = null;
+      }
     };
-  }, [syncFromStorage]);
+  }, [userId, fetchNotifications, supabase]);
 
-  const addNotification = useCallback((
-    module: NexModule, 
-    title: string, 
-    body: string, 
-    priority: 'low' | 'medium' | 'high' = 'medium',
-    actionUrl: string = "/" 
+  const addNotification = useCallback(async (
+    module: NexModule, title: string, body: string, 
+    priority: 'low' | 'medium' | 'high' = 'medium', actionUrl: string = "/" 
   ) => {
-    // ✅ Logic inside setTimeout ensures this runs AFTER the current render cycle
-    setTimeout(() => {
-      const saved = localStorage.getItem("nex_global_notifications");
-      let current: NexNotification[] = saved ? JSON.parse(saved) : [];
+    if (!userId || !supabase) {
+      console.warn("⚠️ [DB SAVE] Blocked: No userId or Supabase client");
+      return;
+    }
 
-      if (current.length > 0 && current[0].title === title && current[0].body === body) return;
+    const { data, error } = await supabase.from("notifications").insert({
+      user_id: userId, 
+      module, 
+      title, 
+      body, 
+      priority, 
+      action_url: actionUrl, 
+      read: false, 
+      archived: false
+    }).select();
 
-      const newNote: NexNotification = {
-        id: crypto.randomUUID(),
-        module, title, body,
-        timestamp: Date.now(),
-        read: false,
-        priority, actionUrl, 
-      };
-
-      const updated = [newNote, ...current].slice(0, 50);
-      localStorage.setItem("nex_global_notifications", JSON.stringify(updated));
-      window.dispatchEvent(new Event("nex_notification_update"));
-
+    if (!error) {
       if (priority !== 'low') {
         sendToServiceWorker(title, body, actionUrl);
       }
-    }, 0);
-  }, []);
+    } else {
+      console.error("❌ [DB SAVE] Error:", error.message);
+    }
+  }, [userId, supabase]);
 
-  const markAsRead = useCallback((id: string) => {
-    const saved = localStorage.getItem("nex_global_notifications");
-    if (!saved) return;
-    const current: NexNotification[] = JSON.parse(saved);
-    const updated = current.map(n => n.id === id ? { ...n, read: true } : n);
-    
-    localStorage.setItem("nex_global_notifications", JSON.stringify(updated));
-    window.dispatchEvent(new Event("nex_notification_update"));
-  }, []);
+  const markAsRead = useCallback(async (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    if (supabase) {
+      await supabase.from("notifications").update({ read: true }).eq("id", id);
+    }
+  }, [supabase]);
 
-  const clearAll = useCallback(() => {
-    localStorage.setItem("nex_global_notifications", JSON.stringify([]));
-    window.dispatchEvent(new Event("nex_notification_update"));
-  }, []);
+  const clearAll = useCallback(async () => {
+    if (!userId || !supabase) return;
+    setNotifications([]);
+    await supabase.from("notifications")
+      .update({ archived: true })
+      .eq("user_id", userId)
+      .eq("archived", false);
+  }, [userId, supabase]);
 
   return {
     notifications,
