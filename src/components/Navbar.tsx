@@ -17,6 +17,7 @@ import {
   LogOut,
   User 
 } from "lucide-react";
+
 import { useNotificationSystem } from "@/notifications/useNotificationSystem";
 import { getSupabaseClient } from "@/lib/supabase";
 
@@ -39,6 +40,7 @@ const COMMAND_ROUTES = [
 export default function Navbar({ 
   meta, setMonthYear, exportData, importData 
 }: NavbarProps) {
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const pathname = usePathname() || ""; 
@@ -48,19 +50,26 @@ export default function Navbar({
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
 
-  // 🔥 Notification Hook (Requires userId)
-  const { notifications, unreadCount, markAsRead, clearAll } = useNotificationSystem(currentUser?.id);
+  // 🔥 Notifications
+  const { notifications, unreadCount, markAsRead, clearAll } =
+    useNotificationSystem(currentUser?.id);
 
   const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [isCmdKOpen, setIsCmdKOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // 🔥 Sync Auth User & Profile
+
+  /**
+   * ✅ FIX: Prevent hydration + repeated calls
+   */
   useEffect(() => {
+    let isMounted = true;
+
     const fetchProfile = async () => {
       if (!supabase) return;
 
       const { data: { user } } = await supabase.auth.getUser();
+      if (!isMounted) return;
+
       setCurrentUser(user);
 
       if (!user) return;
@@ -71,10 +80,14 @@ export default function Navbar({
         .eq("id", user.id)
         .single();
 
-      if (data) setUserProfile(data);
+      if (data && isMounted) setUserProfile(data);
     };
 
     fetchProfile();
+
+    return () => {
+      isMounted = false;
+    };
   }, [supabase]);
 
   const handleLogout = async () => {
@@ -84,6 +97,9 @@ export default function Navbar({
     }
   };
 
+  /**
+   * ✅ Cmd + K handler (stable)
+   */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -94,6 +110,7 @@ export default function Navbar({
         setIsCmdKOpen(false);
       }
     };
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
@@ -106,15 +123,18 @@ export default function Navbar({
 
   const handleImportClick = () => fileInputRef.current?.click();
 
-  const activePaths = {
+  /**
+   * ✅ FIX: Prevent re-renders (VERY IMPORTANT)
+   */
+  const activePaths = useMemo(() => ({
     isTasks: pathname === "/",
     isMini: pathname === "/mini-nisc",
     isDiary: pathname === "/diary",
     isFocus: pathname === "/focus",
     isCalendar: pathname === "/calender-event",
-  };
+  }), [pathname]);
 
-  const [y, m] = (meta.currentMonth || "2024-01").split('-');
+  const [y, m] = (meta.currentMonth || "2024-01").split("-");
 
   const years = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -135,40 +155,44 @@ export default function Navbar({
     clearAll,
     isNoteOpen,
     setIsNoteOpen,
-    userProfile 
+    userProfile
   };
 
-  const filteredCommands = COMMAND_ROUTES.filter(route => 
+  const filteredCommands = COMMAND_ROUTES.filter(route =>
     route.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <>
-      <nav className="sticky top-0 z-[100] bg-white border-b border-gray-200 shadow-sm transition-all">
+      {/* ✅ FIX: Removed transition-all */}
+      <nav className="sticky top-0 z-[100] bg-white border-b border-gray-200 shadow-sm will-change-transform">
         <DesktopNav {...navProps} />
         <MobileNav {...navProps} />
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="hidden" 
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
           accept=".json"
           onChange={(e) => {
             if (e.target.files?.[0]) {
               importData(e.target.files[0]);
-              e.target.value = ""; 
+              e.target.value = "";
             }
-          }} 
+          }}
         />
       </nav>
 
-      {/* Cmd + K Command Menu */}
+      {/* Cmd + K */}
       {isCmdKOpen && (
         <div className="fixed inset-0 z-[9999] bg-gray-900/50 backdrop-blur-sm flex items-start justify-center pt-[15vh] px-4">
           <div className="absolute inset-0" onClick={() => setIsCmdKOpen(false)} />
-          <div className="relative bg-white w-full max-w-xl rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+
+          <div className="relative bg-white w-full max-w-xl rounded-xl shadow-2xl overflow-hidden">
+            
             <div className="flex items-center px-4 py-4 border-b border-gray-100">
               <Search size={20} className="text-gray-400 mr-3" />
-              <input 
+              <input
                 autoFocus
                 type="text"
                 placeholder="Where do you want to go?..."
@@ -180,15 +204,19 @@ export default function Navbar({
 
             <div className="max-h-[400px] overflow-y-auto p-2">
               {filteredCommands.length === 0 ? (
-                <div className="py-8 text-center text-sm text-gray-400">No matching routes found.</div>
+                <div className="py-8 text-center text-sm text-gray-400">
+                  No matching routes found.
+                </div>
               ) : (
                 <>
                   {filteredCommands.map((route, i) => (
                     <button
                       key={i}
                       onClick={() => handleNav(route.path)}
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors group
-                        ${pathname === route.path ? "bg-gray-50 text-gray-400 cursor-default" : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors
+                        ${pathname === route.path
+                          ? "bg-gray-50 text-gray-400 cursor-default"
+                          : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"}
                       `}
                     >
                       <div className="flex items-center gap-3">
@@ -197,27 +225,31 @@ export default function Navbar({
                       </div>
                     </button>
                   ))}
-                  
+
                   <div className="mt-2 pt-2 border-t border-gray-100">
                     {userProfile && (
                       <div className="flex items-center gap-3 px-4 py-3 mb-1">
-                        <img 
-                          src={userProfile.avatar_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=fallback"} 
-                          alt="Avatar"
-                          className="w-8 h-8 rounded-full border border-gray-200" 
+                        <img
+                          src={
+                            userProfile.avatar_url ||
+                            "https://api.dicebear.com/7.x/avataaars/svg?seed=fallback"
+                          }
+                          className="w-8 h-8 rounded-full border border-gray-200"
                         />
                         <div className="flex flex-col text-left">
                           <span className="text-sm font-bold text-gray-900">
                             {userProfile.full_name || "User"}
                           </span>
-                          <span className="text-xs text-gray-400">Signed in</span>
+                          <span className="text-xs text-gray-400">
+                            Signed in
+                          </span>
                         </div>
                       </div>
                     )}
 
                     <button
                       onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors group"
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
                     >
                       <LogOut size={16} />
                       Sign Out
@@ -226,6 +258,7 @@ export default function Navbar({
                 </>
               )}
             </div>
+
           </div>
         </div>
       )}

@@ -90,3 +90,8 @@ body {
   transform-origin: top center;
   animation: swing 2s ease-in-out infinite;
 }
+
+
+html, body {
+  overscroll-behavior: none;
+}

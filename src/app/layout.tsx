@@ -9,7 +9,7 @@ import PWARegistration from "@/components/PWARegistration";
 import "./globals.css";
 
 export const viewport: Viewport = {
-  themeColor: "#FAFAFA", // ✅ Light theme (FIXED)
+  themeColor: "#FAFAFA",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -21,23 +21,17 @@ export const metadata: Metadata = {
     default: "NexTask",
   },
   description: "Execution system for focus, tasks and planning",
-
   manifest: "/manifest.json",
-
   icons: {
     icon: "/favicon.ico",
     apple: "/favicon.ico",
   },
-
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default", // ✅ matches light UI
+    statusBarStyle: "default",
     title: "NexTask",
   },
-
   applicationName: "NexTask",
-
-  // ✅ EXTRA PWA polish
   formatDetection: {
     telephone: false,
   },
@@ -51,21 +45,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
+      className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#FAFAFA] text-slate-900">
+      <body className="bg-[#FAFAFA] text-slate-900 overflow-x-hidden">
 
-        {/* ✅ PWA Registration */}
         <PWARegistration />
-
-        {/* ✅ Top Loader */}
         <TopProgressBar />
-
-        {/* ✅ Offline Handling */}
         <OfflineView />
 
-        {/* ✅ App Content */}
-        <main className="flex-1 flex flex-col">
+        {/* ✅ FIXED ROOT CONTAINER */}
+        <main className="min-h-screen">
           {children}
         </main>
 
