@@ -11,6 +11,7 @@ import Tabs from "../components/Tabs";
 import MatrixView from "../components/MatrixView";
 import AnalyticsView from "../components/AnalyticsView";
 import AuditView from "../components/AuditView";
+import FeedbackPopup from "../components/FeedbackPopup";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +20,11 @@ export default function Home() {
   const pathname = usePathname();
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("matrix");
+  const [activeTab, setActiveTab] = useState("matrix");
   const [isStateLoaded, setIsStateLoaded] = useState(false);
+
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const isMini = pathname === "/mini-nisc";
 
@@ -35,25 +39,97 @@ export default function Home() {
     exportData
   } = useNexCore();
 
-  // 🔥 FIXED AUTH CHECK
+  // 🔐 AUTH + FEEDBACK
   useEffect(() => {
-    const checkUser = async () => {
+    const run = async () => {
       const supabase = getSupabaseClient();
 
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        setIsAuthenticated(false); // 🔥 CRITICAL FIX
+        setIsAuthenticated(false);
         router.replace("/login");
-      } else {
-        setIsAuthenticated(true);
+        return;
+      }
+
+      setIsAuthenticated(true);
+      setUserId(user.id);
+
+      const today = new Date().toISOString().split("T")[0];
+
+      // ✅ SAFE FETCH
+      let { data } = await supabase
+        .from("user_feedback_status")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      // ✅ CREATE IF NOT EXISTS (SAFE INSERT)
+      if (!data) {
+        const { data: newRow, error: insertError } = await supabase
+          .from("user_feedback_status")
+          .insert([
+            {
+              user_id: user.id,
+              feedback_given: false,
+              daily_prompt_count: 0,
+            },
+          ])
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("Insert FULL error:", JSON.stringify(insertError));
+          return;
+        }
+
+        data = newRow;
+      }
+
+      if (!data) return;
+
+      // ✅ RESET DAILY COUNT
+      if (data.last_prompt_date !== today) {
+        const { error } = await supabase
+          .from("user_feedback_status")
+          .update({
+            daily_prompt_count: 0,
+            last_prompt_date: today,
+          })
+          .eq("user_id", user.id);
+
+        if (error) {
+          console.error("Reset error:", JSON.stringify(error));
+          return;
+        }
+
+        data.daily_prompt_count = 0;
+      }
+
+      // ✅ SHOW POPUP
+      if (!data.feedback_given && data.daily_prompt_count < 3) {
+        const { error } = await supabase
+          .from("user_feedback_status")
+          .update({
+            daily_prompt_count: data.daily_prompt_count + 1,
+          })
+          .eq("user_id", user.id);
+
+        if (error) {
+          console.error("Update error:", JSON.stringify(error));
+          return;
+        }
+
+        setTimeout(() => {
+          setShowFeedback(true);
+        }, 45000);
       }
     };
 
-    checkUser();
+    run();
   }, [router]);
 
-  // Load tab preference
+  // Load tab
   useEffect(() => {
     const savedTab = sessionStorage.getItem("nexengine_active_tab");
     if (savedTab) setActiveTab(savedTab);
@@ -65,7 +141,6 @@ export default function Home() {
     sessionStorage.setItem("nexengine_active_tab", tab);
   };
 
-  // 🔥 DEBUG SAFE LOADER
   if (
     isAuthenticated === null ||
     isAuthenticated === false ||
@@ -73,16 +148,14 @@ export default function Home() {
     !isStateLoaded
   ) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-400 text-sm font-semibold uppercase">
-          Initializing Workspace...
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        Initializing Workspace...
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 text-gray-900">
+    <div className="flex flex-col min-h-screen bg-gray-50">
 
       <Navbar
         meta={state.meta}
@@ -92,13 +165,11 @@ export default function Home() {
       />
 
       {!isMini ? (
-        <div className="flex flex-col">
-          
+        <>
           <StatsGrid tasks={state.tasks} meta={state.meta} />
           <Tabs activeTab={activeTab} setActiveTab={handleTabChange} />
 
-          <main className="flex-1 flex flex-col">
-            
+          <main className="flex-1">
             {activeTab === "matrix" && (
               <MatrixView
                 tasks={state.tasks}
@@ -124,17 +195,19 @@ export default function Home() {
               />
             )}
           </main>
-        </div>
+        </>
       ) : (
-        <div className="flex-1 p-8 flex justify-center items-center">
-          <div className="bg-white p-12 rounded-3xl border text-center max-w-lg shadow-sm">
-            <div className="text-4xl mb-4">📝</div>
-            <h2 className="text-xl font-black">Mini Nisc</h2>
-            <p className="text-gray-400 text-sm mt-2">
-              Personal workspace for reflection and deep notes.
-            </p>
-          </div>
+        <div className="flex-1 flex items-center justify-center">
+          Mini Nisc
         </div>
+      )}
+
+      {/* 🔥 POPUP */}
+      {showFeedback && userId && (
+        <FeedbackPopup
+          userId={userId}
+          onClose={() => setShowFeedback(false)}
+        />
       )}
     </div>
   );
