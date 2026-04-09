@@ -29,22 +29,23 @@ const formatTimeAgo = (timestamp: number): string => {
 
 const ModuleIcon = ({ module }: { module: string }) => {
   switch (module) {
-    case 'task': return <ListTodo size={14} className="text-emerald-500" />;
-    case 'planner': return <Calendar size={14} className="text-blue-500" />;
-    case 'focus': return <Brain size={14} className="text-purple-500" />;
-    case 'diary': return <Book size={14} className="text-indigo-500" />;
-    case 'mini': return <FileText size={14} className="text-amber-500" />;
-    case 'system': return <Bell size={14} className="text-gray-600" />;
-    default: return <Info size={14} className="text-gray-400" />;
+    case 'task': return <ListTodo size={16} className="text-emerald-500" />;
+    case 'planner': return <Calendar size={16} className="text-blue-500" />;
+    case 'focus': return <Brain size={16} className="text-purple-500" />;
+    case 'diary': return <Book size={16} className="text-indigo-500" />;
+    case 'mini': return <FileText size={16} className="text-amber-500" />;
+    case 'system': return <Bell size={16} className="text-gray-500" />;
+    default: return <Info size={16} className="text-gray-400" />;
   }
 };
 
 export default function NotificationCenter({ 
   notifications, unreadCount, markAsRead, clearAll, isOpen, onClose 
 }: NotificationCenterProps) {
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  
+
   const [filter, setFilter] = useState<NexModule | 'all' | 'mini' | 'system'>('all');
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -56,7 +57,6 @@ export default function NotificationCenter({
         n.body.toLowerCase().includes(searchQuery.toLowerCase())
       )
       .sort((a, b) => {
-        // Unread first, then newest first
         if (a.read !== b.read) return a.read ? 1 : -1;
         return b.timestamp - a.timestamp;
       });
@@ -72,132 +72,136 @@ export default function NotificationCenter({
     }
   };
 
-  const getPriorityClass = (priority?: string) => {
-    switch (priority) {
-      case 'high': return 'border-l-red-500 bg-red-50/30';
-      case 'medium': return 'border-l-amber-500 bg-amber-50/30';
-      default: return 'border-l-gray-300';
-    }
-  };
-
   return (
-    <div className="absolute top-full right-0 mt-3 w-80 md:w-[420px] bg-white border border-gray-200 rounded-3xl shadow-2xl z-[100] animate-in fade-in slide-in-from-top-2 duration-300 overflow-hidden flex flex-col max-h-[600px]">
+    <div className="absolute top-full right-0 mt-2 w-[360px] md:w-[420px] bg-white rounded-xl border border-gray-100 z-[100] overflow-hidden flex flex-col max-h-[560px]">
+
       {/* Header */}
-      <div className="p-5 border-b border-gray-100 bg-gray-50/50">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-black text-gray-900 text-base tracking-tight">Intelligence Hub</h3>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Active System Logs</p>
-          </div>
-          <div className="flex gap-1.5">
+      <div className="px-4 py-4 border-b border-gray-100 space-y-4">
+
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">
+            Notifications
+          </h3>
+
+          <div className="flex gap-1">
             <button 
               onClick={(e) => { e.stopPropagation(); clearAll(); }} 
-              className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-xl transition-all"
-              title="Clear All"
+              className="p-2 hover:bg-gray-100 rounded-md text-gray-400"
             >
               <Trash2 size={16} />
             </button>
-            <button onClick={onClose} className="p-2 hover:bg-gray-200 text-gray-400 rounded-xl transition-all">
-              <X size={18} />
+
+            <button 
+              onClick={onClose} 
+              className="p-2 hover:bg-gray-100 rounded-md text-gray-400"
+            >
+              <X size={16} />
             </button>
           </div>
         </div>
 
         {/* Search */}
-        <div className="relative mb-4">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
           <input 
             type="text"
-            placeholder="Search intelligence..."
+            placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-black/5 transition-all shadow-sm"
+            className="w-full pl-8 pr-3 py-2 text-sm bg-transparent border-b border-gray-200 focus:outline-none focus:border-black"
           />
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1">
+        {/* Tabs */}
+        <div className="flex gap-4 text-xs">
           {['all', 'task', 'planner', 'focus', 'diary', 'mini', 'system'].map((m) => (
             <button
               key={m}
               onClick={() => setFilter(m as any)}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-tighter transition-all whitespace-nowrap ${
-                filter === m ? 'bg-black text-white' : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-50'
+              className={`capitalize ${
+                filter === m
+                  ? "text-black font-medium"
+                  : "text-gray-400"
               }`}
             >
-              {m === 'mini' ? 'Notes' : m}
+              {m === 'mini' ? 'notes' : m}
             </button>
           ))}
         </div>
       </div>
 
       {/* List */}
-      <div ref={scrollRef} className="overflow-y-auto flex-1 p-3 space-y-2 bg-white min-h-[300px] scrollbar-hide">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+
         {filteredNotifications.length === 0 ? (
-          <div className="py-20 flex flex-col items-center justify-center text-center">
-            <LayoutGrid size={24} className="text-gray-200 mb-4" />
-            <p className="text-xs font-bold text-gray-400">No signals detected.</p>
+          <div className="py-16 flex flex-col items-center text-center text-gray-400">
+            <LayoutGrid size={20} className="mb-2" />
+            <p className="text-sm">No notifications</p>
           </div>
         ) : (
           filteredNotifications.map((n) => (
-            <div 
-              key={n.id} 
+            <div
+              key={n.id}
               onClick={() => handleNotificationClick(n)}
-              className={`group relative p-4 rounded-2xl border transition-all duration-200 cursor-pointer border-l-4 ${getPriorityClass(n.priority)} ${
-                n.read ? 'opacity-60 border-transparent bg-gray-50/50 hover:opacity-100' : 'border-gray-100 hover:shadow-md'
-              }`}
+              className="flex gap-3 px-3 py-3 rounded-md hover:bg-gray-50 cursor-pointer transition"
             >
-              <div className="flex gap-4">
-                <div className="mt-1 shrink-0">
-                  <div className="p-2 rounded-xl bg-white shadow-sm border border-gray-100">
-                    <ModuleIcon module={n.module} />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <h4 className={`text-xs font-black truncate ${n.read ? 'text-gray-500' : 'text-gray-900'}`}>
-                      {n.title}
-                    </h4>
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter shrink-0">
-                      {formatTimeAgo(n.timestamp)}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-gray-500 line-clamp-2 leading-relaxed">
-                    {n.body}
-                  </p>
-                </div>
-                {!n.read && <div className="w-2 h-2 rounded-full bg-orange-500 mt-1 animate-pulse shrink-0" />}
+              <div className="mt-0.5">
+                <ModuleIcon module={n.module} />
               </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-start">
+                  <p className={`text-sm ${
+                    n.read ? "text-gray-600" : "text-gray-900 font-medium"
+                  }`}>
+                    {n.title}
+                  </p>
+
+                  <span className="text-xs text-gray-400">
+                    {formatTimeAgo(n.timestamp)}
+                  </span>
+                </div>
+
+                <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                  {n.body}
+                </p>
+              </div>
+
+              {!n.read && (
+                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
+              )}
             </div>
           ))
         )}
+
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-gray-100 bg-gray-50/30 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-          <AlertCircle size={12} />
-          {unreadCount} New Signals
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+
+        <span className="text-xs text-gray-400">
+          {unreadCount} unread
+        </span>
+
+        <div className="flex gap-2">
           <button 
-            onClick={onClose} 
-            className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-black text-gray-900 hover:bg-gray-50 transition-colors uppercase tracking-widest"
+            onClick={onClose}
+            className="text-xs text-gray-500 hover:text-black"
           >
-            Dismiss
+            Close
           </button>
-          
-          {/* ✅ The New Button linking to our dedicated page */}
+
           <button 
             onClick={() => {
               router.push('/notifications');
               onClose();
-            }} 
-            className="px-4 py-2 bg-black border border-black rounded-xl text-[10px] font-black text-white hover:bg-gray-800 transition-colors uppercase tracking-widest shadow-sm"
+            }}
+            className="text-xs font-medium text-black"
           >
-            View Full Hub
+            View all
           </button>
         </div>
+
       </div>
     </div>
   );

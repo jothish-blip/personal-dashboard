@@ -4,8 +4,8 @@
   "description": "Execution system for focus, tasks and planning",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#111827",
-  "theme_color": "#111827",
+  "background_color": "#FAFAFA",
+  "theme_color": "#FAFAFA",
   "icons": [
     {
       "src": "/icon-192.png",

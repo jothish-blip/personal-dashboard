@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from "next";
-// Import high-performance local fonts (replaces Google Fonts)
-import { GeistSans } from 'geist/font/sans';
-import { GeistMono } from 'geist/font/mono';
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+
 import TopProgressBar from "@/components/TopProgressBar";
 import OfflineView from "@/app/not-found/OfflineView";
 import PWARegistration from "@/components/PWARegistration";
+
 import "./globals.css";
 
 export const viewport: Viewport = {
-  themeColor: "#111827",
+  themeColor: "#FAFAFA", // ✅ Light theme (FIXED)
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -16,37 +17,58 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | NexTask',
-    default: 'Task Engine | NexTask',
+    template: "%s | NexTask",
+    default: "NexTask",
   },
-  description: "Your personal execution and life engine.",
+  description: "Execution system for focus, tasks and planning",
+
   manifest: "/manifest.json",
+
   icons: {
-    icon: "/favicon.ico", 
-    apple: "/favicon.ico", 
+    icon: "/favicon.ico",
+    apple: "/favicon.ico",
   },
+
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "default", // ✅ matches light UI
     title: "NexTask",
+  },
+
+  applicationName: "NexTask",
+
+  // ✅ EXTRA PWA polish
+  formatDetection: {
+    telephone: false,
   },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html 
-      lang="en" 
+    <html
+      lang="en"
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#F9FAFB] text-slate-900 selection:bg-orange-100">
+      <body className="min-h-full flex flex-col bg-[#FAFAFA] text-slate-900">
+
+        {/* ✅ PWA Registration */}
         <PWARegistration />
+
+        {/* ✅ Top Loader */}
         <TopProgressBar />
+
+        {/* ✅ Offline Handling */}
         <OfflineView />
-        {children}
+
+        {/* ✅ App Content */}
+        <main className="flex-1 flex flex-col">
+          {children}
+        </main>
+
       </body>
     </html>
   );
