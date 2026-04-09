@@ -298,7 +298,6 @@ export function useNexCore() {
   useEffect(() => {
     const interval = setInterval(() => {
       if (navigator.onLine && userRef.current) {
-        // Updated logic call with addNotification context
         handleGlobalState(addNotification, state.tasks, []);
         fetchTasksFromDB(); 
       }
@@ -377,7 +376,6 @@ export function useNexCore() {
       return newState;
     });
     
-    // ✅ FIX: Added addNotification as the first argument
     if (status) handleTaskUpdate(addNotification, updatedTasksArray, dateStr); 
 
     if (!navigator.onLine) {
@@ -495,6 +493,22 @@ export function useNexCore() {
     });
   };
 
+  // ✅ ADDED FUNCTION
+  const clearAllLogs = () => {
+    if (!window.confirm("Delete all audit logs? This action cannot be undone.")) return;
+
+    setState(prev => {
+      const newState = { 
+        ...prev, 
+        logs: [] 
+      };
+      debouncedSave(KEY, newState);
+      return newState;
+    });
+
+    addNotification("system", "Logs Cleared", "All audit logs removed.", "low");
+  };
+
   return {
     state,
     mounted,
@@ -510,6 +524,7 @@ export function useNexCore() {
     exportData,
     checkMomentum,
     addAuditLog,
+    clearAllLogs, // ✅ EXPORTED HERE
     currentUser
   };
 }

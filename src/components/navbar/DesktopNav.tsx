@@ -175,39 +175,65 @@ export default function DesktopNav({
         </div>
 
         {/* PROFILE */}
-        <div className="relative flex items-center">
-          <button 
+        <div className="relative">
+          <button
             onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden hover:opacity-80 transition"
+            className="flex items-center gap-2 hover:opacity-80 transition"
           >
             {userProfile?.avatar_url ? (
               <img
                 src={userProfile.avatar_url}
-                className="w-full h-full object-cover"
+                className="w-8 h-8 rounded-full object-cover bg-gray-100"
                 alt="Profile"
               />
             ) : (
-              <User size={16} className="text-gray-500" />
+              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                <User size={16} className="text-gray-500" />
+              </div>
+            )}
+
+            {/* ✅ ADD NAME BACK */}
+            {userProfile?.full_name && (
+              <span className="text-sm font-medium text-gray-700 hidden lg:block">
+                {userProfile.full_name}
+              </span>
             )}
           </button>
 
-          {/* PROFILE DROPDOWN */}
+          {/* DROPDOWN */}
           {isProfileOpen && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setIsProfileOpen(false)} />
-              <div className="absolute right-0 top-12 mt-2 w-44 bg-white border border-gray-100 rounded-md shadow-sm py-1 z-50">
-                <button 
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsProfileOpen(false)}
+              />
+
+              <div className="absolute right-0 mt-3 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-2 z-50">
+
+                {/* ✅ USER INFO */}
+                <div className="px-4 py-2 border-b border-gray-100 mb-1">
+                  <p className="text-sm font-bold text-gray-900 truncate">
+                    {userProfile?.full_name || "User"}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">
+                    {userProfile?.email || ""}
+                  </p>
+                </div>
+
+                <button
                   onClick={() => { handleNav("/settings"); setIsProfileOpen(false); }}
-                  className="w-full px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 transition"
+                  className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 flex items-center gap-2 transition"
                 >
                   <Settings size={14} /> Settings
                 </button>
-                <button 
+
+                <button
                   onClick={() => { handleLogout(); setIsProfileOpen(false); }}
-                  className="w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition"
+                  className="w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-red-50 flex items-center gap-2 transition"
                 >
                   <LogOut size={14} /> Logout
                 </button>
+
               </div>
             </>
           )}

@@ -13,7 +13,7 @@ export default function Tabs({ activeTab, setActiveTab }: TabsProps) {
   ];
 
   return (
-    <div className="w-full border-b border-gray-200 sticky top-[64px] z-[90] bg-white/90 backdrop-blur-md shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+    <div className="w-full border-b border-gray-200 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
       <div className="max-w-[1500px] mx-auto flex items-center px-4 gap-8 overflow-x-auto custom-scrollbar">
         {tabs.map(tab => (
           <button
@@ -30,17 +30,13 @@ export default function Tabs({ activeTab, setActiveTab }: TabsProps) {
           >
             {tab.label}
 
-            {/* ACTIVE INDICATOR (Clean Underline) */}
             {activeTab === tab.id && (
-              <div 
-                className="absolute bottom-0 left-0 right-0 h-[2px] bg-orange-500 rounded-t-sm animate-in fade-in zoom-in-95 duration-200" 
-              />
+              <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-orange-500 rounded-t-sm" />
             )}
           </button>
         ))}
       </div>
 
-      {/* Hide scrollbar on mobile overflow to keep it clean */}
       <style dangerouslySetInnerHTML={{__html: `
         .custom-scrollbar::-webkit-scrollbar { display: none; }
         .custom-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

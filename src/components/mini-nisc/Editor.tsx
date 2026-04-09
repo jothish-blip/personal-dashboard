@@ -4,7 +4,6 @@ import { useEditor, EditorContent, Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import TextAlign from '@tiptap/extension-text-align';
-// Removed duplicate Link import since StarterKit handles basic marks, keeping configuration explicit if needed
 import CharacterCount from '@tiptap/extension-character-count';
 import Color from '@tiptap/extension-color';
 import { TextStyle } from '@tiptap/extension-text-style';
@@ -111,6 +110,10 @@ export default function Editor({ system }: any) {
   const [showFocusMode, setShowFocusMode] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
 
+  // 🔥 KEYBOARD DETECTION STATE
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
   const activeDocIdRef = useRef(activeDocId);
   useEffect(() => {
     activeDocIdRef.current = activeDocId;
@@ -152,6 +155,30 @@ export default function Editor({ system }: any) {
       editor.commands.setContent(activeDocument.content || "<p></p>");
     }
   }, [activeDocId, editor, activeDocument?.content, editingDocRef]);
+
+  // 🔥 ADVANCED KEYBOARD DETECTION (VISUAL VIEWPORT)
+  useEffect(() => {
+    const updateKeyboard = () => {
+      const viewport = window.visualViewport;
+      if (!viewport) return;
+
+      const isKeyboard = viewport.height < window.innerHeight - 100;
+      setKeyboardOpen(isKeyboard);
+      
+      // Store the exact px height to push the toolbar up accurately
+      if (isKeyboard) {
+        setKeyboardHeight(window.innerHeight - viewport.height);
+      } else {
+        setKeyboardHeight(0);
+      }
+    };
+
+    window.visualViewport?.addEventListener("resize", updateKeyboard);
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateKeyboard);
+    };
+  }, []);
 
   if (!mounted || !activeDocument || !editor) return null;
 
@@ -267,7 +294,7 @@ export default function Editor({ system }: any) {
       </div>
 
       {/* MAIN EDITOR AREA */}
-      <div className={`max-w-5xl mx-auto px-4 pb-48 md:pb-20 transition-all ${showFocusMode ? 'pt-8' : 'pt-4'}`}>
+      <div className={`max-w-5xl mx-auto px-4 pb-32 md:pb-20 transition-all ${showFocusMode ? 'pt-8' : 'pt-4'}`}>
         <div className={`relative rounded-[3rem] shadow-sm transition-all ${showFocusMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'}`}>
           <style jsx global>{`
             .ProseMirror {
@@ -310,7 +337,13 @@ export default function Editor({ system }: any) {
       </div>
 
       {/* ==================== MOBILE COMBINED TOOLBAR ==================== */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-2xl">
+      {/* 🔥 DYNAMIC POSITIONING APPLIED HERE */}
+      <div 
+        className="md:hidden fixed left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-2xl transition-all duration-300 ease-out"
+        style={{
+          bottom: keyboardOpen ? `${keyboardHeight}px` : "0px"
+        }}
+      >
         <div className="flex items-center gap-1 p-2 overflow-x-auto border-b border-gray-100">
           <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')}><Bold size={20}/></ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')}><Italic size={20}/></ToolbarButton>
@@ -379,14 +412,23 @@ export default function Editor({ system }: any) {
       {/* QUICK INSERT FLOATING BUTTON */}
       <button
         onClick={() => setShowQuickMenu(!showQuickMenu)}
-        className="md:hidden fixed bottom-24 right-6 z-50 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white p-5 rounded-full shadow-2xl transition-all"
+        className="md:hidden fixed z-50 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white p-5 rounded-full shadow-2xl transition-all duration-300"
+        style={{
+          bottom: keyboardOpen ? `${keyboardHeight + 24}px` : "6rem",
+          right: "1.5rem"
+        }}
       >
         <Plus size={28} />
       </button>
 
       {/* Quick Insert Menu */}
       {showQuickMenu && (
-        <div className="md:hidden fixed bottom-40 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 w-56">
+        <div 
+          className="md:hidden fixed right-6 z-50 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 w-56 transition-all duration-300"
+          style={{
+            bottom: keyboardOpen ? `${keyboardHeight + 96}px` : "10rem"
+          }}
+        >
           {[
             { label: "Heading 1", icon: <Heading1 size={18} />, cmd: 'h1' },
             { label: "Heading 2", icon: <Heading2 size={18} />, cmd: 'h2' },

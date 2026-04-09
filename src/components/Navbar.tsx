@@ -7,15 +7,15 @@ import { Meta } from "../types";
 import DesktopNav from "./navbar/DesktopNav";
 import MobileNav from "./navbar/MobileNav";
 
-import { 
-  Search, 
-  LayoutGrid, 
-  ListTodo, 
-  BookOpen, 
-  Brain, 
-  CalendarDays, 
+import {
+  Search,
+  LayoutGrid,
+  ListTodo,
+  BookOpen,
+  Brain,
+  CalendarDays,
   LogOut,
-  User 
+  User,
 } from "lucide-react";
 
 import { useNotificationSystem } from "@/notifications/useNotificationSystem";
@@ -28,39 +28,29 @@ interface NavbarProps {
   importData: (file: File) => void;
 }
 
-const COMMAND_ROUTES = [
-  { label: "Go to Tasks", path: "/", icon: LayoutGrid },
-  { label: "Go to Mini Nisc", path: "/mini-nisc", icon: ListTodo },
-  { label: "Go to Diary", path: "/diary", icon: BookOpen },
-  { label: "Go to Focus Engine", path: "/focus", icon: Brain },
-  { label: "Go to Planner", path: "/calender-event", icon: CalendarDays },
-  { label: "Settings", path: "/settings", icon: User },
-];
-
-export default function Navbar({ 
-  meta, setMonthYear, exportData, importData 
+export default function Navbar({
+  meta,
+  setMonthYear,
+  exportData,
+  importData,
 }: NavbarProps) {
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const pathname = usePathname() || ""; 
+  const pathname = usePathname() || "";
   const supabase = getSupabaseClient();
 
-  // 🔥 User State
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
 
-  // 🔥 Notifications
   const { notifications, unreadCount, markAsRead, clearAll } =
     useNotificationSystem(currentUser?.id);
 
   const [isNoteOpen, setIsNoteOpen] = useState(false);
-  const [isCmdKOpen, setIsCmdKOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
 
-  /**
-   * ✅ FIX: Prevent hydration + repeated calls
-   */
+  // 🔥 SCROLL STATE
+  const [showNavbar, setShowNavbar] = useState(true);
+  const lastScrollY = useRef(0);
+
+  // ✅ USER FETCH
   useEffect(() => {
     let isMounted = true;
 
@@ -97,42 +87,20 @@ export default function Navbar({
     }
   };
 
-  /**
-   * ✅ Cmd + K handler (stable)
-   */
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setIsCmdKOpen((prev) => !prev);
-      }
-      if (e.key === "Escape") {
-        setIsCmdKOpen(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
   const handleNav = (path: string) => {
     router.push(path);
-    setIsCmdKOpen(false);
-    setSearchQuery("");
   };
 
-  const handleImportClick = () => fileInputRef.current?.click();
-
-  /**
-   * ✅ FIX: Prevent re-renders (VERY IMPORTANT)
-   */
-  const activePaths = useMemo(() => ({
-    isTasks: pathname === "/",
-    isMini: pathname === "/mini-nisc",
-    isDiary: pathname === "/diary",
-    isFocus: pathname === "/focus",
-    isCalendar: pathname === "/calender-event",
-  }), [pathname]);
+  const activePaths = useMemo(
+    () => ({
+      isTasks: pathname === "/",
+      isMini: pathname === "/mini-nisc",
+      isDiary: pathname === "/diary",
+      isFocus: pathname === "/focus",
+      isCalendar: pathname === "/calender-event",
+    }),
+    [pathname]
+  );
 
   const [y, m] = (meta.currentMonth || "2024-01").split("-");
 
@@ -145,123 +113,56 @@ export default function Navbar({
     activePaths,
     handleNav,
     handleLogout,
-    y, m, years,
+    y,
+    m,
+    years,
     setMonthYear,
-    handleImportClick,
-    exportData,
     notifications,
     unreadCount,
     markAsRead,
     clearAll,
     isNoteOpen,
     setIsNoteOpen,
-    userProfile
+    userProfile,
   };
 
-  const filteredCommands = COMMAND_ROUTES.filter(route =>
-    route.label.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // 🔥 SCROLL DETECTION (MAIN LOGIC)
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScroll = window.scrollY;
+
+      if (currentScroll < 10) {
+        setShowNavbar(true);
+      } else if (currentScroll > lastScrollY.current) {
+        // scrolling down
+        setShowNavbar(false);
+      } else {
+        // scrolling up
+        setShowNavbar(true);
+      }
+
+      lastScrollY.current = currentScroll;
+    };
+
+    window.addEventListener("scroll", handleScroll);
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
     <>
-      {/* ✅ FIX: Removed transition-all */}
-      <nav className="sticky top-0 z-[100] bg-white border-b border-gray-200 shadow-sm will-change-transform">
+      {/* 🔥 NAVBAR */}
+      <nav
+        className={`fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-200 shadow-sm transition-transform duration-300 ${
+          showNavbar ? "translate-y-0" : "-translate-y-full"
+        }`}
+      >
         <DesktopNav {...navProps} />
         <MobileNav {...navProps} />
-
-        <input
-          type="file"
-          ref={fileInputRef}
-          className="hidden"
-          accept=".json"
-          onChange={(e) => {
-            if (e.target.files?.[0]) {
-              importData(e.target.files[0]);
-              e.target.value = "";
-            }
-          }}
-        />
       </nav>
 
-      {/* Cmd + K */}
-      {isCmdKOpen && (
-        <div className="fixed inset-0 z-[9999] bg-gray-900/50 backdrop-blur-sm flex items-start justify-center pt-[15vh] px-4">
-          <div className="absolute inset-0" onClick={() => setIsCmdKOpen(false)} />
-
-          <div className="relative bg-white w-full max-w-xl rounded-xl shadow-2xl overflow-hidden">
-            
-            <div className="flex items-center px-4 py-4 border-b border-gray-100">
-              <Search size={20} className="text-gray-400 mr-3" />
-              <input
-                autoFocus
-                type="text"
-                placeholder="Where do you want to go?..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 bg-transparent text-gray-900 font-medium text-lg outline-none placeholder:text-gray-300"
-              />
-            </div>
-
-            <div className="max-h-[400px] overflow-y-auto p-2">
-              {filteredCommands.length === 0 ? (
-                <div className="py-8 text-center text-sm text-gray-400">
-                  No matching routes found.
-                </div>
-              ) : (
-                <>
-                  {filteredCommands.map((route, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleNav(route.path)}
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors
-                        ${pathname === route.path
-                          ? "bg-gray-50 text-gray-400 cursor-default"
-                          : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"}
-                      `}
-                    >
-                      <div className="flex items-center gap-3">
-                        <route.icon size={16} />
-                        {route.label}
-                      </div>
-                    </button>
-                  ))}
-
-                  <div className="mt-2 pt-2 border-t border-gray-100">
-                    {userProfile && (
-                      <div className="flex items-center gap-3 px-4 py-3 mb-1">
-                        <img
-                          src={
-                            userProfile.avatar_url ||
-                            "https://api.dicebear.com/7.x/avataaars/svg?seed=fallback"
-                          }
-                          className="w-8 h-8 rounded-full border border-gray-200"
-                        />
-                        <div className="flex flex-col text-left">
-                          <span className="text-sm font-bold text-gray-900">
-                            {userProfile.full_name || "User"}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            Signed in
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-                    >
-                      <LogOut size={16} />
-                      Sign Out
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-
-          </div>
-        </div>
-      )}
+      {/* ✅ SPACER (IMPORTANT) */}
+      <div className="h-[120px] md:h-[64px]" />
     </>
   );
 }

@@ -56,7 +56,6 @@ export default function MobileNav(props: MobileNavProps) {
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  // scroll fix
   useEffect(() => {
     const el = document.getElementById("active-mobile-nav");
     if (!el) return;
@@ -74,11 +73,15 @@ export default function MobileNav(props: MobileNavProps) {
       {/* HEADER */}
       <div className="flex items-center justify-between">
 
-        <span className="text-sm font-semibold text-gray-900">
-          NexTask
-        </span>
+        {/* 🔥 NAME IN HEADER */}
+        <div className="flex flex-col">
+          <span className="text-xs text-gray-400">Welcome</span>
+          <span className="text-sm font-semibold text-gray-900 truncate max-w-[140px]">
+            {userProfile?.full_name || "User"}
+          </span>
+        </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
 
           {/* 🔔 Notifications */}
           <div className="relative">
@@ -86,7 +89,6 @@ export default function MobileNav(props: MobileNavProps) {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                // ✅ FIX: Passed the boolean directly instead of a callback function
                 setIsNoteOpen(!isNoteOpen);
               }}
               className="relative p-2 text-gray-500 hover:text-black"
@@ -109,14 +111,14 @@ export default function MobileNav(props: MobileNavProps) {
             />
           </div>
 
-          {/* Profile */}
+          {/* PROFILE */}
           <div className="relative">
             <button
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden"
+              className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200"
             >
               {userProfile?.avatar_url ? (
-                <img src={userProfile.avatar_url} className="w-full h-full object-cover" alt="Profile" />
+                <img src={userProfile.avatar_url} className="w-full h-full object-cover" />
               ) : (
                 <User size={14} />
               )}
@@ -124,21 +126,34 @@ export default function MobileNav(props: MobileNavProps) {
 
             {isProfileOpen && (
               <>
-                <div className="fixed inset-0" onClick={() => setIsProfileOpen(false)} />
-                <div className="absolute right-0 mt-2 w-44 bg-white border rounded-md shadow-sm py-1 z-50">
+                <div className="fixed inset-0 z-40" onClick={() => setIsProfileOpen(false)} />
+
+                <div className="absolute right-0 top-10 mt-2 w-52 bg-white border border-gray-100 rounded-lg shadow-lg py-2 z-50">
+
+                  {/* 🔥 USER INFO INSIDE DROPDOWN */}
+                  <div className="px-4 py-2 border-b border-gray-100">
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {userProfile?.full_name || "User"}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {userProfile?.email || ""}
+                    </p>
+                  </div>
+
                   <button
                     onClick={() => { handleNav("/settings"); setIsProfileOpen(false); }}
-                    className="w-full px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                    className="w-full px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
                   >
                     <Settings size={14} /> Settings
                   </button>
 
                   <button
                     onClick={() => { handleLogout(); setIsProfileOpen(false); }}
-                    className="w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                    className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                   >
                     <LogOut size={14} /> Logout
                   </button>
+
                 </div>
               </>
             )}
@@ -158,8 +173,8 @@ export default function MobileNav(props: MobileNavProps) {
               key={item.label}
               id={isActive ? "active-mobile-nav" : undefined}
               onClick={() => handleNav(item.path)}
-              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 whitespace-nowrap snap-center ${
-                isActive ? "text-black font-medium" : "text-gray-400"
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 whitespace-nowrap snap-center rounded-md ${
+                isActive ? "bg-black text-white font-medium" : "text-gray-500 hover:bg-gray-100"
               }`}
             >
               <Icon size={14} />
@@ -171,11 +186,11 @@ export default function MobileNav(props: MobileNavProps) {
 
       {/* DATE */}
       <div className="flex gap-4 text-xs text-gray-500">
-        <select value={y} onChange={(e) => setMonthYear(`${e.target.value}-${m}`)} className="bg-transparent outline-none">
+        <select value={y} onChange={(e) => setMonthYear(`${e.target.value}-${m}`)}>
           {years.map((year) => <option key={year}>{year}</option>)}
         </select>
 
-        <select value={m} onChange={(e) => setMonthYear(`${y}-${e.target.value}`)} className="bg-transparent outline-none">
+        <select value={m} onChange={(e) => setMonthYear(`${y}-${e.target.value}`)}>
           {Array.from({ length: 12 }, (_, i) => {
             const val = String(i + 1).padStart(2, "0");
             return <option key={val}>{val}</option>;

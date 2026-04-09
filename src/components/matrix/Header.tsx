@@ -31,7 +31,7 @@ export default function Header({
   return (
     <>
       {/* DESKTOP HEADER */}
-      <div className="hidden md:block px-4 py-4 sticky top-[112px] z-[80] bg-white/95 backdrop-blur-md border-b border-gray-100">
+      <div className="hidden md:block px-4 py-4 p-4 z-[70] bg-white border-b border-gray-100 z-[80] bg-white/95 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-[1500px] mx-auto flex flex-col gap-6">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-6">
@@ -83,7 +83,7 @@ export default function Header({
       </div>
 
       {/* SHARED CONTROL BAR */}
-      <div className="p-4 md:sticky md:top-[176px] z-[70] bg-white border-b border-gray-100">
+      <div className="p-4 p-4 z-[70] bg-white border-b border-gray-100 z-[70] bg-white border-b border-gray-100">
         <div className="max-w-[1500px] mx-auto flex flex-col md:flex-row items-center gap-3">
           <div className="flex-1 flex flex-col w-full">
             <div className="flex gap-2">

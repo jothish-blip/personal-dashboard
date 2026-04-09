@@ -49,31 +49,15 @@ export default function NotificationCenter({
   const [filter, setFilter] = useState<NexModule | 'all' | 'mini' | 'system'>('all');
   const [searchQuery, setSearchQuery] = useState("");
 
-  // 🔥 REAL FIX: LOCK BODY SCROLL COMPLETELY FOR MOBILE
+  // ✅ Safe version: Lock body scroll by preserving original overflow style
   useEffect(() => {
     if (!isOpen) return;
 
-    const scrollY = window.scrollY;
-
-    // Lock body completely preventing background scroll and jump
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.left = "0";
-    document.body.style.right = "0";
-    document.body.style.width = "100%";
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = "hidden";
 
     return () => {
-      const y = document.body.style.top;
-
-      document.body.style.position = "";
-      document.body.style.top = "";
-      document.body.style.left = "";
-      document.body.style.right = "";
-      document.body.style.width = "";
-
-      if (y) {
-        window.scrollTo(0, parseInt(y) * -1);
-      }
+      document.body.style.overflow = originalStyle;
     };
   }, [isOpen]);
 
@@ -108,7 +92,7 @@ export default function NotificationCenter({
         onClick={onClose}
       />
 
-      {/* ✅ FIXED DROPDOWN (NO layout shift anymore) */}
+      {/* ✅ FIXED DROPDOWN */}
       <div className="fixed top-[60px] right-2 left-2 md:left-auto md:right-4 md:w-[420px] w-auto bg-white rounded-xl border border-gray-100 z-[9999] overflow-hidden flex flex-col max-h-[70vh] shadow-xl">
 
         {/* Header */}
