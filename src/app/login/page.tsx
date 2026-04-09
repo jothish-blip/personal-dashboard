@@ -160,22 +160,6 @@ function LoginContent() {
               )}
             </button>
 
-            {/* Facebook - Solid brand color */}
-            <button
-              onClick={() => handleSocialLogin('facebook')}
-              disabled={!!loadingProvider}
-              className="group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl bg-[#1877F2] text-white hover:bg-[#1877F2]/90 hover:shadow-[0_4px_14px_rgba(24,119,242,0.3)] transition-all duration-200 font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
-            >
-              {loadingProvider === 'facebook' ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <>
-                  <span className="font-bold text-xl leading-none">f</span>
-                  <span>Continue with Facebook</span>
-                </>
-              )}
-            </button>
-
             {/* GitHub - Solid Dark */}
             <button
               onClick={() => handleSocialLogin('github')}
