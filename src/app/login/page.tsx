@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
-import { FaGithub } from "react-icons/fa";
+import { FaGithub, FaDiscord } from "react-icons/fa";
 import { Loader2, ShieldCheck } from "lucide-react";
 
 // Official Google SVG Icon
@@ -51,8 +51,9 @@ function LoginContent() {
     setSuccessMsg("");
     
     try {
-      const { error: authError } = await supabase.auth.signInWithOAuth({ 
-        provider: provider as any, 
+      // FIX: Destructure the error object as authError
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: provider as any,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         }
@@ -172,6 +173,22 @@ function LoginContent() {
                 <>
                   <FaGithub className="text-xl" />
                   <span>Continue with GitHub</span>
+                </>
+              )}
+            </button>
+
+            {/* Discord - Brand Color */}
+            <button
+              onClick={() => handleSocialLogin("discord")}
+              disabled={!!loadingProvider}
+              className="group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl bg-[#5865F2] border border-[#5865F2] text-white hover:bg-[#4752C4] hover:shadow-[0_4px_14px_rgba(88,101,242,0.3)] transition-all duration-200 font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
+            >
+              {loadingProvider === "discord" ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <>
+                  <FaDiscord className="text-xl" />
+                  <span>Continue with Discord</span>
                 </>
               )}
             </button>
