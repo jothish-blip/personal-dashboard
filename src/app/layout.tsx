@@ -17,8 +17,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | NexTask",
-    default: "NexTask",
+    template: "%s | Nextask",
+    default: "Nextask",
   },
   description: "Execution system for focus, tasks and planning",
   manifest: "/manifest.json",
@@ -29,9 +29,9 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "NexTask",
+    title: "Nextask",
   },
-  applicationName: "NexTask",
+  applicationName: "Nextask",
   formatDetection: {
     telephone: false,
   },
