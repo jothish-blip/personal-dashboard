@@ -5,6 +5,7 @@ import { GeistMono } from "geist/font/mono";
 import TopProgressBar from "@/components/TopProgressBar";
 import OfflineView from "@/app/not-found/OfflineView";
 import PWARegistration from "@/components/PWARegistration";
+import ClientWrapper from "@/components/ClientWrapper";
 
 import "./globals.css";
 
@@ -49,14 +50,17 @@ export default function RootLayout({
     >
       <body className="bg-[#FAFAFA] text-slate-900 overflow-x-hidden">
 
+        {/* SYSTEM LAYER */}
         <PWARegistration />
         <TopProgressBar />
         <OfflineView />
 
-        {/* ✅ FIXED ROOT CONTAINER */}
-        <main className="min-h-screen">
-          {children}
-        </main>
+        {/* APP LAYER */}
+        <ClientWrapper>
+          <main className="min-h-screen w-full">
+            {children}
+          </main>
+        </ClientWrapper>
 
       </body>
     </html>
