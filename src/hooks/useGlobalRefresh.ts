@@ -6,7 +6,7 @@ export const useGlobalRefresh = () => {
   const router = useRouter();
 
   const refreshPage = () => {
-    router.refresh(); // Next.js App Router refresh
+    router.refresh();
   };
 
   return { refreshPage };

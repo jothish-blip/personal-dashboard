@@ -8,6 +8,7 @@ import { Profile } from "@/types";
 import {
   User,
   Loader2,
+  Camera,
 } from "lucide-react";
 
 export default function ProfilePage() {
@@ -20,6 +21,7 @@ export default function ProfilePage() {
 
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [uploading, setUploading] = useState(false); // 🔥 New: Avatar specifically
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -40,17 +42,7 @@ export default function ProfilePage() {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select(`
-          id,
-          full_name,
-          username,
-          bio,
-          age,
-          gender,
-          location,
-          avatar_url,
-          updated_at
-        `)
+        .select(`id, full_name, username, bio, age, gender, location, avatar_url, updated_at`)
         .eq("id", user.id)
         .single();
 
@@ -66,36 +58,62 @@ export default function ProfilePage() {
     load();
   }, [supabase]);
 
-  // ✅ Avatar Upload
+  // ✅ Avatar Upload (Corrected Logic)
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !userId || !profile) return;
+    try {
+      const file = e.target.files?.[0];
+      if (!file || !userId || !profile) return;
 
-    const fileExt = file.name.split(".").pop();
-    // Using folder-based structure for better RLS and scalability
-    const filePath = `${userId}/avatar.${fileExt}`;
+      // 1. Validate File Type
+      if (!file.type.startsWith("image/")) {
+        setMessage({ type: "error", text: "Please upload an image file." });
+        return;
+      }
 
-    const { error } = await supabase.storage
-      .from("avatars")
-      .upload(filePath, file, { upsert: true });
+      setUploading(true);
+      setMessage(null);
 
-    if (error) {
+      const fileExt = file.name.split(".").pop();
+      // 🚀 FIX 1: Use timestamp in filename to break CDN/Browser cache
+      const filePath = `${userId}/avatar_${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, file, { 
+            cacheControl: '3600',
+            upsert: false // Set to false since name is now unique
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filePath);
+
+      const avatarUrl = data.publicUrl;
+
+      // Update Database
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ 
+            avatar_url: avatarUrl,
+            updated_at: new Date().toISOString() 
+        })
+        .eq("id", userId);
+
+      if (updateError) throw updateError;
+
+      // Update Local State
+      setProfile({ ...profile, avatar_url: avatarUrl });
+      setMessage({ type: "success", text: "Photo updated." });
+
+    } catch (error) {
       console.error("Upload error:", error);
-      return;
+      setMessage({ type: "error", text: "Failed to upload photo." });
+    } finally {
+      setUploading(false);
+      setTimeout(() => setMessage(null), 3000);
     }
-
-    const { data } = supabase.storage
-      .from("avatars")
-      .getPublicUrl(filePath);
-
-    const avatarUrl = data.publicUrl;
-
-    await supabase
-      .from("profiles")
-      .update({ avatar_url: avatarUrl })
-      .eq("id", userId);
-
-    setProfile({ ...profile, avatar_url: avatarUrl });
   };
 
   // ✅ Update Profile
@@ -122,6 +140,7 @@ export default function ProfilePage() {
         age: profile.age,
         gender: profile.gender,
         location: profile.location,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", userId);
 
@@ -153,24 +172,39 @@ export default function ProfilePage() {
       </div>
 
       {/* Avatar Section */}
-      <div className="flex items-center gap-5">
-        <label className="cursor-pointer">
+      <div className="flex items-center gap-6">
+        <label className="relative cursor-pointer group">
           <input
             type="file"
             className="hidden"
+            accept="image/*"
             onChange={handleAvatarUpload}
+            disabled={uploading}
           />
-          <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-            {profile.avatar_url ? (
-              <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+          <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-100 flex items-center justify-center relative shadow-sm">
+            {uploading ? (
+              <Loader2 className="animate-spin text-gray-400 w-6 h-6" />
+            ) : profile.avatar_url ? (
+              // 🚀 FIX 2: Append timestamp to the src to force a re-render from cache
+              <img 
+                src={`${profile.avatar_url}?t=${new Date(profile.updated_at || "").getTime()}`} 
+                alt="Profile" 
+                className="w-full h-full object-cover" 
+              />
             ) : (
-              <User className="text-gray-400 w-8 h-8" />
+              <User className="text-gray-400 w-10 h-10" />
             )}
+            
+            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+              <Camera className="text-white w-6 h-6" />
+            </div>
           </div>
         </label>
         <div>
-          <p className="text-sm font-medium text-gray-900">Profile photo</p>
-          <p className="text-xs text-gray-500 mt-0.5">Click to change</p>
+          <p className="text-sm font-semibold text-gray-900">Profile photo</p>
+          <p className="text-xs text-gray-500 mt-1 max-w-[180px]">
+            {uploading ? "Uploading..." : "Click image to change. PNG, JPG or GIF."}
+          </p>
         </div>
       </div>
 
@@ -272,9 +306,8 @@ export default function ProfilePage() {
               {isSaving ? "Saving..." : "Save"}
             </button>
             
-            {/* Minimal Message UI */}
             {message && (
-              <span className={`text-sm ${
+              <span className={`text-sm animate-in fade-in slide-in-from-left-2 ${
                 message.type === "success" ? "text-green-600" : "text-red-600"
               }`}>
                 {message.text}
@@ -282,7 +315,6 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* Feedback Link */}
           <p
             onClick={() => router.push("/feedback")}
             className="text-sm text-gray-400 hover:text-black cursor-pointer transition-colors"
