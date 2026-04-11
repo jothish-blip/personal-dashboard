@@ -16,24 +16,30 @@ type WeeklyPoint = {
 const getDateStr = (ts: number) => new Date(ts).toLocaleDateString("en-CA");
 
 export default function FocusStats() {
-  const { sessions, setMode, setTimeRemaining, startSession } = useFocusSystem();
+  // 🔥 FIX 1: Extract isLoaded directly from the context provider
+  const { 
+    sessions: contextSessions, 
+    isLoaded, 
+    setMode, 
+    setTimeRemaining, 
+    startSession 
+  } = useFocusSystem();
   
-  const typedSessions = sessions as FocusSession[];
+  // 🔥 FIX 2 & 3: Removed local cache fallback. The DB is now the only source of truth.
+  const typedSessions = contextSessions as FocusSession[];
   
   const [showMobileDetails, setShowMobileDetails] = useState(false);
   const [selectedRange, setSelectedRange] = useState<DateRange>("today");
   
   const [refDate, setRefDate] = useState<Date>(new Date());
 
-  // 🚀 PART 1: Connect Daily Goal safely to avoid hydration errors
+  // Connect Daily Goal safely to avoid hydration errors
   const [dailyGoalSeconds, setDailyGoalSeconds] = useState(3 * 3600); // default 3h
 
   useEffect(() => {
-    // Read on mount
     const saved = localStorage.getItem("daily_goal");
     if (saved) setDailyGoalSeconds(Number(saved));
 
-    // Listen for changes from TaskSelector in other tabs
     const handleStorage = (e: StorageEvent) => {
       if (e.key === "daily_goal" && e.newValue) {
         setDailyGoalSeconds(Number(e.newValue));
@@ -80,6 +86,8 @@ export default function FocusStats() {
 
   // --- FILTER SESSIONS BASED ON RANGE ---
   const filteredSessions = useMemo(() => {
+    if (!typedSessions) return [];
+    
     return typedSessions.filter((s) => {
       const d = getDateStr(s.startTime);
       switch (selectedRange) {
@@ -95,6 +103,7 @@ export default function FocusStats() {
   }, [typedSessions, selectedRange, todayStr, yesterdayStr, weekStartStr, refDateStr, refMonthStr, refYearStr]);
 
   const yesterdaySessions = useMemo(() => {
+    if (!typedSessions) return [];
     return typedSessions.filter(s => getDateStr(s.startTime) === yesterdayStr);
   }, [typedSessions, yesterdayStr]);
 
@@ -148,12 +157,12 @@ export default function FocusStats() {
   if (selectedRange === "month") goalTarget = dailyGoalSeconds * 30;
   if (selectedRange === "year") goalTarget = dailyGoalSeconds * 365;
   
-  // 🚀 PART 6: Safe edge case calculation
   const goalProgress = goalTarget > 0 
     ? Math.min(100, (totalActualFocus / goalTarget) * 100) 
     : 0;
 
   const streak = useMemo(() => {
+    if (!typedSessions) return 0;
     const datesSet = new Set(typedSessions.map(s => getDateStr(s.startTime)));
     let streakCount = 0;
     let d = new Date();
@@ -169,6 +178,8 @@ export default function FocusStats() {
   const weeklyData = useMemo(() => {
     let bestDayObj = { date: "", score: -1 };
     
+    if (!typedSessions) return { data: [], bestDayObj };
+
     const data: WeeklyPoint[] = datesInWeek.map(dateStr => {
       const daySessions = typedSessions.filter(s => getDateStr(s.startTime) === dateStr);
       const dayScore = daySessions.length > 0 
@@ -269,7 +280,7 @@ export default function FocusStats() {
       };
     }
     if (selectedRange === "week") {
-      const bestDayName = new Date(weeklyData.bestDayObj.date).toLocaleDateString('en-US', { weekday: 'long' });
+      const bestDayName = weeklyData.bestDayObj.date ? new Date(weeklyData.bestDayObj.date).toLocaleDateString('en-US', { weekday: 'long' }) : "None";
       return {
         summary: totalSessions === 0 ? "No activity this week." : `Weekly rhythm: ${bestDayName} was your best day.`,
         issue: topIssue !== "None" ? `Weekly nemesis: ${topIssue}` : "Consistent flow.",
@@ -312,9 +323,8 @@ export default function FocusStats() {
     if (selectedRange === "today" || selectedRange === "yesterday") setSelectedRange("custom");
   };
 
-  // --- HEATMAP GENERATOR ---
   const generateHeatmap = () => {
-    if (selectedRange !== "month" && selectedRange !== "year") return null;
+    if (selectedRange !== "month" && selectedRange !== "year" || !typedSessions) return null;
     
     const daysInPeriod = selectedRange === "month" 
       ? new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0).getDate()
@@ -363,6 +373,32 @@ export default function FocusStats() {
     return [...filteredSessions].sort((a,b) => b.startTime - a.startTime).slice(0, 3);
   }, [filteredSessions]);
 
+
+  // 🔥 FIX 4: Proper DB loading state using isLoaded guard
+  if (!isLoaded) {
+    return (
+      <div className="flex justify-center items-center h-64 w-full max-w-[580px] bg-white border border-gray-200 rounded-2xl shadow-sm animate-pulse mb-4 md:mb-0">
+         <div className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+           <span className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></span>
+           Loading Intelligence...
+         </div>
+      </div>
+    );
+  }
+
+  // 🔥 FIX 5: Empty state ONLY fires if DB fetch is completely finished and returned 0 sessions
+  if (isLoaded && typedSessions.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 w-full max-w-[580px] bg-white border border-gray-200 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] text-center mb-4 md:mb-0">
+        <span className="text-5xl mb-4 opacity-40">📭</span>
+        <h3 className="text-lg font-extrabold text-gray-900">No Intelligence Data (Check Sync)</h3>
+        <p className="text-sm text-gray-500 mt-2 font-medium max-w-[300px]">
+          Your performance metrics will appear here once you complete your first focus session.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex justify-center lg:justify-end w-full">
       <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 p-6 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.06)] space-y-10 w-full max-w-[520px] xl:max-w-[580px] animate-in fade-in duration-300 mb-4 md:mb-0">
@@ -383,7 +419,6 @@ export default function FocusStats() {
                   {badge.label}
                 </div>
               </h2>
-              {/* 🚀 PART 5: Goal Display in Header */}
               <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
                 Target: {Math.floor(dailyGoalSeconds / 3600)}h / day
               </div>
@@ -481,7 +516,6 @@ export default function FocusStats() {
               Planned: {formatHrsMins(totalFocusSeconds)}
             </div>
             
-            {/* 🚀 PART 4: Dynamic Progress Color */}
             <div className="mt-5 h-2 bg-gray-100 rounded-full overflow-hidden">
               <div 
                 className={`h-full transition-all duration-1000 ease-out ${
@@ -495,7 +529,6 @@ export default function FocusStats() {
               />
             </div>
             
-            {/* 🚀 PART 2: Advanced Progress Display */}
             <div className="flex justify-between items-center mt-3 text-[11px] font-semibold text-gray-600">
               <span className={goalProgress >= 100 ? "text-green-600" : goalProgress >= 50 ? "text-blue-600" : "text-amber-600"}>
                 {Math.round(goalProgress)}% completed
@@ -505,7 +538,6 @@ export default function FocusStats() {
               </span>
             </div>
             
-            {/* 🚀 PART 3: Intelligent Feedback */}
             <div className="text-[10px] text-gray-500 mt-2 font-medium">
               {goalProgress < 50 && "You're building momentum"}
               {goalProgress >= 50 && goalProgress < 100 && "You're halfway there"}

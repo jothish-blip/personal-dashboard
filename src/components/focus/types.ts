@@ -96,7 +96,7 @@ export interface FocusState {
   // Optional tracking
   focusedTime: number;
   totalElapsed: number;
-
+  isLoaded: boolean; // ✅ ADD THIS
   activeTaskId: string | null;
 
   // --- DATA MODELS ---

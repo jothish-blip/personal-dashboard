@@ -4,12 +4,9 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useFocusSystem } from "./useFocusSystem";
 import { FocusSession } from "./types";
 
-// 🔥 IMPROVEMENT 7: Extract intelligence logic (clean architecture)
 const calculateAvgDistractionTime = (sessions: FocusSession[]): number | null => {
-  // 🔥 IMPROVEMENT 1: Replace forEach with reduce (clean + functional)
   const { totalSeconds, count } = sessions.reduce(
     (acc, s) => {
-      // Safe access check
       if (s.distractions && s.distractions.length > 0) {
         const firstDist = (s.distractions[0].timestamp - s.startTime) / 1000;
         if (firstDist > 0) {
@@ -22,7 +19,6 @@ const calculateAvgDistractionTime = (sessions: FocusSession[]): number | null =>
     { totalSeconds: 0, count: 0 }
   );
 
-  // 🔥 IMPROVEMENT 4: Return null instead of magic number -1
   return count > 0 ? Math.floor(totalSeconds / count) : null;
 };
 
@@ -39,10 +35,8 @@ export default function SessionTimer() {
 
   const [smartAlert, setSmartAlert] = useState<string | null>(null);
 
-  // 🔥 IMPROVEMENT 3: Prevent unnecessary recompute (advanced memoization)
   const typedSessions = useMemo(() => sessions as FocusSession[], [sessions]);
 
-  // Handle "return to screen" properly. Instantly sync UI with internal calculation.
   useEffect(() => {
     if (currentSession) {
       const remaining = getRemainingTime();
@@ -50,18 +44,21 @@ export default function SessionTimer() {
     }
   }, [currentSession, getRemainingTime, setTimeRemaining]);
 
-  // --- SMART PREDICTIVE INTELLIGENCE ---
-  // 🔥 IMPROVEMENT 2: Memo stability
+  // 🟡 IMPROVEMENT: Safety check for unexpectedly lost session state
+  useEffect(() => {
+    if (isActive && !currentSession) {
+      console.error("SessionTimer: Active state true but currentSession is null. State desync detected.");
+    }
+  }, [isActive, currentSession]);
+
   const avgDistractionTime = useMemo(() => {
     return calculateAvgDistractionTime(typedSessions);
   }, [typedSessions]);
 
-  // 🔥 IMPROVEMENT 5: Smart alert cleanup
   useEffect(() => {
     let timeout: NodeJS.Timeout;
 
     if (isActive && avgDistractionTime !== null && avgDistractionTime > 60) {
-      // 🔥 IMPROVEMENT 6: Avoid exact equality (reliable triggering window)
       if (Math.abs(focusedTime - (avgDistractionTime - 60)) < 2) {
         setSmartAlert("⚠️ Stay sharp! You usually lose focus around this mark.");
         
@@ -80,9 +77,11 @@ export default function SessionTimer() {
 
   const isExtraMode = !!currentSession?.completedAt;
 
+  // 🔥 CORE DISPLAY LOGIC: Using engine's truth for display
   const displayTime = useMemo(() => {
     if (currentSession?.completedAt) {
-      return extraTime; // 🔥 show stopwatch
+      // extraTime is constantly updated by the provider interval
+      return extraTime; 
     }
     if (currentSession) {
       return getRemainingTime();
@@ -96,7 +95,6 @@ export default function SessionTimer() {
     }
   }, [displayTime, isActive, isPaused, isExtraMode]);
 
-  // --- KEYBOARD SHORTCUTS ---
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === "INPUT") return;
@@ -110,7 +108,6 @@ export default function SessionTimer() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [isActive, isPaused, startSession, pauseSession]);
 
-  // --- FORMATTERS & DYNAMIC STYLES ---
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, "0");
     const s = (seconds % 60).toString().padStart(2, "0");
@@ -145,12 +142,11 @@ export default function SessionTimer() {
     return "Deep focus in progress";
   };
 
-  // --- PROGRESS RING CALCS ---
   const circleRadius = 110; 
   const circumference = 2 * Math.PI * circleRadius;
   
   const rawProgress = isExtraMode 
-    ? 1 // 🔥 full circle
+    ? 1 
     : initialSessionTime > 0 
       ? (initialSessionTime - displayTime) / initialSessionTime 
       : 0;

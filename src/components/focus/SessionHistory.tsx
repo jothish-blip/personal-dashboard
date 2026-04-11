@@ -4,40 +4,49 @@ import React, { useState, useMemo } from "react";
 import { useFocusSystem } from "./useFocusSystem";
 import { Distraction, FocusSession } from "./types";
 
-type DateFilter = "today" | "yesterday" | "week" | "custom";
+type DateFilter = "all" | "today" | "yesterday" | "week" | "custom";
 
-// 🔥 IMPROVEMENT 1: Centralize date logic to prevent expensive re-creations
-const getDateStr = (ts: number) => new Date(ts).toLocaleDateString("en-CA");
+// 🔥 FIX 3 & BONUS: Create a strict IST local date constructor to ensure grouping works accurately
+const getDateStr = (ts: number) => {
+  const d = new Date(new Date(ts).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  return d.getFullYear() + "-" + 
+    String(d.getMonth() + 1).padStart(2, "0") + "-" + 
+    String(d.getDate()).padStart(2, "0");
+};
 
 export default function SessionHistory() {
-  const { sessions } = useFocusSystem();
-  const typedSessions = sessions as FocusSession[];
+  const { sessions: contextSessions, isLoaded } = useFocusSystem();
   
-  // State for mobile-friendly expandable details and filtering
+  const typedSessions = (contextSessions || []) as FocusSession[];
+  
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<DateFilter>("today");
+  const [filter, setFilter] = useState<DateFilter>("all");
   const [customDate, setCustomDate] = useState<Date>(new Date());
 
-  // --- FORMATTERS ---
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     return `${m} min`;
   };
 
+  // 🔥 FIX 1: Strict IST Start Time
   const formatStartTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString([], {
+    return new Date(timestamp).toLocaleTimeString("en-IN", {
+      timeZone: "Asia/Kolkata",
       hour: "2-digit",
-      minute: "2-digit"
-    });
+      minute: "2-digit",
+      hour12: true
+    }).toUpperCase();
   };
 
-  // ✅ BUG FIX: Strongly typed and safe fallback for formatEndTime
+  // 🔥 FIX 2: Strict IST End Time
   const formatEndTime = (session: FocusSession) => {
     const end = session.endTime ?? (session.startTime + session.durationSeconds * 1000);
-    return new Date(end).toLocaleTimeString([], {
+    return new Date(end).toLocaleTimeString("en-IN", {
+      timeZone: "Asia/Kolkata",
       hour: "2-digit",
-      minute: "2-digit"
-    });
+      minute: "2-digit",
+      hour12: true
+    }).toUpperCase();
   };
 
   const formatMode = (mode: string) => {
@@ -52,7 +61,6 @@ export default function SessionHistory() {
     return "text-red-500";
   };
 
-  // --- INTELLIGENCE HELPERS ---
   const getSessionClassification = (distractionCount: number) => {
     if (distractionCount === 0) return { label: "Deep Focus", style: "bg-green-100 text-green-700" };
     if (distractionCount < 3) return { label: "Stable", style: "bg-blue-100 text-blue-700" };
@@ -77,15 +85,13 @@ export default function SessionHistory() {
     }, {});
   };
 
-  // --- DATA PREPARATION ---
-
-  // 🔥 IMPROVEMENT 3: Compute anchor dates once per render cycle
   const { todayStr, yesterdayStr, weekStart } = useMemo(() => {
-    const tStr = new Date().toLocaleDateString("en-CA");
+    const now = Date.now();
+    const tStr = getDateStr(now);
     
     const yestDate = new Date();
     yestDate.setDate(yestDate.getDate() - 1);
-    const yStr = yestDate.toLocaleDateString("en-CA");
+    const yStr = getDateStr(yestDate.getTime());
 
     const wStart = new Date();
     wStart.setDate(wStart.getDate() - 6);
@@ -94,10 +100,10 @@ export default function SessionHistory() {
     return { todayStr: tStr, yesterdayStr: yStr, weekStart: wStart };
   }, []);
   
-  // 1. Filter sessions based on selected range
   const filteredSessions = useMemo(() => {
-    // 🔥 IMPROVEMENT 4: Clean extracted filter logic
     const isInFilter = (s: FocusSession) => {
+      if (filter === "all") return true;
+
       const d = getDateStr(s.startTime);
       switch (filter) {
         case "today":
@@ -107,7 +113,7 @@ export default function SessionHistory() {
         case "week":
           return new Date(s.startTime) >= weekStart;
         case "custom":
-          return d === customDate.toLocaleDateString("en-CA");
+          return d === getDateStr(customDate.getTime());
         default:
           return true;
       }
@@ -116,30 +122,33 @@ export default function SessionHistory() {
     return typedSessions.filter(isInFilter);
   }, [typedSessions, filter, customDate, todayStr, yesterdayStr, weekStart]);
 
-  // 2. Sort filtered sessions newest first
-  // 🔥 IMPROVEMENT 5: Memoized sorting logic
   const sortedSessions = useMemo(() => {
     return [...filteredSessions].sort((a: FocusSession, b: FocusSession) => b.startTime - a.startTime);
   }, [filteredSessions]);
 
-  // 3. Group sessions by date
   const groupedSessions = useMemo(() => {
-    // 🔥 IMPROVEMENT 2: Strongly typed reducer accumulator
     const groups = sortedSessions.reduce<Record<string, FocusSession[]>>((acc, session: FocusSession) => {
-      const dateObj = new Date(session.startTime); 
+      // Create date object strictly shifted to IST for formatting
+      const dObj = new Date(new Date(session.startTime).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
       const dateKey = getDateStr(session.startTime);
       
       let dateLabel = "";
-      if (dateKey === todayStr) dateLabel = "📅 Today";
-      else if (dateKey === yesterdayStr) dateLabel = "🕓 Yesterday";
-      else dateLabel = "📆 " + dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      if (dateKey === todayStr) {
+        dateLabel = "📅 Today";
+      } else if (dateKey === yesterdayStr) {
+        dateLabel = "🕓 Yesterday";
+      } else {
+        // 🔥 UX 4: Improve grouping label (e.g., "📆 Sep 12 • Fri")
+        const dStr = dObj.toLocaleDateString("en-IN", { month: "short", day: "numeric" });
+        const dayStr = dObj.toLocaleDateString("en-IN", { weekday: "short" });
+        dateLabel = `📆 ${dStr} • ${dayStr}`;
+      }
 
       if (!acc[dateLabel]) acc[dateLabel] = [];
       acc[dateLabel].push(session);
       return acc;
     }, {});
 
-    // Sort inside group by startTime
     Object.keys(groups).forEach(key => {
       groups[key].sort((a: FocusSession, b: FocusSession) => b.startTime - a.startTime);
     });
@@ -150,7 +159,6 @@ export default function SessionHistory() {
   return (
     <div className="bg-white border border-gray-200 p-5 rounded-xl shadow-sm h-full max-h-[600px] flex flex-col">
       
-      {/* HEADER */}
       <h2 className="text-sm font-semibold text-gray-800 mb-4 shrink-0 flex items-center justify-between">
         <span>Session History</span>
         <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
@@ -158,10 +166,9 @@ export default function SessionHistory() {
         </span>
       </h2>
 
-      {/* FILTER UI */}
       <div className="shrink-0 mb-4">
         <div className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          {(["today", "yesterday", "week", "custom"] as DateFilter[]).map((f) => (
+          {(["all", "today", "yesterday", "week", "custom"] as DateFilter[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -176,27 +183,33 @@ export default function SessionHistory() {
           ))}
         </div>
 
-        {/* CUSTOM DATE PICKER */}
         {filter === "custom" && (
           <div className="mt-3 animate-in fade-in slide-in-from-top-1">
             <input
               type="date"
               className="border border-gray-200 px-3 py-1.5 rounded-lg text-xs text-gray-700 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              value={customDate.toISOString().split("T")[0]}
+              value={getDateStr(customDate.getTime())}
               onChange={(e) => {
-                if (e.target.value) setCustomDate(new Date(e.target.value));
+                if (e.target.value) {
+                    const [year, month, day] = e.target.value.split('-').map(Number);
+                    setCustomDate(new Date(year, month - 1, day));
+                }
               }}
             />
           </div>
         )}
       </div>
 
-      {/* SCROLLABLE LIST */}
-      <div className="overflow-y-auto pr-1 flex-1 custom-scrollbar">
-        {filteredSessions.length === 0 ? (
+      <div className="overflow-y-auto pr-1 flex-1 custom-scrollbar relative">
+        
+        {!isLoaded ? (
+          <div className="flex flex-col items-center justify-center text-gray-400 py-10 h-full animate-pulse">
+            <span className="w-6 h-6 border-2 border-gray-300 border-t-transparent rounded-full animate-spin mb-3"></span>
+            <span className="text-sm font-medium text-gray-500">Loading history...</span>
+          </div>
+        ) : filteredSessions.length === 0 ? (
           
-          /* RICH EMPTY STATE */
-          <div className="flex flex-col items-center justify-center text-gray-400 py-10 h-full">
+          <div className="flex flex-col items-center justify-center text-gray-400 py-10 h-full animate-in fade-in">
             <span className="text-4xl mb-3 opacity-50">📭</span>
             <span className="text-sm font-medium text-gray-600">No sessions found.</span>
             <span className="text-xs text-center mt-1 max-w-[200px]">
@@ -210,14 +223,11 @@ export default function SessionHistory() {
           Object.entries(groupedSessions).map(([dateLabel, daySessions]) => (
             <div key={dateLabel} className="mb-6 relative">
               
-              {/* DATE GROUP HEADER */}
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider sticky top-0 bg-white/95 backdrop-blur py-1.5 z-20 border-b border-gray-100 mb-4 shadow-[0_4px_10px_-10px_rgba(0,0,0,0.1)]">
                 {dateLabel}
               </h3>
 
-              {/* TIMELINE CONTAINER */}
               <div className="flex flex-col">
-                {/* ✅ BUG FIX: Map specifically typed with FocusSession */}
                 {daySessions.map((session: FocusSession, index: number) => {
                   const dists = session.distractions || []; 
                   const distCount = dists.length || 0;
@@ -229,22 +239,19 @@ export default function SessionHistory() {
                   return (
                     <div key={session.id} className="flex gap-3 md:gap-4 relative group">
                       
-                      {/* LEFT: TIMELINE AXIS (Start -> End) */}
-                      <div className="w-12 md:w-16 shrink-0 flex flex-col items-end text-[10px] md:text-[11px] font-mono text-gray-500 pt-1.5">
+                      {/* 🔥 UX 1 & 5: Clean vertical timeline with arrow and IST badge */}
+                      <div className="w-[75px] md:w-[85px] shrink-0 flex flex-col items-end text-[10px] md:text-[11px] font-mono text-gray-500 pt-1.5">
                         <span className="font-semibold text-gray-800">{formatStartTime(session.startTime)}</span>
                         <div className="flex flex-col items-center justify-center h-4 my-0.5 text-gray-300">
-                           <span className="text-[6px]">•</span>
-                           <span className="text-[6px]">•</span>
+                           <span className="text-[10px]">↓</span>
                         </div>
                         <span>{formatEndTime(session)}</span>
+                        <span className="text-[8px] bg-gray-100 text-gray-400 px-1 py-[1px] rounded mt-1.5 font-sans font-medium tracking-wide">IST</span>
                       </div>
 
-                      {/* CENTER: TIMELINE LINE & NODE */}
                       <div className="relative flex flex-col items-center">
-                        {/* The Line */}
                         <div className={`w-px absolute top-3 z-0 ${isLast ? 'h-full bg-gradient-to-b from-gray-200 to-transparent' : 'h-full bg-gray-200'}`}></div>
                         
-                        {/* The Node */}
                         <div className={`w-2.5 h-2.5 rounded-full z-10 mt-2 ring-4 ring-white shadow-sm transition-transform duration-300 group-hover:scale-125 ${
                           hasExtraFlow 
                             ? 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]' 
@@ -252,19 +259,16 @@ export default function SessionHistory() {
                         }`}></div>
                       </div>
 
-                      {/* RIGHT: CARD CONTENT */}
                       <div className="flex-1 pb-6 min-w-0">
                         <div
                           className={`p-3 bg-white border rounded-lg transition-all relative overflow-hidden ${
                             isExpanded ? "border-blue-200 shadow-md ring-1 ring-blue-50" : "border-gray-100 hover:border-gray-300 hover:shadow-sm"
                           }`}
                         >
-                          {/* Flow Gradient Bar */}
                           {hasExtraFlow && (
                             <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-purple-400 to-transparent"></div>
                           )}
 
-                          {/* TOP ROW: Task, Badge, Flow, Score */}
                           <div className="flex justify-between items-start mb-1.5">
                             <div className="flex flex-col gap-1 pr-2 min-w-0">
                               <span className="text-sm font-semibold text-gray-800 truncate" title={session.taskTitle}>
@@ -286,11 +290,19 @@ export default function SessionHistory() {
                             </span>
                           </div>
 
-                          {/* DETAILS ROW: Meta Data */}
                           <div className="flex justify-between items-end mt-2">
                             <div className="text-[11px] font-medium text-gray-500 flex flex-col gap-1">
+                              
+                              {/* 🔥 UX 2: Explicit Duration Clarity */}
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-semibold text-gray-700">{formatTime(session.durationSeconds)}</span>
+                                <span className="font-semibold text-gray-700">
+                                  {formatTime(session.durationSeconds)} (Focus)
+                                </span>
+                                {hasExtraFlow && (
+                                  <span className="font-semibold text-purple-600">
+                                    +{formatTime(session.extraDuration || 0)} (Extra)
+                                  </span>
+                                )}
                                 <span className="text-gray-300">•</span>
                                 <span className={distCount > 0 ? "text-amber-600 font-semibold" : ""}>
                                   {distCount} interruption{distCount !== 1 ? 's' : ''}
@@ -299,7 +311,6 @@ export default function SessionHistory() {
                                 <span>{formatMode(session.mode)}</span>
                               </div>
                               
-                              {/* TOGGLE EXPAND BUTTON */}
                               {distCount > 0 && (
                                 <button
                                   onClick={() => setExpandedId(isExpanded ? null : session.id)}
@@ -311,11 +322,9 @@ export default function SessionHistory() {
                             </div>
                           </div>
 
-                          {/* EXPANDED DISTRACTION BREAKDOWN */}
                           {isExpanded && distCount > 0 && (
                             <div className="mt-3 pt-3 border-t border-gray-100 animate-in fade-in slide-in-from-top-2 duration-200">
                               
-                              {/* Density Indicator Bar */}
                               <div className="w-full h-1 bg-gray-100 rounded-full mb-3 overflow-hidden" title="Distraction density">
                                 <div 
                                   className="h-full bg-red-400 rounded-full transition-all" 
@@ -324,29 +333,25 @@ export default function SessionHistory() {
                               </div>
 
                               <div className="flex flex-col gap-2">
-                                {/* Top Issue */}
                                 <div className="text-[11px] text-gray-500">
                                   Top Issue: <span className="font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded ml-1">{getTopDistraction(dists)}</span>
                                 </div>
 
-                                {/* Breakdown Pills */}
                                 <div className="flex flex-wrap gap-1.5">
                                   {Object.entries(getDistractionBreakdown(dists)).map(([reason, count]) => (
                                     <span
                                       key={reason}
                                       className="text-[10px] font-medium px-2 py-0.5 bg-gray-50 border border-gray-200 text-gray-600 rounded-md flex items-center gap-1"
                                     >
-                                      {reason} <span className="text-gray-400">({count})</span>
+                                      {reason} <span className="text-gray-400">({count as React.ReactNode})</span>
                                     </span>
                                   ))}
                                 </div>
                                 
-                                {/* Timeline Preview (Timestamps) */}
                                 <div className="mt-1 flex flex-wrap gap-1.5">
-                                  {/* ✅ BUG FIX: Map specifically typed with Distraction */}
                                   {dists.map((d: Distraction) => (
                                     <span key={d.id} className="text-[9px] font-mono text-gray-400 bg-gray-50 px-1 rounded border border-gray-100">
-                                      {new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      {new Date(d.timestamp).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                   ))}
                                 </div>
