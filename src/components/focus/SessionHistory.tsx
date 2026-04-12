@@ -6,12 +6,8 @@ import { Distraction, FocusSession } from "./types";
 
 type DateFilter = "all" | "today" | "yesterday" | "week" | "custom";
 
-// 🔥 FIX 3 & BONUS: Create a strict IST local date constructor to ensure grouping works accurately
 const getDateStr = (ts: number) => {
-  const d = new Date(new Date(ts).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  return d.getFullYear() + "-" + 
-    String(d.getMonth() + 1).padStart(2, "0") + "-" + 
-    String(d.getDate()).padStart(2, "0");
+  return new Date(ts).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 };
 
 export default function SessionHistory() {
@@ -28,7 +24,6 @@ export default function SessionHistory() {
     return `${m} min`;
   };
 
-  // 🔥 FIX 1: Strict IST Start Time
   const formatStartTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString("en-IN", {
       timeZone: "Asia/Kolkata",
@@ -38,9 +33,11 @@ export default function SessionHistory() {
     }).toUpperCase();
   };
 
-  // 🔥 FIX 2: Strict IST End Time
   const formatEndTime = (session: FocusSession) => {
-    const end = session.endTime ?? (session.startTime + session.durationSeconds * 1000);
+    // 🔥 SAFE FALLBACK: uses actualDuration to ensure paused/extra time is mathematically included
+    const fallbackEnd = session.startTime + (session.actualDuration * 1000);
+    const end = session.endTime || fallbackEnd;
+    
     return new Date(end).toLocaleTimeString("en-IN", {
       timeZone: "Asia/Kolkata",
       hour: "2-digit",
@@ -128,8 +125,8 @@ export default function SessionHistory() {
 
   const groupedSessions = useMemo(() => {
     const groups = sortedSessions.reduce<Record<string, FocusSession[]>>((acc, session: FocusSession) => {
-      // Create date object strictly shifted to IST for formatting
-      const dObj = new Date(new Date(session.startTime).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+      
+      const dObj = new Date(session.startTime); 
       const dateKey = getDateStr(session.startTime);
       
       let dateLabel = "";
@@ -138,9 +135,8 @@ export default function SessionHistory() {
       } else if (dateKey === yesterdayStr) {
         dateLabel = "🕓 Yesterday";
       } else {
-        // 🔥 UX 4: Improve grouping label (e.g., "📆 Sep 12 • Fri")
-        const dStr = dObj.toLocaleDateString("en-IN", { month: "short", day: "numeric" });
-        const dayStr = dObj.toLocaleDateString("en-IN", { weekday: "short" });
+        const dStr = dObj.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", month: "short", day: "numeric" });
+        const dayStr = dObj.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short" });
         dateLabel = `📆 ${dStr} • ${dayStr}`;
       }
 
@@ -239,7 +235,6 @@ export default function SessionHistory() {
                   return (
                     <div key={session.id} className="flex gap-3 md:gap-4 relative group">
                       
-                      {/* 🔥 UX 1 & 5: Clean vertical timeline with arrow and IST badge */}
                       <div className="w-[75px] md:w-[85px] shrink-0 flex flex-col items-end text-[10px] md:text-[11px] font-mono text-gray-500 pt-1.5">
                         <span className="font-semibold text-gray-800">{formatStartTime(session.startTime)}</span>
                         <div className="flex flex-col items-center justify-center h-4 my-0.5 text-gray-300">
@@ -293,7 +288,6 @@ export default function SessionHistory() {
                           <div className="flex justify-between items-end mt-2">
                             <div className="text-[11px] font-medium text-gray-500 flex flex-col gap-1">
                               
-                              {/* 🔥 UX 2: Explicit Duration Clarity */}
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="font-semibold text-gray-700">
                                   {formatTime(session.durationSeconds)} (Focus)

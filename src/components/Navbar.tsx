@@ -21,6 +21,10 @@ import {
 import { useNotificationSystem } from "@/notifications/useNotificationSystem";
 import { getSupabaseClient } from "@/lib/supabase";
 
+// 🔥 FIX: Import the context hook so we don't fetch auth manually
+// Adjust this path to wherever your useFocusSystem is located!
+import { useFocusSystem } from "../components/focus/useFocusSystem";
+
 interface NavbarProps {
   meta: Meta;
   setMonthYear: (val: string) => void;
@@ -38,7 +42,9 @@ export default function Navbar({
   const pathname = usePathname() || "";
   const supabase = getSupabaseClient();
 
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  // 🔥 FIX 1: Consume currentUser from the global provider instead of local state
+  const { currentUser } = useFocusSystem(); 
+  
   const [userProfile, setUserProfile] = useState<any>(null);
 
   const { notifications, unreadCount, markAsRead, clearAll } =
@@ -50,27 +56,30 @@ export default function Navbar({
   const [showNavbar, setShowNavbar] = useState(true);
   const lastScrollY = useRef(0);
 
-  // ✅ USER FETCH
+  // ✅ USER PROFILE FETCH (No more auth lock crashing!)
   useEffect(() => {
     let isMounted = true;
 
     const fetchProfile = async () => {
-      if (!supabase) return;
+      // 🔥 FIX 2: If no user is passed down from Context, clear profile and abort.
+      // This completely removes the need for supabase.auth.getUser() here.
+      if (!supabase || !currentUser?.id) {
+        if (isMounted) setUserProfile(null);
+        return;
+      }
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!isMounted) return;
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", currentUser.id)
+          .single();
 
-      setCurrentUser(user);
-
-      if (!user) return;
-
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      if (data && isMounted) setUserProfile(data);
+        if (error) throw error;
+        if (data && isMounted) setUserProfile(data);
+      } catch (err) {
+        console.error("Failed to fetch user profile:", err);
+      }
     };
 
     fetchProfile();
@@ -78,7 +87,7 @@ export default function Navbar({
     return () => {
       isMounted = false;
     };
-  }, [supabase]);
+  }, [supabase, currentUser]); // 🔥 Re-run only when context currentUser changes
 
   const handleLogout = async () => {
     if (supabase) {

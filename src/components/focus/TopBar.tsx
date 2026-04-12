@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useFocusSystem } from "./useFocusSystem";
 import { FocusMode } from "./types";
+import { Play, Pause, Square, Maximize, Minimize, Circle } from "lucide-react";
 
 const MODES = [
   { key: "pomodoro", label: "Pomodoro" },
@@ -21,25 +22,25 @@ export default function TopBar() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [customMinutes, setCustomMinutes] = useState<number | "">("");
 
-  // 🔥 UPGRADED STATUS LOGIC WITH STRONGER COLORS
+  // 🔥 1 & 2. STRICT COLOR SYSTEM APPLIED (Communicates State)
   const getStatus = () => {
     if (!isActive) return { 
       label: "Idle", 
-      dot: "bg-gray-400", 
-      text: "text-gray-600", 
-      pill: "bg-gray-100 border-gray-200" 
+      iconColor: "text-gray-400", 
+      text: "text-gray-500", 
+      pill: "bg-gray-50 border-gray-200" 
     };
     if (isActive && isPaused) return { 
       label: "Paused", 
-      dot: "bg-orange-500", 
-      text: "text-orange-700", 
-      pill: "bg-orange-100 border-orange-300" 
+      iconColor: "text-amber-500", 
+      text: "text-amber-700", 
+      pill: "bg-amber-50 border-amber-200" 
     };
     return { 
       label: "In Focus", 
-      dot: "bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]", 
+      iconColor: "text-green-500 animate-pulse", 
       text: "text-green-700", 
-      pill: "bg-green-100 border-green-300" 
+      pill: "bg-green-50 border-green-200" 
     };
   };
 
@@ -86,23 +87,20 @@ export default function TopBar() {
   };
 
   return (
-    // 🔥 PART 1, 8, 9: PREMIUM CONTAINER WITH GRADIENT BACKGROUND AND ACCENT LINE
-    <div className="bg-gradient-to-br from-white via-gray-50 to-blue-50 border border-gray-200 rounded-2xl shadow-[0_6px_20px_rgba(0,0,0,0.04)] transition-all relative overflow-hidden">
-      
-      {/* 🔥 PART 8: TOP ACCENT LINE */}
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 via-green-400 to-orange-400"></div>
+    // 🔥 5. REMOVED GRADIENTS: Clean white professional card, subtle shadow
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 relative overflow-hidden">
       
       <div className="p-4 md:p-5">
-        {/* SPLIT INTO 3 CLEAR ZONES */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 items-center gap-6 lg:gap-4 mt-1">
+        {/* 🔥 7. MOBILE UX: Stack layout on mobile, grid on desktop */}
+        <div className="flex flex-col gap-5 lg:grid lg:grid-cols-3 lg:items-center mt-1">
           
           {/* ==========================================
               ZONE 1: SETUP (Left)
           ========================================== */}
-          <div className="flex flex-wrap items-center gap-3 justify-center lg:justify-start order-2 lg:order-1">
+          <div className="flex flex-wrap items-center gap-3 justify-center lg:justify-start order-2 lg:order-1 w-full lg:w-auto">
             
-            {/* 🔥 PART 2: SEGMENTED CONTROL (BLUE THEME) */}
-            <div className="flex bg-blue-100/60 p-1 rounded-xl w-fit shadow-inner">
+            {/* 🔥 4. MODE SELECTOR: Neutral base, pure blue selection */}
+            <div className="flex bg-gray-100 p-1 rounded-xl w-fit">
               {MODES.map((m) => {
                 const isSelected = mode === m.key;
                 return (
@@ -114,8 +112,9 @@ export default function TopBar() {
                       px-4 py-1.5 md:py-2 text-xs font-bold rounded-lg transition-all tracking-wide
                       ${isSelected 
                         ? "bg-white text-blue-700 shadow-sm border border-blue-200" 
-                        : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"}
+                        : "text-gray-600 hover:text-blue-600 hover:bg-gray-200/50"}
                       ${isActive && !isSelected ? "opacity-40 cursor-not-allowed hidden sm:block" : ""}
+                      ${!isActive ? "hover:scale-[1.03] active:scale-95" : ""}
                     `}
                   >
                     {m.label}
@@ -124,19 +123,19 @@ export default function TopBar() {
               })}
             </div>
 
-            {/* 🔥 PART 6: CUSTOM MODE UX (ORANGE/RED ENERGY) */}
+            {/* 🔥 CUSTOM MODE UX: Neutralized (No more flashy red/orange) */}
             {mode === "custom" && !isActive && (
-              <div className="flex items-center gap-2 bg-gradient-to-br from-red-50 to-orange-50 border border-orange-200 px-2 py-1 rounded-xl animate-in fade-in slide-in-from-left-2 duration-200">
+              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 px-2 py-1.5 rounded-xl animate-in fade-in slide-in-from-left-2 duration-200">
                 <input
                   type="number"
                   value={customMinutes}
                   onChange={handleCustomTimeChange}
                   placeholder="0"
-                  className="w-10 bg-transparent text-sm text-red-700 font-extrabold text-center focus:outline-none placeholder:text-red-300"
+                  className="w-10 bg-transparent text-sm text-gray-800 font-bold text-center focus:outline-none placeholder:text-gray-300"
                 />
-                <span className="text-[10px] uppercase font-bold tracking-wider text-red-400">min</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400">min</span>
                 
-                <div className="flex gap-1 ml-1 border-l border-orange-200 pl-2">
+                <div className="flex gap-1 ml-1 border-l border-gray-200 pl-2">
                   {PRESETS.map(p => (
                     <button
                       key={p}
@@ -145,7 +144,7 @@ export default function TopBar() {
                         if (setTimeRemaining) setTimeRemaining(p * 60); 
                         if (setInitialSessionTime) setInitialSessionTime(p * 60); 
                       }}
-                      className="text-[10px] font-bold text-red-600 px-2 py-1 rounded-lg bg-white border border-red-100 hover:bg-red-100 hover:border-red-200 transition-colors active:scale-95 shadow-sm"
+                      className="text-[10px] font-bold text-gray-600 px-2 py-1 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 hover:text-gray-900 transition-transform duration-150 active:scale-95 hover:scale-[1.05] shadow-sm"
                     >
                       {p}
                     </button>
@@ -158,16 +157,16 @@ export default function TopBar() {
           {/* ==========================================
               ZONE 2: CURRENT FOCUS (Center)
           ========================================== */}
-          {/* 🔥 PART 3: HERO TASK WITH DYNAMIC COLOR FEEDBACK */}
-          <div className="text-center order-1 lg:order-2 flex flex-col justify-center">
+          <div className="text-center order-1 lg:order-2 flex flex-col justify-center w-full">
             <div className="text-[10px] uppercase text-gray-400 font-extrabold tracking-widest mb-1">
               Current Focus
             </div>
-            <div className={`text-sm md:text-base font-extrabold truncate max-w-[300px] mx-auto px-4 transition-colors duration-300 ${
+            {/* 🔥 Task display color logic refined */}
+            <div className={`text-lg md:text-xl font-bold tracking-tight truncate max-w-[300px] lg:max-w-full mx-auto px-4 transition-colors duration-300 ${
               isActive 
-                ? "text-orange-600"
+                ? "text-green-700"
                 : activeTaskId 
-                  ? "text-blue-700"
+                  ? "text-gray-900"
                   : "text-gray-500"
             }`}>
               {displayTask}
@@ -175,35 +174,44 @@ export default function TopBar() {
           </div>
 
           {/* ==========================================
-              ZONE 3: CONTROLS & STATUS (Right)
+              ZONE 3: CONTROLS & STATUS (Right/Bottom)
           ========================================== */}
-          <div className="flex flex-wrap items-center justify-center lg:justify-end gap-3 order-3">
+          <div className="flex flex-wrap items-center justify-center lg:justify-end gap-3 order-3 w-full lg:w-auto">
             
-            {/* 🔥 PART 5: COLOR-CODED INTUITIVE CONTROLS */}
+            {/* 🔥 3. BUTTON HIERARCHY: Primary Blue, Secondary Amber, Danger Red */}
             {isActive && (
               <div className="flex items-center gap-2 shrink-0 animate-in fade-in zoom-in-95 duration-200">
-                <button 
-                  onClick={isPaused ? startSession : pauseSession}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all active:scale-95 shadow-sm border ${
-                    isPaused 
-                      ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200" 
-                      : "bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200"
-                  }`}
-                >
-                  {isPaused ? "Resume" : "Pause"}
-                </button>
+                {isPaused ? (
+                  <button 
+                    onClick={startSession}
+                    className="h-10 px-4 flex items-center gap-1.5 rounded-xl font-bold text-sm bg-blue-600 text-white border border-blue-600 hover:bg-blue-700 transition-transform duration-150 hover:scale-[1.03] active:scale-95 shadow-sm"
+                  >
+                    <Play size={16} className="fill-white" />
+                    Resume
+                  </button>
+                ) : (
+                  <button 
+                    onClick={pauseSession}
+                    className="h-10 px-4 flex items-center gap-1.5 rounded-xl font-bold text-sm bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200 transition-transform duration-150 hover:scale-[1.03] active:scale-95 shadow-sm"
+                  >
+                    <Pause size={16} className="fill-amber-700" />
+                    Pause
+                  </button>
+                )}
+
                 <button 
                   onClick={() => stopSession(false)} 
-                  className="px-4 py-1.5 text-xs font-bold rounded-lg bg-red-100 text-red-700 border border-red-300 hover:bg-red-200 transition-all active:scale-95 shadow-sm"
+                  className="h-10 px-4 flex items-center gap-1.5 rounded-xl font-bold text-sm bg-red-100 text-red-700 border border-red-300 hover:bg-red-200 transition-transform duration-150 hover:scale-[1.03] active:scale-95 shadow-sm"
                 >
+                  <Square size={14} className="fill-red-700" />
                   Stop
                 </button>
               </div>
             )}
 
-            {/* 🔥 PART 4: UPGRADED STATUS PILL */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm transition-colors ${status.pill}`}>
-              <span className={`w-2 h-2 rounded-full shrink-0 ${status.dot}`}></span>
+            {/* 🔥 3. STATUS PILL: Simplified borders and colors */}
+            <div className={`flex items-center gap-2 h-10 px-3 md:px-4 rounded-xl border shadow-sm transition-colors ${status.pill}`}>
+              <Circle size={10} className={`${status.iconColor} fill-current`} />
               <span className={`text-[10px] md:text-xs font-extrabold uppercase tracking-wider ${status.text}`}>
                 {status.label}
               </span>
@@ -211,12 +219,13 @@ export default function TopBar() {
 
             <div className="w-px h-6 bg-gray-200 mx-1 hidden md:block"></div>
 
-            {/* 🔥 PART 7: FULLSCREEN BUTTON IMPROVEMENT */}
+            {/* 🔥 FULLSCREEN: Icon only, neutral hover */}
             <button 
               onClick={toggleFullscreen}
-              className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-gray-500 hover:text-blue-600 transition-colors active:scale-95 px-2 py-1.5 rounded-lg hover:bg-blue-50 shrink-0"
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+              className="h-10 w-10 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-transform duration-150 active:scale-95 hover:scale-[1.05] shrink-0"
             >
-              {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+              {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
             </button>
 
           </div>

@@ -2,76 +2,57 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useFocusSystem } from "./useFocusSystem";
+import { FocusSession } from "./types"; // 🔥 Imported FocusSession for the TS fix
 
 export default function TaskSelector() {
-  const { activeTaskId, setActiveTask, isActive, currentSession, sessions } = useFocusSystem();
+  // 🔥 Context consumption updated
+  const { activeTaskId, setActiveTask, isActive, currentSession, sessions, dailyGoal, updateDailyGoal } = useFocusSystem();
   
-  // Local state for the input field
   const [taskInput, setTaskInput] = useState("");
   const [showHistory, setShowHistory] = useState(false);
-  const [dailyGoal, setDailyGoal] = useState(3 * 3600); // Default 3 hours in seconds
   
-  // Smart defaults / Recent tasks
   const [recentTasks, setRecentTasks] = useState<string[]>([
     "Deep Work", 
     "Admin & Emails", 
     "Learning & Research"
   ]);
 
-  // Load + Save Daily Goal from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("daily_goal");
-    if (saved) setDailyGoal(Number(saved));
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("daily_goal", dailyGoal.toString());
-  }, [dailyGoal]);
-
-  // Determine what to display: Locked session task vs. Staging task
   const displayTask = isActive && currentSession 
     ? currentSession.taskId 
     : activeTaskId;
 
-  // 🧠 Extract Intent History from previous sessions
   const intentHistory = useMemo(() => {
     const map = new Map<string, number>();
 
-    sessions.forEach((s) => {
+    // 🔥 TS FIX: explicitly typing 's' as FocusSession
+    (sessions as FocusSession[]).forEach((s: FocusSession) => {
       if (!s.taskTitle || s.taskTitle === "Untitled Focus" || s.taskTitle === "Archived Focus") return;
       map.set(s.taskTitle, (map.get(s.taskTitle) || 0) + 1);
     });
 
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 10); // Expanded to 10 to make the toggle useful
+      .slice(0, 10);
   }, [sessions]);
 
-  // Determine visible history based on toggle state
   const visibleHistory = showHistory ? intentHistory : intentHistory.slice(0, 3);
-
-  // Smart suggestion for placeholder
   const suggested = intentHistory[0]?.[0];
 
-  // Handle setting a new intent
   const handleSetIntent = (intentValue?: string) => {
     const valueToSet = intentValue !== undefined ? intentValue : taskInput;
     if (!valueToSet.trim()) return;
 
     const trimmed = valueToSet.trim();
-    
-    // 🧠 Prevent weak intents
     if (trimmed.length < 3) return;
 
     setActiveTask(trimmed);
 
-    // Add to recent tasks (prevent duplicates, keep last 5)
     setRecentTasks((prev) => {
       const filtered = prev.filter(t => t.toLowerCase() !== trimmed.toLowerCase());
       return [trimmed, ...filtered].slice(0, 5);
     });
 
-    setTaskInput(""); // Clear input after setting
+    setTaskInput(""); 
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -113,14 +94,12 @@ export default function TaskSelector() {
             Active Intent
           </div>
           
-          {/* 🧠 Intent Lock Feedback */}
           {isActive && (
             <div className="text-[10px] text-orange-600 font-bold animate-pulse uppercase tracking-wider bg-orange-100 px-2 py-0.5 rounded border border-orange-200">
               🔒 Locked during session
             </div>
           )}
 
-          {/* Allow clearing the intent if it's set but the session hasn't started yet */}
           {activeTaskId && !isActive && (
             <button 
               onClick={() => setActiveTask(null)}
@@ -142,7 +121,6 @@ export default function TaskSelector() {
         </div>
       </div>
 
-      {/* INPUT, GOALS & RECENTS (Hides completely during active session to prevent distraction) */}
       {!isActive && (
         <div className="flex flex-col gap-5 animate-in fade-in slide-in-from-top-2 duration-300">
           
@@ -166,7 +144,7 @@ export default function TaskSelector() {
             </button>
           </div>
 
-          {/* 🎯 DAILY GOAL SETTING */}
+          {/* 🎯 DAILY GOAL SETTING - NOW USING GLOBAL CONTEXT */}
           <div className="flex items-center justify-between bg-gradient-to-br from-green-50 to-white border border-green-200 rounded-xl px-4 py-3 shadow-sm">
             <div className="text-xs text-green-700 font-bold uppercase tracking-wider">
               Daily Target
@@ -175,7 +153,7 @@ export default function TaskSelector() {
               <input
                 type="number"
                 value={dailyGoal / 3600}
-                onChange={(e) => setDailyGoal(Number(e.target.value) * 3600)}
+                onChange={(e) => updateDailyGoal(Number(e.target.value) * 3600)}
                 className="w-12 text-center text-sm font-bold bg-white border border-green-200 text-green-800 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-300 transition-shadow"
                 min={1}
                 max={16}
@@ -220,7 +198,7 @@ export default function TaskSelector() {
             </div>
           )}
 
-          {/* 🧠 FOCUS HISTORY (Extracted from Sessions) */}
+          {/* 🧠 FOCUS HISTORY */}
           {intentHistory.length > 0 && (
             <div className="space-y-2 mt-2 pt-5 border-t border-gray-100">
               <div className="flex justify-between items-center mb-3">
