@@ -7,6 +7,9 @@ import OfflineView from "@/app/not-found/OfflineView";
 import PWARegistration from "@/components/PWARegistration";
 import ClientWrapper from "@/components/ClientWrapper";
 
+// 🔥 FIX: Correctly imported FocusProvider instead of useFocusSystem
+import { FocusProvider } from "../components/focus/useFocusSystem";
+
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -56,11 +59,13 @@ export default function RootLayout({
         <OfflineView />
 
         {/* APP LAYER */}
-        <ClientWrapper>
-          <main className="min-h-screen w-full">
-            {children}
-          </main>
-        </ClientWrapper>
+        <FocusProvider>
+          <ClientWrapper>
+            <main className="min-h-screen w-full">
+              {children}
+            </main>
+          </ClientWrapper>
+        </FocusProvider>
 
       </body>
     </html>

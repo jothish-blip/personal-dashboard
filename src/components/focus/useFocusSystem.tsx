@@ -12,7 +12,7 @@ export type ExtendedActiveSession = ActiveSession & {
   initialDuration: number;
 };
 
-const FocusContext = createContext<FocusState | undefined>(undefined);
+const FocusContext = createContext<any>(undefined);
 
 const MODE_DURATIONS = {
   pomodoro: 25 * 60,
@@ -26,7 +26,10 @@ type DBFocusSession = {
   duration: number;
   completed: boolean;
   started_at: string;
+  ended_at?: string; 
   extra_duration?: number;
+  distractions?: Distraction[]; // 🔥 FIX: Added to schema
+  score?: number;               // 🔥 FIX: Added to schema
 };
 
 const acquireLock = (lockKey: string, cooldownMs: number): boolean => {
@@ -40,10 +43,27 @@ const acquireLock = (lockKey: string, cooldownMs: number): boolean => {
   return false;
 };
 
+const parseDBDate = (dateStr: string | undefined | null) => {
+  if (!dateStr) return 0;
+  let safeStr = dateStr;
+  if (!safeStr.endsWith('Z') && !safeStr.match(/[+-]\d{2}(:\d{2})?$/)) {
+    safeStr += 'Z';
+  }
+  return new Date(safeStr).getTime();
+};
+
 const mapDBSessionToFocusSession = (row: DBFocusSession): FocusSession => {
-  const startTime = new Date(row.started_at).getTime();
-  const duration = row.duration;
+  const startTime = parseDBDate(row.started_at);
+  const duration = row.duration || 0;
   const extra = row.extra_duration || 0;
+
+  const endTime = row.ended_at 
+    ? parseDBDate(row.ended_at) 
+    : startTime + (duration + extra) * 1000;
+
+  const safeEndTime = endTime < startTime 
+    ? startTime + (duration + extra) * 1000 
+    : endTime;
 
   return {
     id: row.id,
@@ -51,16 +71,16 @@ const mapDBSessionToFocusSession = (row: DBFocusSession): FocusSession => {
     taskTitle: row.task_id || "Archived Focus",
     mode: (row as any).mode ?? "pomodoro", 
     startTime,
-    endTime: startTime + duration * 1000,
+    endTime: safeEndTime, 
     initialDuration: duration,
-    distractions: [],
+    distractions: row.distractions || [], // 🔥 FIX: Reads real distractions
     durationSeconds: duration,
     totalSessionSeconds: duration,
     extraDuration: extra,
     actualDuration: duration + extra,
-    date: new Date(row.started_at).toISOString(),
-    score: row.completed ? 100 : 50,
-    distractionCount: 0,
+    date: new Date(startTime).toISOString(),
+    score: row.score ?? (row.completed ? 100 : 50), // 🔥 FIX: Reads exact score
+    distractionCount: row.distractions?.length || 0,
     topDistraction: null,
     avgDistractionGap: 0,
   };
@@ -89,9 +109,31 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
+
+  const [dailyGoal, setDailyGoal] = useState(3 * 3600);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("daily_goal");
+      if (saved) setDailyGoal(Number(saved));
+    }
+  }, []);
+
+  const updateDailyGoal = (seconds: number) => {
+    setDailyGoal(seconds);
+    localStorage.setItem("daily_goal", seconds.toString());
+  };
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const alarmPlayedRef = useRef(false);
+  const isFetchingRef = useRef(false);
+
+  const initialSessionTimeRef = useRef(initialSessionTime);
+  const fetchSessionsRef = useRef<() => Promise<boolean>>(async () => false);
+
+  useEffect(() => {
+    initialSessionTimeRef.current = initialSessionTime;
+  }, [initialSessionTime]);
 
   const getElapsedTime = useCallback(() => {
     if (!currentSession) return 0;
@@ -129,64 +171,78 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   };
 
   const fetchSessionsFromDB = useCallback(async (): Promise<boolean> => {
+    if (isFetchingRef.current) return false;
+    isFetchingRef.current = true;
     setIsLoaded(false);
 
-    if (!currentUser?.id || !supabase) {
-      setIsLoaded(true);
-      return false;
-    }
+    try {
+      if (!currentUser?.id || !supabase) {
+        setIsLoaded(true);
+        return false;
+      }
 
-    const { data: historyData, error: historyError } = await supabase
-      .from('focus_sessions')
-      .select('*')
-      .eq('user_id', currentUser.id) 
-      .order('started_at', { ascending: false });
+      const { data: historyData, error: historyError } = await supabase
+        .from('focus_sessions')
+        .select('*')
+        .eq('user_id', currentUser.id) 
+        .order('started_at', { ascending: false });
 
-    if (historyError) {
-      console.error("❌ DB FETCH FAILED:", historyError);
-    } else if (historyData) {
-      setSessionHistory(historyData.map(mapDBSessionToFocusSession));
-    }
+      if (historyError) {
+        console.error("❌ DB FETCH FAILED:", historyError);
+      } else if (historyData) {
+        setSessionHistory(historyData.map(mapDBSessionToFocusSession));
+      }
 
-    const { data: activeData } = await supabase
-      .from('focus_active_sessions')
-      .select('session')
-      .eq('user_id', currentUser.id)
-      .maybeSingle();
+      const { data: activeData } = await supabase
+        .from('focus_active_sessions')
+        .select('session')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
 
-    if (activeData?.session) {
-      const s = activeData.session as ExtendedActiveSession;
+      if (activeData?.session) {
+        const s = activeData.session as ExtendedActiveSession;
 
-      setCurrentSession(s);
-      setIsActive(true);
-      setMode(s.mode);
+        setCurrentSession(prev => {
+          if (prev && prev.id === s.id) return prev;
+          return s;
+        });
 
-      const elapsed = Math.floor((Date.now() - s.startTime) / 1000);
-      const duration = s.initialDuration || initialSessionTime;
+        setIsActive(true);
+        setMode(s.mode);
 
-      setInitialSessionTime(duration);
-      setTimeRemaining(Math.max(0, duration - elapsed));
+        const duration = s.initialDuration || initialSessionTime;
+        setInitialSessionTime(duration);
 
-      if (s.completedAt && s.extraStartTime) {
-        setIsSessionComplete(true);
-        setExtraTime(Math.floor((Date.now() - s.extraStartTime) / 1000));
+        if (s.completedAt && s.extraStartTime) {
+          setIsSessionComplete(true);
+          setExtraTime(Math.floor((Date.now() - s.extraStartTime) / 1000));
+        } else {
+          setIsSessionComplete(false);
+          setExtraTime(0);
+        }
       } else {
+        setCurrentSession(prev => {
+          if (prev) return prev;
+          return null;
+        });
+        setIsActive(false);
         setIsSessionComplete(false);
         setExtraTime(0);
       }
-    } else {
-      setCurrentSession(null);
-      setIsActive(false);
-      setIsSessionComplete(false);
-      setExtraTime(0);
-    }
 
-    setIsLoaded(true);
-    return !!activeData?.session;
+      setIsLoaded(true);
+      return !!activeData?.session;
+    } finally {
+      isFetchingRef.current = false;
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, currentUser]);
 
-  const syncSessionToDB = async (session: FocusSession, isCompleted: boolean) => {
+  useEffect(() => {
+    fetchSessionsRef.current = fetchSessionsFromDB;
+  }, [fetchSessionsFromDB]);
+
+  const syncSessionToDB = async (session: FocusSession, isCompleted: boolean, retries = 2) => {
     try {
       if (!currentUser?.id) {
         console.error("❌ No user → abort save");
@@ -201,30 +257,29 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         duration: session.durationSeconds,
         extra_duration: session.extraDuration || 0,
         completed: isCompleted,
-        started_at: new Date(session.startTime).toISOString()
+        started_at: new Date(session.startTime).toISOString(),
+        ended_at: new Date(session.endTime).toISOString(),
+        distractions: session.distractions || [], // 🔥 FIX: Saves real distractions
+        score: session.score || 0                 // 🔥 FIX: Saves exact score
       };
 
-      const { data } = await supabase
+      await supabase
         .from('focus_sessions')
         .upsert(payload, { onConflict: 'id' })
         .select()
         .throwOnError(); 
 
     } catch (err) {
-      console.error("❌ DB SAVE FAILED (Exception):", err);
+      console.error("❌ DB SAVE FAILED:", err);
+      if (retries > 0) {
+        console.log(`Retrying save... (${retries} left)`);
+        setTimeout(() => syncSessionToDB(session, isCompleted, retries - 1), 1000);
+      }
     }
   };
 
   useEffect(() => {
     if (!supabase) return;
-
-    const initAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-      setCurrentUser(data.session?.user || null);
-      setAuthInitialized(true);
-    };
-
-    initAuth();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, session: Session | null) => {
@@ -265,13 +320,22 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
     const handleVisibility = () => {
       if (document.visibilityState === "visible" && currentUser?.id) {
-        fetchSessionsFromDB(); 
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          fetchSessionsFromDB(); 
+        }, 500);
       }
     };
+    
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      clearTimeout(timeoutId);
+    };
   }, [fetchSessionsFromDB, currentUser]);
 
   useEffect(() => {
@@ -297,12 +361,18 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!supabase || !currentUser?.id) return;
 
-    const channel = supabase
-      .channel(`focus-${currentUser.id}`)
+    const uniqueChannelName = `focus-${currentUser.id}-${Math.random().toString(36).slice(2, 11)}`;
+    const channel = supabase.channel(uniqueChannelName);
+
+    channel
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "focus_sessions", filter: `user_id=eq.${currentUser.id}` },
-        () => fetchSessionsFromDB()
+        (payload: any) => {
+          if (payload.eventType === "INSERT" || payload.eventType === "DELETE") {
+            fetchSessionsRef.current();
+          }
+        }
       )
       .on(
         "postgres_changes",
@@ -318,21 +388,27 @@ export function FocusProvider({ children }: { children: ReactNode }) {
           } else if (payload.new?.session) {
             const session = payload.new.session as ExtendedActiveSession;
             
-            setCurrentSession(prev => ({
-              ...session,
-              extraStartTime: session.extraStartTime ?? prev?.extraStartTime,
-              completedAt: session.completedAt ?? prev?.completedAt,
-            }));
+            setCurrentSession(prev => {
+              if (prev && prev.id === session.id) {
+                return {
+                  ...prev,
+                  extraStartTime: session.extraStartTime ?? prev?.extraStartTime,
+                  completedAt: session.completedAt ?? prev?.completedAt,
+                };
+              }
+              return {
+                ...session,
+                extraStartTime: session.extraStartTime,
+                completedAt: session.completedAt,
+              };
+            });
             
             setIsActive(true);
             setMode(session.mode);
             setIsPaused(false);
 
-            const sessionDuration = session.initialDuration || initialSessionTime;
+            const sessionDuration = session.initialDuration || initialSessionTimeRef.current;
             setInitialSessionTime(sessionDuration);
-            
-            const elapsed = Math.floor((Date.now() - session.startTime) / 1000);
-            setTimeRemaining(Math.max(0, sessionDuration - elapsed));
 
             if (session.completedAt && session.extraStartTime) {
               setIsSessionComplete(true);
@@ -348,8 +424,10 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  }, [supabase, currentUser, fetchSessionsFromDB, initialSessionTime]);
+    return () => { 
+      supabase.removeChannel(channel); 
+    };
+  }, [supabase, currentUser?.id]); 
 
   useEffect(() => {
     const handleStorageSync = (e: StorageEvent) => {
@@ -617,9 +695,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       
       const sessionDuration = remoteSession.initialDuration || initialSessionTime;
       setInitialSessionTime(sessionDuration);
-      
-      const elapsed = Math.floor((Date.now() - remoteSession.startTime) / 1000);
-      setTimeRemaining(Math.max(0, sessionDuration - elapsed));
 
       if (remoteSession.completedAt && remoteSession.extraStartTime) {
         setIsSessionComplete(true);
@@ -671,6 +746,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   return (
     <FocusContext.Provider
       value={{
+        currentUser, 
         isActive, isPaused, mode, timeRemaining, initialSessionTime, focusedTime,
         totalElapsed, activeTaskId, isFocusMode,
         currentSession,
@@ -679,6 +755,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         sessions: sessionHistory,
         isSessionComplete,
         isLoaded, 
+        dailyGoal, 
+        updateDailyGoal, 
         setIsSessionComplete, 
         enterFocusMode, exitFocusMode,
         setTimeRemaining, 

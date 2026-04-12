@@ -13,6 +13,9 @@ import AnalyticsView from "../components/AnalyticsView";
 import AuditView from "../components/AuditView";
 import FeedbackPopup from "../components/FeedbackPopup";
 
+// 🔥 FIX 1: Import the Focus context
+import { useFocusSystem } from "../components/focus/useFocusSystem";
+
 export const dynamic = "force-dynamic";
 
 export default function Home() {
@@ -39,29 +42,32 @@ export default function Home() {
     exportData
   } = useNexCore();
 
+  // 🔥 FIX 2: Pull auth state directly from the global provider
+  const { currentUser, isLoaded: isFocusLoaded } = useFocusSystem();
+
   // 🔐 AUTH + FEEDBACK
   useEffect(() => {
-    const run = async () => {
+    // 🔥 Wait until the FocusProvider has finished initializing auth
+    if (!isFocusLoaded) return;
+
+    if (!currentUser) {
+      setIsAuthenticated(false);
+      router.replace("/login");
+      return;
+    }
+
+    setIsAuthenticated(true);
+    setUserId(currentUser.id);
+
+    const runFeedbackCheck = async () => {
       const supabase = getSupabaseClient();
-
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        setIsAuthenticated(false);
-        router.replace("/login");
-        return;
-      }
-
-      setIsAuthenticated(true);
-      setUserId(user.id);
-
       const today = new Date().toISOString().split("T")[0];
 
       // ✅ SAFE FETCH
       let { data } = await supabase
         .from("user_feedback_status")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", currentUser.id)
         .maybeSingle();
 
       // ✅ CREATE IF NOT EXISTS (SAFE INSERT)
@@ -70,7 +76,7 @@ export default function Home() {
           .from("user_feedback_status")
           .insert([
             {
-              user_id: user.id,
+              user_id: currentUser.id,
               feedback_given: false,
               daily_prompt_count: 0,
             },
@@ -96,7 +102,7 @@ export default function Home() {
             daily_prompt_count: 0,
             last_prompt_date: today,
           })
-          .eq("user_id", user.id);
+          .eq("user_id", currentUser.id);
 
         if (error) {
           console.error("Reset error:", JSON.stringify(error));
@@ -113,7 +119,7 @@ export default function Home() {
           .update({
             daily_prompt_count: data.daily_prompt_count + 1,
           })
-          .eq("user_id", user.id);
+          .eq("user_id", currentUser.id);
 
         if (error) {
           console.error("Update error:", JSON.stringify(error));
@@ -126,8 +132,8 @@ export default function Home() {
       }
     };
 
-    run();
-  }, [router]);
+    runFeedbackCheck();
+  }, [currentUser, isFocusLoaded, router]);
 
   // Load tab
   useEffect(() => {
@@ -141,11 +147,13 @@ export default function Home() {
     sessionStorage.setItem("nexengine_active_tab", tab);
   };
 
+  // 🔥 Also wait for isFocusLoaded here so the screen doesn't flash before auth loads
   if (
     isAuthenticated === null ||
     isAuthenticated === false ||
     !mounted ||
-    !isStateLoaded
+    !isStateLoaded ||
+    !isFocusLoaded
   ) {
     return (
       <div className="min-h-screen flex items-center justify-center">
