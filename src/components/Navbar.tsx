@@ -7,22 +7,8 @@ import { Meta } from "../types";
 import DesktopNav from "./navbar/DesktopNav";
 import MobileNav from "./navbar/MobileNav";
 
-import {
-  Search,
-  LayoutGrid,
-  ListTodo,
-  BookOpen,
-  Brain,
-  CalendarDays,
-  LogOut,
-  User,
-} from "lucide-react";
-
 import { useNotificationSystem } from "@/notifications/useNotificationSystem";
 import { getSupabaseClient } from "@/lib/supabase";
-
-// 🔥 FIX: Import the context hook so we don't fetch auth manually
-// Adjust this path to wherever your useFocusSystem is located!
 import { useFocusSystem } from "../components/focus/useFocusSystem";
 
 interface NavbarProps {
@@ -42,7 +28,6 @@ export default function Navbar({
   const pathname = usePathname() || "";
   const supabase = getSupabaseClient();
 
-  // 🔥 FIX 1: Consume currentUser from the global provider instead of local state
   const { currentUser } = useFocusSystem(); 
   
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -52,17 +37,13 @@ export default function Navbar({
 
   const [isNoteOpen, setIsNoteOpen] = useState(false);
 
-  // 🔥 SCROLL STATE
   const [showNavbar, setShowNavbar] = useState(true);
   const lastScrollY = useRef(0);
 
-  // ✅ USER PROFILE FETCH (No more auth lock crashing!)
   useEffect(() => {
     let isMounted = true;
 
     const fetchProfile = async () => {
-      // 🔥 FIX 2: If no user is passed down from Context, clear profile and abort.
-      // This completely removes the need for supabase.auth.getUser() here.
       if (!supabase || !currentUser?.id) {
         if (isMounted) setUserProfile(null);
         return;
@@ -87,7 +68,7 @@ export default function Navbar({
     return () => {
       isMounted = false;
     };
-  }, [supabase, currentUser]); // 🔥 Re-run only when context currentUser changes
+  }, [supabase, currentUser]);
 
   const handleLogout = async () => {
     if (supabase) {
@@ -103,29 +84,19 @@ export default function Navbar({
   const activePaths = useMemo(
     () => ({
       isTasks: pathname === "/",
-      isMini: pathname === "/mini-nisc",
-      isDiary: pathname === "/diary",
       isFocus: pathname === "/focus",
       isCalendar: pathname === "/calender-event",
+      isDiary: pathname === "/diary",
+      isMini: pathname === "/mini-nisc",
     }),
     [pathname]
   );
 
-  const [y, m] = (meta.currentMonth || "2024-01").split("-");
-
-  const years = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    return Array.from({ length: 7 }, (_, i) => currentYear - 1 + i);
-  }, []);
-
+  // 🔥 1. Removed y, m, years, and setMonthYear from navProps
   const navProps = {
     activePaths,
     handleNav,
     handleLogout,
-    y,
-    m,
-    years,
-    setMonthYear,
     notifications,
     unreadCount,
     markAsRead,
@@ -135,7 +106,6 @@ export default function Navbar({
     userProfile,
   };
 
-  // 🔥 SCROLL DETECTION (MAIN LOGIC)
   useEffect(() => {
     const handleScroll = () => {
       const currentScroll = window.scrollY;
@@ -143,10 +113,8 @@ export default function Navbar({
       if (currentScroll < 10) {
         setShowNavbar(true);
       } else if (currentScroll > lastScrollY.current) {
-        // scrolling down
         setShowNavbar(false);
       } else {
-        // scrolling up
         setShowNavbar(true);
       }
 
@@ -154,15 +122,14 @@ export default function Navbar({
     };
 
     window.addEventListener("scroll", handleScroll);
-
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
     <>
-      {/* 🔥 NAVBAR */}
+      {/* 🔥 3.1 & 3.5 Premium Glass UI and Smoother Transitions */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-200 shadow-sm transition-transform duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-[0_4px_20px_rgba(0,0,0,0.05)] transition-transform duration-300 ease-in-out ${
           showNavbar ? "translate-y-0" : "-translate-y-full"
         }`}
       >
@@ -170,7 +137,6 @@ export default function Navbar({
         <MobileNav {...navProps} />
       </nav>
 
-      {/* ✅ SPACER (IMPORTANT) */}
       <div className="h-[120px] md:h-[64px]" />
     </>
   );

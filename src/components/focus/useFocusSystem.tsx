@@ -28,8 +28,8 @@ type DBFocusSession = {
   started_at: string;
   ended_at?: string; 
   extra_duration?: number;
-  distractions?: Distraction[]; // 🔥 FIX: Added to schema
-  score?: number;               // 🔥 FIX: Added to schema
+  distractions?: Distraction[];
+  score?: number;               
 };
 
 const acquireLock = (lockKey: string, cooldownMs: number): boolean => {
@@ -73,13 +73,13 @@ const mapDBSessionToFocusSession = (row: DBFocusSession): FocusSession => {
     startTime,
     endTime: safeEndTime, 
     initialDuration: duration,
-    distractions: row.distractions || [], // 🔥 FIX: Reads real distractions
+    distractions: row.distractions || [],
     durationSeconds: duration,
     totalSessionSeconds: duration,
     extraDuration: extra,
     actualDuration: duration + extra,
     date: new Date(startTime).toISOString(),
-    score: row.score ?? (row.completed ? 100 : 50), // 🔥 FIX: Reads exact score
+    score: row.score ?? (row.completed ? 100 : 50),
     distractionCount: row.distractions?.length || 0,
     topDistraction: null,
     avgDistractionGap: 0,
@@ -127,6 +127,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const alarmPlayedRef = useRef(false);
   const isFetchingRef = useRef(false);
+  const alarmTimeoutRef = useRef<NodeJS.Timeout | null>(null); // ✅ Added timeout ref
 
   const initialSessionTimeRef = useRef(initialSessionTime);
   const fetchSessionsRef = useRef<() => Promise<boolean>>(async () => false);
@@ -259,8 +260,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         completed: isCompleted,
         started_at: new Date(session.startTime).toISOString(),
         ended_at: new Date(session.endTime).toISOString(),
-        distractions: session.distractions || [], // 🔥 FIX: Saves real distractions
-        score: session.score || 0                 // 🔥 FIX: Saves exact score
+        distractions: session.distractions || [],
+        score: session.score || 0                
       };
 
       await supabase
@@ -458,31 +459,45 @@ export function FocusProvider({ children }: { children: ReactNode }) {
           audioRef.current.pause();
           audioRef.current.currentTime = 0;
         }
-        setIsSessionComplete(true);
+        // ✅ Prevent multi-trigger from local storage
+        if (isActive && !alarmPlayedRef.current) {
+          setIsSessionComplete(true);
+        }
       }
     };
 
     window.addEventListener("storage", handleStorageSync);
     return () => window.removeEventListener("storage", handleStorageSync);
-  }, []);
+  }, [isActive]); 
 
   const stopSession = async (isNatural = false) => {
+    // ✅ FIRST: kill alarm trigger condition
+    setIsSessionComplete(false);
+    alarmPlayedRef.current = true;
+
+    // ✅ Clear timeout if user stops session early
+    if (alarmTimeoutRef.current) {
+      clearTimeout(alarmTimeoutRef.current);
+      alarmTimeoutRef.current = null;
+    }
+
     if (!currentUser?.id) {
       console.error("❌ No user → abort save");
       return; 
     }
 
+    // ✅ THEN stop audio
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
     
-    alarmPlayedRef.current = true; 
-
     if (!currentSession) return;
 
-    if (currentSession?.extraStartTime) {
-      setIsSessionComplete(false);
+    // ✅ Clear session completion flags properly
+    if (currentSession) {
+      currentSession.completedAt = undefined;
+      currentSession.extraStartTime = undefined;
     }
 
     const finalElapsed = getElapsedTime();
@@ -558,28 +573,66 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     if (mode === "deepWork") setTimeRemaining(MODE_DURATIONS.deepWork);
 
     await fetchSessionsFromDB(); 
-  };
 
-  useEffect(() => {
-    if (isSessionComplete && !alarmPlayedRef.current) {
-      alarmPlayedRef.current = true;
-      
-      if (audioRef.current) {
-        audioRef.current.volume = 1.0;
-        audioRef.current.play().catch(() => {});
-      }
-      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
-      
-      if (acquireLock('focus_complete_alert', 5000)) {
-        addNotification('focus', 'Goal Reached', 'You hit your target! Entering Extra Focus mode.', 'high', '/focus');
-      }
-    } else if (!isSessionComplete && audioRef.current?.paused === false) { 
+    // ✅ Add hard stop safety
+    setTimeout(() => {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
       }
+    }, 0);
+  };
+
+  // ✅ New updated alarm effect with 10s auto-stop
+  useEffect(() => {
+    if (isSessionComplete && isActive && !alarmPlayedRef.current) {
+      alarmPlayedRef.current = true;
+  
+      if (audioRef.current) {
+        audioRef.current.loop = true; // keep loop
+        audioRef.current.volume = 1.0;
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(() => {});
+      }
+  
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([300, 100, 300, 100, 300]);
+      }
+
+      // ✅ STOP after 10 seconds
+      if (alarmTimeoutRef.current) clearTimeout(alarmTimeoutRef.current);
+  
+      alarmTimeoutRef.current = setTimeout(() => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        }
+      }, 10000); // 10 sec
+  
+      // ✅ notification (only once with 15s lock)
+      if (acquireLock('focus_complete_alert', 15000)) {
+        addNotification(
+          'focus',
+          'Goal Reached',
+          'You hit your target! Entering Extra Focus mode.',
+          'high',
+          '/focus'
+        );
+      }
+  
+    } else if (!isSessionComplete) {
+      // safety cleanup
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+  
+      if (alarmTimeoutRef.current) {
+        clearTimeout(alarmTimeoutRef.current);
+        alarmTimeoutRef.current = null;
+      }
     }
-  }, [isSessionComplete, addNotification]); 
+  }, [isSessionComplete, isActive, addNotification]);
 
   useEffect(() => {
     if (!isActive || isPaused) return;
