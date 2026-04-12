@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   LayoutGrid,
   ListTodo,
@@ -25,10 +25,6 @@ interface MobileNavProps {
     isCalendar: boolean;
   };
   handleNav: (path: string) => void;
-  y: string;
-  m: string;
-  years: number[];
-  setMonthYear: (val: string) => void;
   notifications: NexNotification[];
   unreadCount: number;
   markAsRead: (id: string) => void;
@@ -41,42 +37,31 @@ interface MobileNavProps {
 
 const NAV_ITEMS = [
   { label: "Tasks", icon: LayoutGrid, path: "/", key: "isTasks" },
-  { label: "Mini", icon: ListTodo, path: "/mini-nisc", key: "isMini" },
-  { label: "Diary", icon: BookOpen, path: "/diary", key: "isDiary" },
   { label: "Focus", icon: Brain, path: "/focus", key: "isFocus" },
   { label: "Planner", icon: CalendarDays, path: "/calender-event", key: "isCalendar" },
+  { label: "Diary", icon: BookOpen, path: "/diary", key: "isDiary" },
+  { label: "Mini", icon: ListTodo, path: "/mini-nisc", key: "isMini" },
 ];
 
 export default function MobileNav(props: MobileNavProps) {
   const {
-    activePaths, handleNav, y, m, years, setMonthYear,
+    activePaths, handleNav,
     notifications, unreadCount, markAsRead, clearAll,
     isNoteOpen, setIsNoteOpen, handleLogout, userProfile
   } = props;
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  useEffect(() => {
-    const el = document.getElementById("active-mobile-nav");
-    if (!el) return;
-
-    el.scrollIntoView({
-      behavior: "auto",
-      inline: "center",
-      block: "nearest"
-    });
-  }, []);
-
   return (
-    <div className="md:hidden px-4 py-3 space-y-3 bg-[#FAFAFA]">
+    <div className="md:hidden px-4 py-3 space-y-4 bg-white/95 backdrop-blur-md">
 
       {/* HEADER */}
       <div className="flex items-center justify-between">
 
-        {/* 🔥 NAME IN HEADER */}
+        {/* NAME IN HEADER */}
         <div className="flex flex-col">
-          <span className="text-xs text-gray-400">Welcome</span>
-          <span className="text-sm font-semibold text-gray-900 truncate max-w-[140px]">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Welcome</span>
+          <span className="text-lg font-bold text-gray-900 truncate max-w-[160px] leading-tight mt-0.5">
             {userProfile?.full_name || "User"}
           </span>
         </div>
@@ -91,11 +76,11 @@ export default function MobileNav(props: MobileNavProps) {
                 e.stopPropagation();
                 setIsNoteOpen(!isNoteOpen);
               }}
-              className="relative p-2 text-gray-500 hover:text-black"
+              className="relative p-2 text-gray-500 hover:text-gray-900 transition-all duration-200 hover:scale-[1.05]"
             >
-              <Bell size={18} />
+              <Bell size={20} />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 text-[10px] bg-black text-white px-1 rounded-full">
+                <span className="absolute top-0 -right-1 text-[10px] bg-red-500 text-white px-1.5 py-0.5 font-bold rounded-full border border-white">
                   {unreadCount}
                 </span>
               )}
@@ -115,12 +100,14 @@ export default function MobileNav(props: MobileNavProps) {
           <div className="relative">
             <button
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200"
+              className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200 shadow-sm transition-all duration-200 hover:scale-[1.05]"
             >
               {userProfile?.avatar_url ? (
-                <img src={userProfile.avatar_url} className="w-full h-full object-cover" />
+                <img src={userProfile.avatar_url} className="w-full h-full object-cover" alt="Avatar"/>
               ) : (
-                <User size={14} />
+                <span className="text-sm font-bold text-gray-700 uppercase">
+                  {userProfile?.full_name?.[0] || "U"}
+                </span>
               )}
             </button>
 
@@ -128,32 +115,29 @@ export default function MobileNav(props: MobileNavProps) {
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsProfileOpen(false)} />
 
-                <div className="absolute right-0 top-10 mt-2 w-52 bg-white border border-gray-100 rounded-lg shadow-lg py-2 z-50">
-
-                  {/* 🔥 USER INFO INSIDE DROPDOWN */}
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="text-sm font-semibold text-gray-900 truncate">
+                <div className="absolute right-0 top-12 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="px-4 py-3 border-b border-gray-100 mb-1">
+                    <p className="text-sm font-bold text-gray-900 truncate">
                       {userProfile?.full_name || "User"}
                     </p>
-                    <p className="text-xs text-gray-400 truncate">
+                    <p className="text-xs text-gray-400 truncate mt-0.5">
                       {userProfile?.email || ""}
                     </p>
                   </div>
 
                   <button
                     onClick={() => { handleNav("/settings"); setIsProfileOpen(false); }}
-                    className="w-full px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                    className="w-full px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"
                   >
-                    <Settings size={14} /> Settings
+                    <Settings size={14} className="text-gray-400" /> Settings
                   </button>
 
                   <button
                     onClick={() => { handleLogout(); setIsProfileOpen(false); }}
-                    className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                    className="w-full px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 transition"
                   >
                     <LogOut size={14} /> Logout
                   </button>
-
                 </div>
               </>
             )}
@@ -162,8 +146,7 @@ export default function MobileNav(props: MobileNavProps) {
         </div>
       </div>
 
-      {/* NAV */}
-      <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory">
+      <div className="flex justify-between items-center px-1">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = activePaths[item.key as keyof typeof activePaths];
@@ -171,31 +154,21 @@ export default function MobileNav(props: MobileNavProps) {
           return (
             <button
               key={item.label}
-              id={isActive ? "active-mobile-nav" : undefined}
               onClick={() => handleNav(item.path)}
-              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 whitespace-nowrap snap-center rounded-md ${
-                isActive ? "bg-black text-white font-medium" : "text-gray-500 hover:bg-gray-100"
+              className={`relative flex flex-col items-center gap-1.5 text-[10px] font-semibold tracking-wide py-2 px-1 transition-all duration-200 hover:scale-[1.05] ${
+                isActive ? "text-orange-600" : "text-gray-500"
               }`}
             >
-              <Icon size={14} />
-              {item.label}
+              <div className={`p-1.5 rounded-xl transition-colors ${isActive ? 'bg-orange-50' : 'bg-transparent'}`}>
+                <Icon size={20} />
+              </div>
+              <span className="leading-none">{item.label}</span>
+              {isActive && (
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-orange-500 rounded-full" />
+              )}
             </button>
           );
         })}
-      </div>
-
-      {/* DATE */}
-      <div className="flex gap-4 text-xs text-gray-500">
-        <select value={y} onChange={(e) => setMonthYear(`${e.target.value}-${m}`)}>
-          {years.map((year) => <option key={year}>{year}</option>)}
-        </select>
-
-        <select value={m} onChange={(e) => setMonthYear(`${y}-${e.target.value}`)}>
-          {Array.from({ length: 12 }, (_, i) => {
-            const val = String(i + 1).padStart(2, "0");
-            return <option key={val}>{val}</option>;
-          })}
-        </select>
       </div>
 
     </div>
