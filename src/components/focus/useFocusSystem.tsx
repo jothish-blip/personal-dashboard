@@ -127,7 +127,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const alarmPlayedRef = useRef(false);
   const isFetchingRef = useRef(false);
-  const alarmTimeoutRef = useRef<NodeJS.Timeout | null>(null); // ✅ Added timeout ref
+  const alarmTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const initialSessionTimeRef = useRef(initialSessionTime);
   const fetchSessionsRef = useRef<() => Promise<boolean>>(async () => false);
@@ -214,8 +214,11 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         const duration = s.initialDuration || initialSessionTime;
         setInitialSessionTime(duration);
 
+        // ✅ FINAL FIX: Guarded Tab Refocus / Fetch Sync
         if (s.completedAt && s.extraStartTime) {
-          setIsSessionComplete(true);
+          if (!alarmPlayedRef.current) {
+            setIsSessionComplete(true);
+          }
           setExtraTime(Math.floor((Date.now() - s.extraStartTime) / 1000));
         } else {
           setIsSessionComplete(false);
@@ -411,8 +414,11 @@ export function FocusProvider({ children }: { children: ReactNode }) {
             const sessionDuration = session.initialDuration || initialSessionTimeRef.current;
             setInitialSessionTime(sessionDuration);
 
+            // ✅ FINAL FIX: Guarded Realtime Sync Trigger
             if (session.completedAt && session.extraStartTime) {
-              setIsSessionComplete(true);
+              if (!alarmPlayedRef.current) {
+                setIsSessionComplete(true);
+              }
               setExtraTime(Math.floor((Date.now() - session.extraStartTime) / 1000));
             } else {
               setIsSessionComplete(false);
@@ -454,13 +460,13 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         } catch (err) {}
       }
       
+      // ✅ FINAL FIX: Storage trigger safety via alarmPlayedRef
       if (e.key === "focus_complete_signal") {
         if (audioRef.current) {
           audioRef.current.pause();
           audioRef.current.currentTime = 0;
         }
-        // ✅ Prevent multi-trigger from local storage
-        if (isActive && !alarmPlayedRef.current) {
+        if (!alarmPlayedRef.current) {
           setIsSessionComplete(true);
         }
       }
@@ -468,7 +474,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener("storage", handleStorageSync);
     return () => window.removeEventListener("storage", handleStorageSync);
-  }, [isActive]); 
+  }, []); 
 
   const stopSession = async (isNatural = false) => {
     // ✅ FIRST: kill alarm trigger condition
@@ -583,13 +589,13 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }, 0);
   };
 
-  // ✅ New updated alarm effect with 10s auto-stop
+  // ✅ New updated alarm effect with SINGLE clean timeout
   useEffect(() => {
     if (isSessionComplete && isActive && !alarmPlayedRef.current) {
       alarmPlayedRef.current = true;
   
       if (audioRef.current) {
-        audioRef.current.loop = true; // keep loop
+        audioRef.current.loop = true; 
         audioRef.current.volume = 1.0;
         audioRef.current.currentTime = 0;
         audioRef.current.play().catch(() => {});
@@ -599,15 +605,25 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         navigator.vibrate([300, 100, 300, 100, 300]);
       }
 
-      // ✅ STOP after 10 seconds
-      if (alarmTimeoutRef.current) clearTimeout(alarmTimeoutRef.current);
-  
-      alarmTimeoutRef.current = setTimeout(() => {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-        }
-      }, 10000); // 10 sec
+      // ✅ SINGLE clean timeout
+          if (alarmTimeoutRef.current) {
+             clearTimeout(alarmTimeoutRef.current);
+           }
+
+        alarmTimeoutRef.current = setTimeout(() => {
+             if (audioRef.current) {
+               audioRef.current.pause();
+               audioRef.current.currentTime = 0;
+             } 
+        }, 10000);
+
+       // ✅ EXTRA safety (mobile resume case)
+      setTimeout(() => {
+         if (audioRef.current && !audioRef.current.paused) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+          }
+        }, 12000);
   
       // ✅ notification (only once with 15s lock)
       if (acquireLock('focus_complete_alert', 15000)) {
@@ -661,8 +677,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       if (rem <= 0 && currentSession && !currentSession.completedAt) {
         const now = Date.now();
         
-        alarmPlayedRef.current = false; 
-
         const updatedSession: ExtendedActiveSession = {
           ...currentSession,
           completedAt: now,
@@ -671,10 +685,10 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
         setCurrentSession(updatedSession);
         
-        setIsSessionComplete(true);
-        setTimeout(() => {
+        // ✅ FINAL FIX: Guarded Internal Timer Completion
+        if (!alarmPlayedRef.current) {
           setIsSessionComplete(true);
-        }, 0);
+        }
 
         localStorage.setItem("focus_active_session", JSON.stringify(updatedSession));
 
@@ -723,7 +737,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    alarmPlayedRef.current = false;
+    alarmPlayedRef.current = false; // ✅ Only resets on manual start
 
     if (audioRef.current) {
       audioRef.current.play().then(() => {
@@ -749,8 +763,11 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       const sessionDuration = remoteSession.initialDuration || initialSessionTime;
       setInitialSessionTime(sessionDuration);
 
+      // ✅ FINAL FIX: Guarded Start Session Restoration
       if (remoteSession.completedAt && remoteSession.extraStartTime) {
-        setIsSessionComplete(true);
+        if (!alarmPlayedRef.current) {
+          setIsSessionComplete(true);
+        }
         setExtraTime(Math.floor((Date.now() - remoteSession.extraStartTime) / 1000));
       }
 

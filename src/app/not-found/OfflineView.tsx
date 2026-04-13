@@ -1,26 +1,31 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { WifiOff, RefreshCw, Trophy, Gamepad2, ChevronLeft, ChevronRight, Zap, Target, Brain, Activity } from "lucide-react";
+import { WifiOff, RefreshCw, Trophy } from "lucide-react";
 
-type GameType = "navigator" | "snake" | "bounce" | "memory" | "tap";
+interface GameItem {
+  id: number;
+  x: number;
+  y: number;
+  type: "task" | "friction";
+}
 
 export default function OfflineView() {
   const [isOnline, setIsOnline] = useState(true);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [activeGame, setActiveGame] = useState<GameType>("navigator");
 
   // Global Game State
   const [gameState, setGameState] = useState<"idle" | "playing" | "gameover">("idle");
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
 
-  // Navigator/Bounce/Snake States
-  const [items, setItems] = useState<any[]>([]);
+  // Navigator Game States
+  const [items, setItems] = useState<GameItem[]>([]);
   const [playerPosition, setPlayerPosition] = useState(50);
   
-  const gameLoopRef = useRef<any>(null);
+  const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Network Listeners
   useEffect(() => {
     setIsOnline(navigator.onLine);
     const handleOnline = () => setIsOnline(true);
@@ -44,44 +49,50 @@ export default function OfflineView() {
   const initGame = () => {
     stopLoop();
     setScore(0);
-    setGameState("playing");
+    setPlayerPosition(50);
     setItems([]);
+    setGameState("playing");
 
-    if (activeGame === "navigator") {
-      gameLoopRef.current = setInterval(() => {
-        setItems(prev => {
-          const moved = prev.map(i => ({ ...i, y: i.y + 5 })).filter(i => i.y < 110);
-          if (Math.random() > 0.9) {
-            moved.push({ id: Date.now(), x: Math.random() * 90, y: -10, type: Math.random() > 0.3 ? "task" : "friction" });
-          }
-          return moved;
-        });
-      }, 50);
-    } 
-    
-    else if (activeGame === "tap") {
-      let timer = 10;
-      gameLoopRef.current = setInterval(() => {
-        timer--;
-        if (timer <= 0) endGame();
-      }, 1000);
-    }
+    // Game Loop (Smoother interval)
+    gameLoopRef.current = setInterval(() => {
+      setItems(prev => {
+        // Move items down slowly (step of 1.5 for smoother 30ms framerate)
+        const moved = prev
+          .map(i => ({ ...i, y: i.y + 1.5 }))
+          .filter(i => i.y < 110); // Remove items that fall off screen
+
+        // Spawn new items randomly
+        if (Math.random() > 0.94) {
+          moved.push({
+            id: Date.now() + Math.random(),
+            x: Math.random() * 90 + 5, // Keep away from extreme edges
+            y: -10,
+            type: Math.random() > 0.25 ? "task" : "friction" // 75% good, 25% bad
+          });
+        }
+        return moved;
+      });
+    }, 30);
   };
 
+  // Collision Detection Loop
   useEffect(() => {
     if (gameState !== "playing") return;
-    if (activeGame === "navigator") {
-      const collision = items.find(i => i.y > 80 && i.y < 95 && Math.abs(i.x - playerPosition) < 12);
-      if (collision) {
-        if (collision.type === "task") {
-          setScore(s => s + 10);
-          setItems(prev => prev.filter(i => i.id !== collision.id));
-        } else {
-          endGame();
-        }
+
+    // Rocket is fixed near the bottom (roughly 85% to 95% of the screen height)
+    const collision = items.find(
+      i => i.y > 85 && i.y < 95 && Math.abs(i.x - playerPosition) < 8
+    );
+
+    if (collision) {
+      if (collision.type === "task") {
+        setScore(s => s + 10);
+        setItems(prev => prev.filter(i => i.id !== collision.id));
+      } else {
+        endGame();
       }
     }
-  }, [items, playerPosition]);
+  }, [items, playerPosition, gameState]);
 
   const endGame = () => {
     setGameState("gameover");
@@ -97,120 +108,119 @@ export default function OfflineView() {
   if (isOnline) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-[#F9FAFB] flex items-center justify-center p-4 overflow-y-auto">
-      <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 p-6 space-y-6">
+    <div className="fixed inset-0 z-[9999] bg-slate-900 flex flex-col overflow-hidden font-sans">
+      
+      {/* TOP HEADER OVERLAY (Full Width) */}
+      <div className="absolute top-0 inset-x-0 z-40 flex items-center justify-between p-4 md:p-6 bg-gradient-to-b from-slate-900/90 to-transparent pointer-events-none">
         
-        {/* TOP STATUS */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-50 rounded-xl"><WifiOff size={20} className="text-red-500" /></div>
-            <div>
-              <h2 className="text-sm font-black text-gray-900 uppercase">Offline Mode</h2>
-              <p className="text-[10px] font-bold text-gray-400">NexEngine Arcade</p>
-            </div>
+        {/* Left: Status */}
+        <div className="flex items-center gap-3 pointer-events-auto">
+          <div className="p-2.5 bg-red-500/20 backdrop-blur-md rounded-xl border border-red-500/30">
+            <WifiOff size={22} className="text-red-400" />
           </div>
-          <button onClick={handleReconnect} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <RefreshCw size={18} className={`${isRetrying ? 'animate-spin' : ''} text-gray-400`} />
-          </button>
-        </div>
-
-        {/* GAME SELECTOR */}
-        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-          {[
-            { id: "navigator", icon: <Target size={14}/>, label: "Navigator" },
-            { id: "tap", icon: <Zap size={14}/>, label: "Tap-Power" },
-            { id: "memory", icon: <Brain size={14}/>, label: "Logic" },
-            { id: "bounce", icon: <Activity size={14}/>, label: "Focus" },
-            { id: "snake", icon: <Gamepad2 size={14}/>, label: "Snake" }
-          ].map(g => (
-            <button 
-              key={g.id}
-              onClick={() => { setActiveGame(g.id as GameType); setGameState("idle"); stopLoop(); }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-tight whitespace-nowrap transition-all ${activeGame === g.id ? 'bg-orange-500 text-white shadow-lg' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
-            >
-              {g.icon} {g.label}
-            </button>
-          ))}
-        </div>
-
-        {/* SCREEN */}
-        <div className="relative h-64 bg-slate-900 rounded-[2rem] border-4 border-slate-800 overflow-hidden group">
-          {gameState === "idle" && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-sm">
-              <p className="text-white font-black text-sm mb-4">READY TO EXECUTE?</p>
-              <button onClick={initGame} className="px-8 py-3 bg-white text-slate-900 font-black rounded-2xl text-xs uppercase hover:scale-105 transition shadow-xl">Start {activeGame}</button>
-            </div>
-          )}
-
-          {gameState === "gameover" && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-red-500/20 backdrop-blur-md">
-              <p className="text-white font-black text-xl mb-1">SESSION ENDED</p>
-              <p className="text-white/80 font-bold text-[10px] mb-4">Score: {score}</p>
-              <button onClick={initGame} className="px-8 py-3 bg-white text-slate-900 font-black rounded-2xl text-xs uppercase">Restart</button>
-            </div>
-          )}
-
-          {/* Render Navigator Game */}
-          {activeGame === "navigator" && gameState === "playing" && (
-            <>
-              <div className="absolute bottom-4 text-2xl z-10 transition-all duration-75" style={{ left: `${playerPosition}%`, transform: 'translateX(-50%)' }}>🚀</div>
-              {items.map(i => <div key={i.id} className="absolute text-xl" style={{ left: `${i.x}%`, top: `${i.y}%` }}>{i.type === "task" ? "✅" : "❌"}</div>)}
-              <input type="range" min="5" max="95" value={playerPosition} onChange={(e) => setPlayerPosition(parseInt(e.target.value))} className="absolute inset-x-0 bottom-0 h-full opacity-0 cursor-pointer z-30" />
-            </>
-          )}
-
-          {/* Render Tap Game */}
-          {activeGame === "tap" && gameState === "playing" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <button onClick={() => setScore(s => s + 1)} className="w-24 h-24 bg-orange-500 rounded-full flex items-center justify-center text-white shadow-lg active:scale-90 transition transform">
-                <Zap size={40} fill="white" />
-              </button>
-              <p className="text-white/40 text-[10px] mt-4 font-bold uppercase">Click Fast!</p>
-            </div>
-          )}
-
-          {/* Placeholders for others to keep code light */}
-          {(activeGame === "memory" || activeGame === "bounce" || activeGame === "snake") && gameState === "playing" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-white/50 text-center p-8">
-              <Code2 className="mb-2" />
-              <p className="text-[10px] font-bold uppercase tracking-widest">Logic Node Locked</p>
-              <p className="text-[8px] mt-1">This module is under construction for the v0.9 update.</p>
-              <button onClick={endGame} className="mt-4 text-[10px] underline">Back to Navigator</button>
-            </div>
-          )}
-
-          {/* UI OVERLAY */}
-          <div className="absolute top-4 inset-x-6 flex justify-between pointer-events-none">
-             <div className="text-left">
-               <p className="text-[8px] font-bold text-slate-500 uppercase">Progress</p>
-               <p className="text-white font-black text-lg">{score}</p>
-             </div>
-             <div className="text-right">
-               <p className="text-[8px] font-bold text-slate-500 uppercase">Best</p>
-               <p className="text-orange-400 font-black text-lg">{highScore}</p>
-             </div>
+          <div>
+            <h2 className="text-sm font-black text-white uppercase tracking-wider">Connection Lost</h2>
+            <p className="text-[11px] font-bold text-slate-400">NexEngine Offline Mode</p>
           </div>
         </div>
 
-        {/* BOTTOM ACTION */}
-        <div className="pt-2">
-          <button onClick={handleReconnect} disabled={isRetrying} className="w-full py-4 bg-slate-900 text-white font-black rounded-2xl flex items-center justify-center gap-3 hover:bg-black transition active:scale-95 disabled:opacity-50">
-            {isRetrying ? <RefreshCw className="animate-spin" size={18} /> : <RefreshCw size={18} />}
-            <span className="uppercase text-xs tracking-widest">{isRetrying ? 'Synchronizing...' : 'Retry Uplink'}</span>
-          </button>
-          <div className="flex items-center justify-center gap-2 mt-4 text-orange-500">
-            <Trophy size={14} />
-            <span className="text-[9px] font-black uppercase tracking-[0.2em]">Rank: System Guardian</span>
-          </div>
-        </div>
-
+        {/* Right: Reconnect Button */}
+        <button 
+          onClick={handleReconnect} 
+          disabled={isRetrying}
+          className="pointer-events-auto flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white text-xs font-bold uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 border border-white/10"
+        >
+          <RefreshCw size={14} className={isRetrying ? 'animate-spin' : ''} />
+          <span className="hidden sm:inline">{isRetrying ? 'Synchronizing...' : 'Retry Uplink'}</span>
+        </button>
       </div>
-    </div>
-  );
-}
 
-function Code2(props: any) {
-  return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-code-2"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+      {/* GAME SCORE HUD */}
+      <div className="absolute top-24 inset-x-0 z-30 px-6 flex justify-between pointer-events-none">
+         <div className="text-left">
+           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Progress</p>
+           <p className="text-white font-black text-3xl tabular-nums">{score}</p>
+         </div>
+         <div className="text-right flex flex-col items-end">
+           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1">
+             <Trophy size={10} className="text-orange-500"/> Best
+           </p>
+           <p className="text-orange-400 font-black text-3xl tabular-nums">{highScore}</p>
+         </div>
+      </div>
+
+      {/* MAIN FULL-SCREEN GAME AREA */}
+      <div className="relative flex-1 w-full h-full overflow-hidden">
+        
+        {/* IDLE STATE */}
+        {gameState === "idle" && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-md">
+            <div className="w-20 h-20 mb-6 bg-slate-800 rounded-3xl flex items-center justify-center border-2 border-slate-700 shadow-2xl">
+              <span className="text-4xl">🚀</span>
+            </div>
+            <h1 className="text-white font-black text-2xl md:text-3xl tracking-tight mb-2 uppercase">Navigator</h1>
+            <p className="text-slate-400 text-sm font-medium mb-8 max-w-xs text-center">Collect the green tasks ✅ and avoid the red frictions ❌ while we try to reconnect you.</p>
+            <button 
+              onClick={initGame} 
+              className="px-10 py-4 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-2xl text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-[0_0_40px_rgba(249,115,22,0.4)]"
+            >
+              Initiate Launch
+            </button>
+          </div>
+        )}
+
+        {/* GAME OVER STATE */}
+        {gameState === "gameover" && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-red-950/80 backdrop-blur-md">
+            <p className="text-red-400 font-black text-3xl md:text-5xl mb-2 tracking-tight">CRITICAL HIT</p>
+            <p className="text-white font-bold text-lg mb-8 bg-black/30 px-6 py-2 rounded-full">Final Score: {score}</p>
+            <button 
+              onClick={initGame} 
+              className="px-10 py-4 bg-white text-slate-900 hover:bg-gray-100 font-black rounded-2xl text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl"
+            >
+              Restart System
+            </button>
+          </div>
+        )}
+
+        {/* PLAYING STATE - THE ACTUAL GAME */}
+        {gameState === "playing" && (
+          <>
+            {/* The Background Grid (purely visual) */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:linear-gradient(to_bottom,transparent,black,transparent)] opacity-20 pointer-events-none" />
+
+            {/* Falling Items */}
+            {items.map(i => (
+              <div 
+                key={i.id} 
+                className="absolute text-3xl md:text-4xl transition-all duration-[30ms] ease-linear drop-shadow-2xl" 
+                style={{ left: `${i.x}%`, top: `${i.y}%`, transform: 'translate(-50%, -50%)' }}
+              >
+                {i.type === "task" ? "✅" : "❌"}
+              </div>
+            ))}
+
+            {/* Player Rocket */}
+            <div 
+              className="absolute bottom-[10%] text-5xl md:text-6xl z-10 transition-all duration-75 ease-out drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] pointer-events-none" 
+              style={{ left: `${playerPosition}%`, transform: 'translateX(-50%)' }}
+            >
+              🚀
+            </div>
+
+            {/* Invisible Input Slider (Controls the rocket) */}
+            <input 
+              type="range" 
+              min="0" 
+              max="100" 
+              value={playerPosition} 
+              onChange={(e) => setPlayerPosition(parseInt(e.target.value))} 
+              className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-20 touch-none" 
+            />
+          </>
+        )}
+      </div>
+
+    </div>
   );
 }
