@@ -1,3 +1,4 @@
+
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
 import { useEditor, EditorContent, Extension } from '@tiptap/react';
@@ -69,7 +70,6 @@ const editorExtensions = [
   CharacterCount,
 ];
 
-// 🔥 IMPROVEMENT 2 & 5: Compact p-2 on mobile, smooth transitions
 const ToolbarButton = ({ children, onClick, isActive, title, className = "" }: any) => (
   <button
     type="button"
@@ -92,6 +92,15 @@ const GroupLabel = ({ children }: { children: string }) => (
   </span>
 );
 
+const SLASH_COMMANDS = [
+  { label: "Heading 1", cmd: 'h1', icon: <Heading1 size={18} /> },
+  { label: "Heading 2", cmd: 'h2', icon: <Heading2 size={18} /> },
+  { label: "To-do List", cmd: 'todo', icon: "☑" },
+  { label: "Quote", cmd: 'quote', icon: '"' },
+  { label: "Divider", cmd: 'divider', icon: <Minus size={18} /> },
+  { label: "Code Block", cmd: 'code', icon: <Terminal size={18} /> },
+];
+
 export default function Editor({ system }: any) {
   const {
     activeDocument,
@@ -108,17 +117,19 @@ export default function Editor({ system }: any) {
   useEffect(() => setMounted(true), []);
 
   const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashQuery, setSlashQuery] = useState("");
   const [showFocusMode, setShowFocusMode] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
-  const [showMobileMore, setShowMobileMore] = useState(false); // Mobile secondary toolbar state
+  const [showMobileMore, setShowMobileMore] = useState(false);
 
-  // 🔥 KEYBOARD DETECTION STATE
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-  // 🔥 IMPROVEMENT 1: Typing state to hide heavy UI
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // ⚡ FIX 1: Debounce Save Ref
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const activeDocIdRef = useRef(activeDocId);
   useEffect(() => {
@@ -130,19 +141,33 @@ export default function Editor({ system }: any) {
     extensions: editorExtensions, 
     content: activeDocument?.content || '',
     onUpdate: ({ editor }) => {
-      // Handle typing state
+      // ⚡ FIX 4: Faster UI recovery (800ms)
       setIsTyping(true);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 1500);
+      typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 800);
 
       const html = editor.getHTML();
       const { from } = editor.state.selection;
-      const textBefore = editor.state.doc.textBetween(Math.max(0, from - 1), from);
-      setShowSlashMenu(textBefore === '/');
-
-      if (activeDocIdRef.current) {
-        updateDocumentContent(activeDocIdRef.current, html);
+      
+      // 🧠 UPGRADE 1: Intelligent Slash Command Search
+      const textBefore = editor.state.doc.textBetween(Math.max(0, from - 20), from, '\n');
+      const match = textBefore.match(/(?:\s|^)\/(\w*)$/);
+      
+      if (match) {
+        setShowSlashMenu(true);
+        setSlashQuery(match[1].toLowerCase());
+      } else {
+        setShowSlashMenu(false);
+        setSlashQuery("");
       }
+
+      // ⚡ FIX 1: Heavy rendering debounce
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        if (activeDocIdRef.current) {
+          updateDocumentContent(activeDocIdRef.current, html);
+        }
+      }, 500);
     },
   });
 
@@ -165,20 +190,20 @@ export default function Editor({ system }: any) {
     }
   }, [activeDocId, editor, activeDocument?.content, editingDocRef]);
 
-  // 🔥 ADVANCED KEYBOARD DETECTION (VISUAL VIEWPORT)
   useEffect(() => {
     const updateKeyboard = () => {
       const viewport = window.visualViewport;
       if (!viewport) return;
 
-      const isKeyboard = viewport.height < window.innerHeight - 100;
+      // ⚡ FIX 2: Stable Android cross-device keyboard detection
+      const isKeyboard = viewport.height < window.innerHeight * 0.75;
       setKeyboardOpen(isKeyboard);
       
       if (isKeyboard) {
         setKeyboardHeight(window.innerHeight - viewport.height);
       } else {
         setKeyboardHeight(0);
-        setShowMobileMore(false); // Auto-close expanded menu when keyboard drops
+        setShowMobileMore(false);
       }
     };
 
@@ -189,7 +214,6 @@ export default function Editor({ system }: any) {
     };
   }, []);
 
-  // 🥉 FIX 3: AUTO SCROLL TO CURSOR (SMOOTH)
   useEffect(() => {
     if (!editor || !keyboardOpen) return;
 
@@ -200,10 +224,13 @@ export default function Editor({ system }: any) {
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
 
-      window.scrollTo({
-        top: window.scrollY + rect.bottom - window.innerHeight / 2,
-        behavior: "smooth",
-      });
+      // ⚡ FIX 3: Prevent scroll jump glitch
+      if (rect.bottom > window.innerHeight - 100) {
+        window.scrollTo({
+          top: window.scrollY + rect.bottom - window.innerHeight / 2,
+          behavior: "smooth",
+        });
+      }
     }, 100);
 
     return () => clearTimeout(timeout);
@@ -213,24 +240,33 @@ export default function Editor({ system }: any) {
 
   const handleSlashCommand = (command: string) => {
     const chain = editor.chain().focus();
+    const deleteLength = slashQuery.length + 1; // +1 for the '/'
+    const { from } = editor.state.selection;
+    const deleteRange = { from: from - deleteLength, to: from };
+
     switch (command) {
-      case 'h1': chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from }).toggleHeading({ level: 1 }).run(); break;
-      case 'h2': chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from }).toggleHeading({ level: 2 }).run(); break;
-      case 'todo': chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from }).toggleTaskList().run(); break;
-      case 'quote': chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from }).toggleBlockquote().run(); break;
-      case 'divider': chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from }).setHorizontalRule().run(); break;
-      case 'code': chain.deleteRange({ from: editor.state.selection.from - 1, to: editor.state.selection.from }).toggleCodeBlock().run(); break;
+      case 'h1': chain.deleteRange(deleteRange).toggleHeading({ level: 1 }).run(); break;
+      case 'h2': chain.deleteRange(deleteRange).toggleHeading({ level: 2 }).run(); break;
+      case 'todo': chain.deleteRange(deleteRange).toggleTaskList().run(); break;
+      case 'quote': chain.deleteRange(deleteRange).toggleBlockquote().run(); break;
+      case 'divider': chain.deleteRange(deleteRange).setHorizontalRule().run(); break;
+      case 'code': chain.deleteRange(deleteRange).toggleCodeBlock().run(); break;
     }
+    
     setShowSlashMenu(false);
+    setSlashQuery("");
   };
 
   const wordCount = editor.storage.characterCount.words();
+  
+  const filteredSlashCommands = SLASH_COMMANDS.filter(c => 
+    c.label.toLowerCase().includes(slashQuery) || 
+    c.cmd.includes(slashQuery)
+  );
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${showFocusMode ? 'bg-zinc-950' : 'bg-gray-50'}`}>
       
-      {/* DOCUMENT HEADER */}
-      {/* 🔥 IMPROVEMENT 1: HIDE HEAVY UI WHEN TYPING OR KEYBOARD OPEN */}
       <div className={`max-w-5xl mx-auto px-4 pt-6 pb-8 transition-opacity duration-300 ${showFocusMode || keyboardOpen || isTyping ? 'opacity-0 pointer-events-none h-0 overflow-hidden py-0' : 'opacity-100'}`}>
         <div className="bg-white border border-gray-200 rounded-[2.5rem] shadow-sm p-8">
           <input
@@ -255,10 +291,8 @@ export default function Editor({ system }: any) {
         </div>
       </div>
 
-      {/* DESKTOP TOOLBAR */}
       <div className="hidden md:block sticky top-4 z-40 max-w-5xl mx-auto px-4">
         <div className="bg-white/95 backdrop-blur-xl border border-gray-200 rounded-2xl p-3 shadow-xl flex flex-wrap gap-4 items-center transition-all">
-          {/* Style Group */}
           <div className="relative flex items-center gap-1 border border-gray-100 p-1.5 rounded-xl">
             <GroupLabel>Style</GroupLabel>
             <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')}><Bold size={18}/></ToolbarButton>
@@ -276,7 +310,6 @@ export default function Editor({ system }: any) {
             <ToolbarButton onClick={() => editor.chain().focus().toggleHighlight().run()} isActive={editor.isActive('highlight')}><Highlighter size={18}/></ToolbarButton>
           </div>
 
-          {/* Font Group */}
           <div className="relative flex items-center gap-2 border border-gray-100 p-1.5 rounded-xl">
             <GroupLabel>Font</GroupLabel>
             <select
@@ -299,7 +332,6 @@ export default function Editor({ system }: any) {
             </select>
           </div>
 
-          {/* Blocks */}
           <div className="relative flex items-center gap-1 border border-gray-100 p-1.5 rounded-xl">
             <GroupLabel>Blocks</GroupLabel>
             <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} isActive={editor.isActive('heading', { level: 1 })}>H1</ToolbarButton>
@@ -310,7 +342,6 @@ export default function Editor({ system }: any) {
 
           <div className="flex-1" />
 
-          {/* Right Controls */}
           <div className="flex items-center gap-2">
             <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Undo"><Undo size={20}/></ToolbarButton>
             <ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Redo"><Redo size={20}/></ToolbarButton>
@@ -324,12 +355,10 @@ export default function Editor({ system }: any) {
         </div>
       </div>
 
-      {/* MAIN EDITOR AREA */}
-      {/* 🥇 FIX 1: DYNAMIC PADDING TO PUSH EDITOR ABOVE KEYBOARD */}
       <div 
         className={`max-w-5xl mx-auto px-4 transition-all duration-300 ease-out ${showFocusMode ? 'pt-8' : 'pt-4'}`}
         style={{
-          paddingBottom: keyboardOpen ? `${keyboardHeight + 120}px` : "8rem"
+          paddingBottom: keyboardOpen ? "120px" : "8rem"
         }}
       >
         <div className={`relative rounded-[3rem] shadow-sm transition-all duration-500 ${showFocusMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'}`}>
@@ -372,15 +401,12 @@ export default function Editor({ system }: any) {
         </div>
       </div>
 
-      {/* ==================== MOBILE COMBINED TOOLBAR ==================== */}
-      {/* 🥈 FIX 2 & 4: ATTACH TOOLBAR SMOOTHLY WITH OFFSET & SAFE AREA */}
       <div 
         className="md:hidden fixed left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] transition-all duration-200 ease-out"
         style={{
-          bottom: keyboardOpen ? `${Math.max(0, keyboardHeight - 10)}px` : "env(safe-area-inset-bottom)"
+          bottom: keyboardOpen ? `${keyboardHeight}px` : "env(safe-area-inset-bottom)"
         }}
       >
-        {/* 🔥 IMPROVEMENT 3: PRIORITY TOOLBAR VIEW */}
         <div className="flex items-center justify-between p-2 overflow-x-auto border-b border-gray-100 no-scrollbar gap-1">
           <div className="flex items-center gap-1">
             <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')}><Bold size={20}/></ToolbarButton>
@@ -403,7 +429,6 @@ export default function Editor({ system }: any) {
           </button>
         </div>
 
-        {/* 🔥 SECONDARY TOOLS EXPANDED VIEW */}
         <div className={`grid grid-cols-[1fr] transition-all duration-200 ease-out ${showMobileMore ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
           <div className="overflow-hidden">
             <div className="flex items-center gap-2 p-2 overflow-x-auto bg-gray-50 border-b border-gray-100 no-scrollbar">
@@ -434,7 +459,6 @@ export default function Editor({ system }: any) {
           </div>
         </div>
 
-        {/* STATUS BAR (Only visible when not typing intensely) */}
         <div className={`flex justify-between items-center px-4 py-1.5 text-[10px] font-medium bg-white text-gray-400 transition-opacity duration-200 ${isTyping ? 'opacity-30' : 'opacity-100'}`}>
           <div className="font-mono uppercase tracking-wider">
             {wordCount} words
@@ -449,34 +473,25 @@ export default function Editor({ system }: any) {
         </div>
       </div>
 
-      {/* QUICK INSERT FLOATING BUTTON */}
       <button
         onClick={() => setShowQuickMenu(!showQuickMenu)}
         className="md:hidden fixed z-50 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white p-4 rounded-full shadow-xl transition-all duration-300 ease-out"
         style={{
-          bottom: keyboardOpen ? `${keyboardHeight + 70 + (showMobileMore ? 50 : 0)}px` : "7rem",
+          bottom: keyboardOpen ? `${keyboardHeight + 80}px` : "7rem",
           right: "1.5rem"
         }}
       >
         <Plus size={24} className={`transition-transform duration-200 ${showQuickMenu ? 'rotate-45' : 'rotate-0'}`} />
       </button>
 
-      {/* Quick Insert Menu */}
       {showQuickMenu && (
         <div 
           className="md:hidden fixed right-6 z-50 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 w-56 animate-in slide-in-from-bottom-4 fade-in duration-200"
           style={{
-            bottom: keyboardOpen ? `${keyboardHeight + 140 + (showMobileMore ? 50 : 0)}px` : "11rem"
+            bottom: keyboardOpen ? `${keyboardHeight + 140}px` : "11rem"
           }}
         >
-          {[
-            { label: "Heading 1", icon: <Heading1 size={18} />, cmd: 'h1' },
-            { label: "Heading 2", icon: <Heading2 size={18} />, cmd: 'h2' },
-            { label: "To-do List", icon: "☑", cmd: 'todo' },
-            { label: "Quote", icon: '"', cmd: 'quote' },
-            { label: "Divider", icon: <Minus size={18} />, cmd: 'divider' },
-            { label: "Code Block", icon: <Terminal size={18} />, cmd: 'code' },
-          ].map((item, i) => (
+          {SLASH_COMMANDS.map((item, i) => (
             <button
               key={i}
               onClick={() => { handleSlashCommand(item.cmd); setShowQuickMenu(false); }}
@@ -489,18 +504,12 @@ export default function Editor({ system }: any) {
         </div>
       )}
 
-      {/* SLASH MENU */}
       {showSlashMenu && (
         <div className="fixed left-1/2 top-1/3 -translate-x-1/2 z-[60] bg-white/95 backdrop-blur-xl border border-gray-200 shadow-[0_10px_40px_rgba(0,0,0,0.1)] rounded-2xl p-3 w-72 animate-in fade-in zoom-in-95 duration-200">
-          <p className="text-[10px] font-black text-gray-400 px-3 py-1 uppercase tracking-widest">Quick Commands</p>
-          {[
-            { label: "Heading 1", cmd: 'h1', icon: <Heading1 size={18} /> },
-            { label: "Heading 2", cmd: 'h2', icon: <Heading2 size={18} /> },
-            { label: "To-do List", cmd: 'todo', icon: "☑" },
-            { label: "Blockquote", cmd: 'quote', icon: '"' },
-            { label: "Divider", cmd: 'divider', icon: <Minus size={18} /> },
-            { label: "Code Block", cmd: 'code', icon: <Terminal size={18} /> },
-          ].map((item) => (
+          <p className="text-[10px] font-black text-gray-400 px-3 py-1 uppercase tracking-widest">
+            {filteredSlashCommands.length > 0 ? "Quick Commands" : "No Match Found"}
+          </p>
+          {filteredSlashCommands.map((item) => (
             <button
               key={item.cmd}
               onClick={() => handleSlashCommand(item.cmd)}

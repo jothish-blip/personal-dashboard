@@ -1,23 +1,13 @@
 "use client";
 
 import { ReactNode } from "react";
-import { useGlobalRefresh } from "@/hooks/useGlobalRefresh";
-import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import PullToRefreshUI from "@/hooks/PullToRefreshUI";
+import PullToRefreshUI from "@/hooks/PullToRefreshUI"; // Adjust path if needed
 
 export default function ClientWrapper({ children }: { children: ReactNode }) {
-  const { refreshPage } = useGlobalRefresh();
-
-  const { pullDistance, readyToRefresh } =
-    usePullToRefresh(refreshPage);
-
   return (
     <>
-      {/* 🔥 Pull to Refresh UI */}
-      <PullToRefreshUI
-        pullDistance={pullDistance}
-        ready={readyToRefresh}
-      />
+      {/* 🔥 Pull to Refresh UI handles its own hooks now! No props needed. */}
+      <PullToRefreshUI />
 
       {children}
     </>

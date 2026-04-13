@@ -1,12 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-
 export const useGlobalRefresh = () => {
-  const router = useRouter();
-
   const refreshPage = () => {
-    router.refresh();
+    // Forces a true, full-page reload on mobile devices
+    window.location.reload();
   };
 
   return { refreshPage };
