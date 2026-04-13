@@ -9,7 +9,8 @@ import { AuthChangeEvent, Session } from '@supabase/supabase-js';
 const SYSTEM_VERSION = 1.2;
 const STORAGE_KEY = "taskflow_planner_v1";
 
-export type TabType = "today" | "all" | "logs";
+// NEW UNIFIED TAB TYPE
+export type TabType = "today" | "yesterday" | "tomorrow" | "range" | "logs";
 
 // --- STRICT DB TYPES ---
 type DBPlannerEvent = {
@@ -31,6 +32,31 @@ const timeToMinutes = (t: string) => {
   return h * 60 + m;
 };
 
+// --- TIMEZONE SAFE HELPERS ---
+const getLocalDate = () => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().split("T")[0];
+};
+
+const toLocalDateString = (date: Date) => {
+  const d = new Date(date);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().split("T")[0];
+};
+
+const getDateLabel = (dateStr: string) => {
+  const today = getLocalDate();
+
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrow = toLocalDateString(tomorrowDate);
+
+  if (dateStr === today) return "Today";
+  if (dateStr === tomorrow) return "Tomorrow";
+  return dateStr;
+};
+
 // Universal Row Mapper
 const mapRow = (row: DBPlannerEvent): PlannerEvent => ({
   id: row.id,
@@ -47,11 +73,11 @@ const mapRow = (row: DBPlannerEvent): PlannerEvent => ({
 export function usePlannerSystem() {
   const supabase = getSupabaseClient();
 
-  // --- AUTH STATE (Moved up to support Notification Hook) ---
+  // --- AUTH STATE ---
   const [currentUser, setCurrentUser] = useState<any>(null); 
   const userRef = useRef<any>(null); 
 
-  // --- NOTIFICATION HOOK (Updated to pass userId) ---
+  // --- NOTIFICATION HOOK ---
   const { addNotification } = useNotificationSystem(currentUser?.id);
 
   // --- APP STATE ---
@@ -67,7 +93,7 @@ export function usePlannerSystem() {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
   const [formData, setFormData] = useState<Partial<PlannerEvent>>({
-    id: "", title: "", date: new Date().toISOString().split('T')[0], time: "09:00", type: "Work", priority: "medium"
+    id: "", title: "", date: getLocalDate(), time: "09:00", type: "Work", priority: "medium"
   });
 
   const saveRef = useRef<NodeJS.Timeout | null>(null); 
@@ -124,7 +150,7 @@ export function usePlannerSystem() {
     } catch (e) { console.error("Log Sync Error", e); }
   };
 
-  // --- FIX 1: AUTH RE-SYNC (Single Source of Truth) ---
+  // --- AUTH RE-SYNC ---
   useEffect(() => {
     if (!supabase) return;
 
@@ -139,7 +165,7 @@ export function usePlannerSystem() {
     return () => listener.subscription.unsubscribe();
   }, [supabase]);
 
-  // --- FIX 2: BOOT-UP & DATA FETCH (Driven by currentUser) ---
+  // --- BOOT-UP & DATA FETCH ---
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -183,10 +209,9 @@ export function usePlannerSystem() {
         setLogs(loadedLogs);
         setIsReady(true); 
 
-        // Notifications logic
         if (!sessionStorage.getItem("planner_behavior_scanned") && loadedEvents.length > 0) {
           sessionStorage.setItem("planner_behavior_scanned", "true");
-          const todayStr = new Date().toISOString().split('T')[0];
+          const todayStr = getLocalDate();
           const todayEvents = loadedEvents.filter(e => e.date === todayStr);
 
           if (todayEvents.length === 0) {
@@ -201,7 +226,7 @@ export function usePlannerSystem() {
     initPlanner();
   }, [currentUser, addNotification]); 
 
-  // --- FIX 3: REALTIME ENGINE (Strictly tied to currentUser) ---
+  // --- REALTIME ENGINE ---
   useEffect(() => {
     if (!supabase || !currentUser) return;
 
@@ -283,7 +308,7 @@ export function usePlannerSystem() {
 
     const checkMissedTasks = () => {
       const now = new Date();
-      const todayStr = now.toISOString().split("T")[0];
+      const todayStr = getLocalDate();
 
       setEvents(prev => {
         let stateChanged = false;
@@ -379,7 +404,7 @@ export function usePlannerSystem() {
     }
     
     setIsAddModalOpen(false);
-    setFormData({ id: "", title: "", date: new Date().toISOString().split('T')[0], time: "09:00", type: "Work", priority: "medium" });
+    setFormData({ id: "", title: "", date: getLocalDate(), time: "09:00", type: "Work", priority: "medium" });
   };
 
   const toggleStatus = (id: string) => {
@@ -489,23 +514,34 @@ export function usePlannerSystem() {
   };
 
   // --- FILTER & SORT OPTIMIZATION ---
+  // NOTE: Tab filtering is now handled natively inside EventList! We only filter by Search and sort here.
   const filteredEvents = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
     return events.filter(e => {
-      const matchesSearch = e.title.toLowerCase().includes(debouncedSearch.toLowerCase());
-      if (!matchesSearch) return false;
-      if (activeTab === "today") return e.date === today;
-      if (activeTab === "all") return true;
-      return false; 
-    }).sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time)); 
-  }, [events, activeTab, debouncedSearch]);
+      return e.title.toLowerCase().includes(debouncedSearch.toLowerCase());
+    }).sort((a, b) => {
+      // 1. Missed first
+      if (a.status === "missed" && b.status !== "missed") return -1;
+      if (b.status === "missed" && a.status !== "missed") return 1;
+    
+      // 2. High priority first
+      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      }
+    
+      // 3. Date + Time
+      const dateTimeA = new Date(`${a.date}T${a.time}`).getTime();
+      const dateTimeB = new Date(`${b.date}T${b.time}`).getTime();
+    
+      return dateTimeA - dateTimeB;
+    });
+  }, [events, debouncedSearch]);
 
   const analytics = useMemo(() => {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    const yesterday = new Date(today);
+    const todayStr = getLocalDate();
+    const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayStr = toLocalDateString(yesterday);
 
     const todayEvents = events.filter(e => e.date === todayStr);
     const yesterdayEvents = events.filter(e => e.date === yesterdayStr);
@@ -554,6 +590,7 @@ export function usePlannerSystem() {
     activeTab, setActiveTab, searchQuery, setSearchQuery,
     isAddModalOpen, setIsAddModalOpen, isStatusModalOpen, closeStatusModal,
     formData, setFormData, filteredEvents, analytics,
-    handleSave, toggleStatus, deleteWithUndo, rescheduleTask, rescheduleAllMissed
+    handleSave, toggleStatus, deleteWithUndo, rescheduleTask, rescheduleAllMissed,
+    getDateLabel
   };
 }

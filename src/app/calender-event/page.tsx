@@ -41,8 +41,8 @@ export default function MatrixIntelligenceSystem() {
       {/* 2. TopBar - Wired to unified state */}
       <TopBar 
         events={system.events}
-        filterMode={system.activeTab}
-        setFilterMode={system.setActiveTab}
+        activeTab={system.activeTab as any}
+        setActiveTab={system.setActiveTab as any}
         onAddClick={() => system.setIsAddModalOpen(true)} 
       />
 
@@ -52,8 +52,8 @@ export default function MatrixIntelligenceSystem() {
         {/* Left Side: Event List */}
         <div className="w-full lg:col-span-8">
           <EventList 
-            activeTab={system.activeTab} 
-            setActiveTab={system.setActiveTab} 
+            activeTab={system.activeTab as any} 
+            setActiveTab={system.setActiveTab as any} 
             searchQuery={system.searchQuery}
             setSearchQuery={system.setSearchQuery}
             filteredEvents={system.filteredEvents}
@@ -64,7 +64,8 @@ export default function MatrixIntelligenceSystem() {
               system.setFormData(ev); 
               system.setIsAddModalOpen(true); 
             }}
-            onAddClick={() => system.setIsAddModalOpen(true)} 
+            onAddClick={() => system.setIsAddModalOpen(true)}
+            getDateLabel={system.getDateLabel}
           />
         </div>
 
@@ -89,11 +90,17 @@ export default function MatrixIntelligenceSystem() {
         isOpen={system.isAddModalOpen}
         onClose={() => {
           system.setIsAddModalOpen(false);
+          
+          // ✅ Timezone-safe date reset
+          const d = new Date();
+          d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+          const localDate = d.toISOString().split('T')[0];
+
           // Reset form on close
           system.setFormData({ 
             id: "", 
             title: "", 
-            date: new Date().toISOString().split('T')[0], 
+            date: localDate, 
             time: "09:00", 
             type: "Work", 
             priority: "medium" 
