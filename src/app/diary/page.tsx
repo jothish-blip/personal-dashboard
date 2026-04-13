@@ -3,7 +3,7 @@
 import React from 'react';
 import Navbar from "@/components/Navbar";
 import { useDiarySystem } from "@/components/diary/useDiarySystem";
-import { LockedScreen, WipPopup } from "@/components/diary/Modals";
+import { WipPopup } from "@/components/diary/Modals";
 import HeaderControls from "@/components/diary/HeaderControls";
 import InsightsBoard from "@/components/diary/InsightsBoard";
 import BehaviorPanel from "@/components/diary/BehaviorPanel";
@@ -27,18 +27,6 @@ export default function DiaryPage() {
     );
   }
 
-  // 2️⃣ Privacy / Lock Check
-  const isLockedAndProtected = system.currentEntry.isLocked && system.selectedDate !== system.actualToday;
-  
-  if (isLockedAndProtected && system.passwordAttempt !== 'nex') {
-    return (
-      <LockedScreen 
-        passwordAttempt={system.passwordAttempt} 
-        setPasswordAttempt={system.setPasswordAttempt} 
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-24 relative selection:bg-orange-100 selection:text-orange-900">
       
@@ -59,7 +47,7 @@ export default function DiaryPage() {
       />
 
       {/* Main Dashboard Layout */}
-      <main className="p-4 sm:p-6 md:p-8 max-w-[1040px] mx-auto w-full flex flex-col gap-8 md:gap-10 pt-6 md:pt-10 animate-in fade-in duration-500 slide-in-from-bottom-4">
+      <main className="p-4 sm:p-6 md:p-8 max-w-[1040px] mx-auto w-full flex flex-col gap-8 md:gap-10 pt-6 md:pt-10 animate-in fade-in duration-500 slide-in-from-bottom-4 text-left">
         
         {/* The Cockpit */}
         <section aria-label="System Controls">
