@@ -214,7 +214,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         const duration = s.initialDuration || initialSessionTime;
         setInitialSessionTime(duration);
 
-        // ✅ FINAL FIX: Guarded Tab Refocus / Fetch Sync
         if (s.completedAt && s.extraStartTime) {
           if (!alarmPlayedRef.current) {
             setIsSessionComplete(true);
@@ -414,7 +413,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
             const sessionDuration = session.initialDuration || initialSessionTimeRef.current;
             setInitialSessionTime(sessionDuration);
 
-            // ✅ FINAL FIX: Guarded Realtime Sync Trigger
             if (session.completedAt && session.extraStartTime) {
               if (!alarmPlayedRef.current) {
                 setIsSessionComplete(true);
@@ -460,7 +458,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         } catch (err) {}
       }
       
-      // ✅ FINAL FIX: Storage trigger safety via alarmPlayedRef
       if (e.key === "focus_complete_signal") {
         if (audioRef.current) {
           audioRef.current.pause();
@@ -477,11 +474,9 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   }, []); 
 
   const stopSession = async (isNatural = false) => {
-    // ✅ FIRST: kill alarm trigger condition
     setIsSessionComplete(false);
     alarmPlayedRef.current = true;
 
-    // ✅ Clear timeout if user stops session early
     if (alarmTimeoutRef.current) {
       clearTimeout(alarmTimeoutRef.current);
       alarmTimeoutRef.current = null;
@@ -492,7 +487,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       return; 
     }
 
-    // ✅ THEN stop audio
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -500,17 +494,18 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     
     if (!currentSession) return;
 
-    // ✅ Clear session completion flags properly
-    if (currentSession) {
-      currentSession.completedAt = undefined;
-      currentSession.extraStartTime = undefined;
-    }
-
+    // 🔥 FIX: Calculate time variables BEFORE clearing session properties
     const finalElapsed = getElapsedTime();
     
     const finalExtraTime = currentSession.extraStartTime 
       ? Math.floor((Date.now() - currentSession.extraStartTime) / 1000) 
       : 0;
+
+    // ✅ Now clear the session completion flags
+    if (currentSession) {
+      currentSession.completedAt = undefined;
+      currentSession.extraStartTime = undefined;
+    }
 
     setIsActive(false);
     setIsPaused(false);
@@ -580,7 +575,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
     await fetchSessionsFromDB(); 
 
-    // ✅ Add hard stop safety
     setTimeout(() => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -589,7 +583,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }, 0);
   };
 
-  // ✅ New updated alarm effect with SINGLE clean timeout
   useEffect(() => {
     if (isSessionComplete && isActive && !alarmPlayedRef.current) {
       alarmPlayedRef.current = true;
@@ -605,7 +598,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         navigator.vibrate([300, 100, 300, 100, 300]);
       }
 
-      // ✅ SINGLE clean timeout
           if (alarmTimeoutRef.current) {
              clearTimeout(alarmTimeoutRef.current);
            }
@@ -617,7 +609,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
              } 
         }, 10000);
 
-       // ✅ EXTRA safety (mobile resume case)
       setTimeout(() => {
          if (audioRef.current && !audioRef.current.paused) {
             audioRef.current.pause();
@@ -625,7 +616,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
           }
         }, 12000);
   
-      // ✅ notification (only once with 15s lock)
       if (acquireLock('focus_complete_alert', 15000)) {
         addNotification(
           'focus',
@@ -637,7 +627,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       }
   
     } else if (!isSessionComplete) {
-      // safety cleanup
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
@@ -685,7 +674,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
         setCurrentSession(updatedSession);
         
-        // ✅ FINAL FIX: Guarded Internal Timer Completion
         if (!alarmPlayedRef.current) {
           setIsSessionComplete(true);
         }
@@ -737,7 +725,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    alarmPlayedRef.current = false; // ✅ Only resets on manual start
+    alarmPlayedRef.current = false;
 
     if (audioRef.current) {
       audioRef.current.play().then(() => {
@@ -763,7 +751,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       const sessionDuration = remoteSession.initialDuration || initialSessionTime;
       setInitialSessionTime(sessionDuration);
 
-      // ✅ FINAL FIX: Guarded Start Session Restoration
       if (remoteSession.completedAt && remoteSession.extraStartTime) {
         if (!alarmPlayedRef.current) {
           setIsSessionComplete(true);
