@@ -1,40 +1,89 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   Plus, 
   Target, 
   CheckCircle2,
   AlertCircle,
   CalendarDays,
-  LayoutList
+  LayoutList,
+  Activity
 } from "lucide-react";
 
 import { PlannerEvent } from "./types";
 
+// --- TIMEZONE SAFE HELPER ---
+const getLocalDate = () => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().split("T")[0];
+};
+
+export type TabType = "today" | "yesterday" | "tomorrow" | "range" | "logs";
+
 interface TopBarProps {
   onAddClick: () => void;
   events?: PlannerEvent[];
-  filterMode?: string;
-  setFilterMode?: (mode: any) => void;
+  activeTab?: TabType;
+  setActiveTab?: (tab: TabType) => void;
 }
 
 export default function TopBar({ 
   onAddClick,
   events = [],
-  filterMode = 'today',
-  setFilterMode = () => {}
+  activeTab = 'today',
+  setActiveTab = () => {}
 }: TopBarProps) {
   
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [topbarOffset, setTopbarOffset] = useState(64); 
+  const [scrollY, setScrollY] = useState(0); 
+  const lastScrollY = useRef(0);
 
+  // --- SCROLL LOGIC (GPU OPTIMIZED + THRESHOLD) ---
+  useEffect(() => {
+    const SCROLL_THRESHOLD = 10; 
+
+    const handleScroll = () => {
+      const currentScroll = window.scrollY;
+      setScrollY(currentScroll); 
+      
+      const diff = currentScroll - lastScrollY.current;
+      const isMobile = window.innerWidth < 768;
+
+      if (isMobile) return; 
+
+      if (Math.abs(diff) < SCROLL_THRESHOLD) return;
+
+      const updateOffset = (val: number) => {
+        setTopbarOffset(prev => (prev === val ? prev : val));
+      };
+
+      if (currentScroll < 20) {
+        updateOffset(64); 
+      } else if (diff > 0) {
+        updateOffset(0);  
+      } else {
+        updateOffset(64); 
+      }
+
+      lastScrollY.current = currentScroll;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // --- TIME UPDATES ---
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // --- DERIVED DATA ---
   const stats = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDate();
     const todayEvents = events.filter(e => e.date === todayStr);
     
     return {
@@ -50,7 +99,10 @@ export default function TopBar({
   const nextTask = useMemo(() => {
     return events
       .filter(e => e.status === "pending")
-      .filter(e => new Date(`${e.date}T${e.time}`) > currentTime)
+      .filter(e => {
+        const eventTime = new Date(`${e.date}T${e.time}`);
+        return eventTime.getTime() > currentTime.getTime();
+      })
       .sort((a, b) => {
         const timeA = new Date(`${a.date}T${a.time}`).getTime();
         const timeB = new Date(`${b.date}T${b.time}`).getTime();
@@ -62,94 +114,165 @@ export default function TopBar({
   const dateString = currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
   const statusLabel = stats.rate >= 70 ? "High Productivity" : stats.rate >= 40 ? "Steady Progress" : "Planning Phase";
-  const statusColor = stats.rate >= 70 ? "bg-emerald-500" : stats.rate >= 40 ? "bg-orange-500" : "bg-slate-300";
+  
+  // --- SCROLL INTELLIGENCE ---
+  const isCompressed = topbarOffset === 0 && scrollY > 50;
 
   return (
     <>
-      <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-100">
-        <div className="max-w-7xl mx-auto">
-          {/* Top Row: Brand & Time */}
-          <div className="px-4 md:px-6 py-3 flex justify-between items-center">
+      <nav 
+        style={{ 
+          transform: `translateY(${topbarOffset === 0 ? -64 : 0}px)` 
+        }}
+        className={`relative z-30 bg-white/70 backdrop-blur-md border-b transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+          isCompressed ? "border-transparent shadow-sm" : "border-gray-50 shadow-none"
+        }`}
+      >
+        <div className={`max-w-[1500px] mx-auto px-4 md:px-6 min-h-[120px] md:min-h-[80px] transition-all duration-300 ${
+          isCompressed ? "py-2 space-y-2" : "py-4 space-y-4"
+        }`}>
+
+          {/* ROW 1 — CONTEXT */}
+          <div className="hidden md:flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-200">
-                <CheckCircle2 size={18} className="text-white" />
+              <div className="w-8 h-8 bg-orange-50 text-orange-600 flex items-center justify-center rounded-lg">
+                <CheckCircle2 size={16} />
               </div>
+
               <div>
-                <h1 className="text-sm font-bold text-slate-900 leading-none">TaskFlow</h1>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <span className={`h-1.5 w-1.5 rounded-full ${statusColor}`} />
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{statusLabel}</span>
+                <h2 className="text-sm font-semibold text-gray-900">
+                  NexTask Planner
+                </h2>
+                <div className="flex items-center gap-2">
+                  <p className="text-[11px] text-gray-400 font-medium">
+                    Track and execute your daily plan
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-[11px] font-bold">
-              <span className="text-slate-400">{dateString}</span>
-              <span className="h-4 w-[1px] bg-slate-200" />
-              <span className="text-slate-900">{timeString}</span>
+            <div className="text-right">
+              <p className="text-xs text-gray-400 font-medium">{dateString}</p>
+              <p className="text-sm font-medium text-gray-900">{timeString}</p>
             </div>
           </div>
 
-          {/* Middle Row: Stats & Next Task */}
-          <div className="px-4 md:px-6 py-2 bg-slate-50/50 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              <span className="text-slate-900">{stats.done}/{stats.total} Completed</span>
-              {stats.missed > 0 && <span className="text-red-500 flex items-center gap-1"><AlertCircle size={10}/> {stats.missed} Overdue</span>}
+          {/* ROW 2 — EXECUTION SUMMARY */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-6">
+            <div className="flex-1 w-full">
+              <div className="flex items-center justify-between md:justify-start gap-4 text-xs font-medium">
+                
+                <div className="flex items-center gap-2 text-gray-700">
+                  <CheckCircle2 size={14} className="text-emerald-500" />
+                  <span>{stats.done}/{stats.total} Done</span>
+                </div>
+
+                {stats.missed > 0 && (
+                  <div className="flex items-center gap-2 text-red-500">
+                    <AlertCircle size={14} />
+                    <span>{stats.missed} Missed</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 text-gray-400 hidden sm:flex">
+                  <Target size={14} />
+                  <span>{statusLabel}</span>
+                </div>
+              </div>
+
+              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mt-2">
+                <div
+                  className="h-full bg-emerald-500 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
+                  style={{ width: `${stats.rate}%` }}
+                />
+              </div>
             </div>
 
             {nextTask ? (
-              <div className="flex items-center gap-2 bg-orange-50 border border-orange-100 px-3 py-1.5 rounded-full self-start md:self-auto">
-                <Target size={12} className="text-orange-600" />
-                <span className="text-[10px] font-bold text-orange-800">
-                  NEXT: {nextTask.title} <span className="opacity-60 ml-1">at {nextTask.time}</span>
+              <div className="flex items-center justify-between md:justify-start gap-2 px-3 py-2 bg-orange-50 text-orange-700 rounded-lg text-xs font-medium border border-orange-100 shadow-sm hover:scale-[1.02] transition-transform cursor-pointer shrink-0">
+                <div className="flex items-center gap-2">
+                  <Target size={14} />
+                  <span className="truncate max-w-[180px] font-semibold">
+                    {nextTask.title}
+                  </span>
+                </div>
+                <span className="text-[10px] opacity-70 ml-2 font-semibold">
+                  {nextTask.time}
                 </span>
               </div>
             ) : (
-              <div className="text-[10px] font-medium text-slate-400">All tasks caught up</div>
+              <div className="text-xs text-gray-400 font-medium shrink-0 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                No upcoming tasks
+              </div>
             )}
           </div>
 
-          {/* Bottom Row: Desktop Filter (Hidden on Mobile) */}
-          <div className="hidden md:flex px-6 py-4 items-center justify-between">
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              <button 
-                onClick={() => setFilterMode('today')}
-                className={`px-6 py-2 text-xs font-bold rounded-lg transition-all ${filterMode === 'today' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          {/* ROW 3 — CONTROLS */}
+          <div className="flex items-center justify-between">
+            <div className="hidden md:flex bg-gray-50/50 p-1 rounded-lg border border-gray-100 overflow-hidden">
+              <button
+                onClick={() => setActiveTab('yesterday')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                  activeTab === 'yesterday' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                Yesterday
+              </button>
+              <button
+                onClick={() => setActiveTab('today')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                  activeTab === 'today' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-800'
+                }`}
               >
                 Today
               </button>
-              <button 
-                onClick={() => setFilterMode('all')}
-                className={`px-6 py-2 text-xs font-bold rounded-lg transition-all ${filterMode === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              <button
+                onClick={() => setActiveTab('tomorrow')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                  activeTab === 'tomorrow' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-800'
+                }`}
               >
-                All Tasks
+                Tomorrow
+              </button>
+              <button
+                onClick={() => setActiveTab('range')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                  activeTab === 'range' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                Timeline
+              </button>
+              <button
+                onClick={() => setActiveTab('logs')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                  activeTab === 'logs' ? 'bg-white text-gray-900 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                Activity
               </button>
             </div>
 
-            <button 
+            <button
               onClick={onAddClick}
-              className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-2xl text-sm font-bold transition-all active:scale-95 shadow-md shadow-orange-100"
+              className="flex items-center justify-center w-full md:w-auto gap-2 bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 md:ml-auto"
             >
-              <Plus size={18} strokeWidth={3} /> Add Task
+              <Plus size={16} /> Add Task
             </button>
           </div>
         </div>
       </nav>
 
-      {/* MOBILE THUMB NAVIGATION (Updated Layout) */}
+      {/* MOBILE THUMB NAVIGATION */}
       <div className="md:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm">
-        <div className="bg-white/95 backdrop-blur-md rounded-[2.5rem] p-2 shadow-2xl shadow-slate-300 border border-slate-200 flex items-center justify-between px-6">
-          
-          {/* Today Tasks Button */}
+        <div className="bg-white/95 backdrop-blur-md rounded-3xl p-2 shadow-2xl shadow-gray-200 border border-gray-100 flex items-center justify-between px-6">
           <button 
-            onClick={() => setFilterMode('today')}
-            className={`flex flex-col items-center gap-1 transition-all ${filterMode === 'today' ? 'text-orange-500' : 'text-slate-400'}`}
+            onClick={() => setActiveTab('today')}
+            className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'today' ? 'text-orange-500' : 'text-gray-400'}`}
           >
             <CalendarDays size={20} />
             <span className="text-[8px] font-black uppercase tracking-widest">Today</span>
           </button>
 
-          {/* Centered Add Button */}
           <button 
             onClick={onAddClick}
             className="flex items-center justify-center bg-orange-500 text-white h-14 w-14 rounded-full shadow-lg shadow-orange-200 transition-transform active:scale-90 -mt-2"
@@ -157,15 +280,13 @@ export default function TopBar({
             <Plus size={28} strokeWidth={3} />
           </button>
 
-          {/* All Tasks Button */}
           <button 
-            onClick={() => setFilterMode('all')}
-            className={`flex flex-col items-center gap-1 transition-all ${filterMode === 'all' ? 'text-orange-500' : 'text-slate-400'}`}
+            onClick={() => setActiveTab('range')}
+            className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'range' ? 'text-orange-500' : 'text-gray-400'}`}
           >
             <LayoutList size={20} />
-            <span className="text-[8px] font-black uppercase tracking-widest">All Tasks</span>
+            <span className="text-[8px] font-black uppercase tracking-widest">Timeline</span>
           </button>
-
         </div>
       </div>
     </>
