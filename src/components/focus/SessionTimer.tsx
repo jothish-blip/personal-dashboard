@@ -84,6 +84,7 @@ export default function SessionTimer() {
       return extraTime; 
     }
     if (currentSession) {
+      // ✅ getRemainingTime now benefits directly from the getElapsedTime() pause fix!
       return getRemainingTime();
     }
     return timeRemaining;

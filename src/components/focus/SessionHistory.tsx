@@ -34,7 +34,6 @@ export default function SessionHistory() {
   };
 
   const formatEndTime = (session: FocusSession) => {
-    // 🔥 SAFE FALLBACK: uses actualDuration to ensure paused/extra time is mathematically included
     const fallbackEnd = session.startTime + (session.actualDuration * 1000);
     const end = session.endTime || fallbackEnd;
     
@@ -225,8 +224,11 @@ export default function SessionHistory() {
 
               <div className="flex flex-col">
                 {daySessions.map((session: FocusSession, index: number) => {
-                  const dists = session.distractions || []; 
+                  
+                  // 🔥 FIX 3: Safety check guarantees we always deal with an Array here
+                  const dists = Array.isArray(session.distractions) ? session.distractions : []; 
                   const distCount = dists.length || 0;
+                  
                   const classification = getSessionClassification(distCount);
                   const isExpanded = expandedId === session.id;
                   const isLast = index === daySessions.length - 1;
