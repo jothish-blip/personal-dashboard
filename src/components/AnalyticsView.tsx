@@ -214,8 +214,8 @@ export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Me
           customRange={customRange} setCustomRange={setCustomRange}
         />
 
-        {/* 4. SUMMARY METRICS */}
-        <SummaryCards stats={filteredData.stats} />
+        {/* 4. SUMMARY METRICS (🔥 FIXED: Passed momentum prop) */}
+        <SummaryCards stats={filteredData.stats} momentum={momentum} />
 
         {/* 5. INSIGHT & FOCUS TARGET */}
         <InsightsPanel stats={filteredData.stats} momentum={momentum} loadLevel={loadLevel as 'High' | 'Moderate' | 'Low'} />

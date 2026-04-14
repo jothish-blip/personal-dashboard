@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from "react";
-import { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { AuthChangeEvent, Session, RealtimeChannel } from '@supabase/supabase-js';
 import { FocusState, FocusMode, FocusSession, ActiveSession, Distraction } from "./types";
 import { useNotificationSystem } from '@/notifications/useNotificationSystem'; 
 import { getSupabaseClient } from "@/lib/supabase"; 
@@ -10,6 +10,8 @@ export type ExtendedActiveSession = ActiveSession & {
   extraStartTime?: number;
   completedAt?: number;
   initialDuration: number;
+  pauseStartTime?: number;
+  totalPausedDuration?: number;
 };
 
 const FocusContext = createContext<any>(undefined);
@@ -112,6 +114,16 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
   const [dailyGoal, setDailyGoal] = useState(3 * 3600);
 
+  const currentSessionRef = useRef<ExtendedActiveSession | null>(null);
+  const isActiveRef = useRef(false);
+  const isPausedRef = useRef(false);
+  const initialSessionTimeRef = useRef(initialSessionTime);
+
+  useEffect(() => { currentSessionRef.current = currentSession; }, [currentSession]);
+  useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
+  useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+  useEffect(() => { initialSessionTimeRef.current = initialSessionTime; }, [initialSessionTime]);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("daily_goal");
@@ -128,29 +140,32 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   const alarmPlayedRef = useRef(false);
   const isFetchingRef = useRef(false);
   const alarmTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const initialSessionTimeRef = useRef(initialSessionTime);
   const fetchSessionsRef = useRef<() => Promise<boolean>>(async () => false);
 
-  useEffect(() => {
-    initialSessionTimeRef.current = initialSessionTime;
-  }, [initialSessionTime]);
-
   const getElapsedTime = useCallback(() => {
-    if (!currentSession) return 0;
-    return Math.floor((Date.now() - currentSession.startTime) / 1000);
-  }, [currentSession]);
+    const session = currentSessionRef.current;
+    if (!session) return 0;
+    
+    const now = session.pauseStartTime ? session.pauseStartTime : Date.now();
+    const pausedTime = session.totalPausedDuration || 0;
+    
+    return Math.floor((now - session.startTime - pausedTime) / 1000);
+  }, []);
 
   const getRemainingTime = useCallback(() => {
-    if (!currentSession) return initialSessionTime;
+    const session = currentSessionRef.current;
+    const initial = initialSessionTimeRef.current;
+    if (!session) return initial;
+
     const elapsed = getElapsedTime();
-    return Math.max(0, initialSessionTime - elapsed);
-  }, [currentSession, initialSessionTime, getElapsedTime]);
+    return Math.max(0, initial - elapsed);
+  }, [getElapsedTime]);
 
   const getExtraTime = useCallback(() => {
-    if (!currentSession?.extraStartTime) return 0;
-    return Math.floor((Date.now() - currentSession.extraStartTime) / 1000);
-  }, [currentSession]);
+    const session = currentSessionRef.current;
+    if (!session?.extraStartTime) return 0;
+    return Math.floor((Date.now() - session.extraStartTime) / 1000);
+  }, []);
 
   const calculateFocusScore = (duration: number, distractions: Distraction[]) => {
     const distractionPenalty = distractions.length * 10;
@@ -167,7 +182,9 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   const enterFocusMode = () => {
     setIsFocusMode(true);
     if (typeof document !== 'undefined' && !document.fullscreenElement) {
-      document.documentElement.requestFullscreen?.().catch(() => {});
+      document.documentElement.requestFullscreen?.().catch((err) => {
+        console.warn("Focus Mode fullscreen blocked (likely missing user gesture):", err);
+      });
     }
   };
 
@@ -210,6 +227,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
         setIsActive(true);
         setMode(s.mode);
+        setIsPaused(!!s.pauseStartTime); 
 
         const duration = s.initialDuration || initialSessionTime;
         setInitialSessionTime(duration);
@@ -351,11 +369,12 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         await supabase
           .from("focus_active_sessions")
           .update({ last_seen: new Date().toISOString() })
-          .eq("user_id", currentUser.id);
+          .eq("user_id", currentUser.id)
+          .throwOnError();
       } catch (e) {
         console.error("Active Session Last Seen Update Failed", e);
       }
-    }, 10000);
+    }, 30000); 
 
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -364,8 +383,16 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!supabase || !currentUser?.id) return;
 
-    const uniqueChannelName = `focus-${currentUser.id}-${Math.random().toString(36).slice(2, 11)}`;
-    const channel = supabase.channel(uniqueChannelName);
+    const channelName = `focus-sync-${currentUser.id}`;
+
+    const existingChannels = supabase.getChannels();
+    existingChannels.forEach((c: RealtimeChannel) => {
+      if (c.topic === `realtime:${channelName}`) {
+        supabase.removeChannel(c);
+      }
+    });
+
+    const channel = supabase.channel(channelName);
 
     channel
       .on(
@@ -397,6 +424,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
                   ...prev,
                   extraStartTime: session.extraStartTime ?? prev?.extraStartTime,
                   completedAt: session.completedAt ?? prev?.completedAt,
+                  pauseStartTime: session.pauseStartTime ?? prev?.pauseStartTime,
+                  totalPausedDuration: session.totalPausedDuration ?? prev?.totalPausedDuration
                 };
               }
               return {
@@ -408,7 +437,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
             
             setIsActive(true);
             setMode(session.mode);
-            setIsPaused(false);
+            setIsPaused(!!session.pauseStartTime);
 
             const sessionDuration = session.initialDuration || initialSessionTimeRef.current;
             setInitialSessionTime(sessionDuration);
@@ -494,14 +523,26 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     
     if (!currentSession) return;
 
-    // 🔥 FIX: Calculate time variables BEFORE clearing session properties
+    const latestSessionStr = localStorage.getItem("focus_active_session");
+    let finalSession = currentSession;
+    
+    if (latestSessionStr && currentSession) {
+      try {
+        const parsed = JSON.parse(latestSessionStr) as ExtendedActiveSession;
+        if (parsed.id === currentSession.id) { 
+          finalSession = parsed;
+        }
+      } catch (e) {
+        console.error("Error parsing latest session fallback", e);
+      }
+    }
+
     const finalElapsed = getElapsedTime();
     
-    const finalExtraTime = currentSession.extraStartTime 
-      ? Math.floor((Date.now() - currentSession.extraStartTime) / 1000) 
+    const finalExtraTime = finalSession.extraStartTime 
+      ? Math.floor((Date.now() - finalSession.extraStartTime) / 1000) 
       : 0;
 
-    // ✅ Now clear the session completion flags
     if (currentSession) {
       currentSession.completedAt = undefined;
       currentSession.extraStartTime = undefined;
@@ -522,31 +563,32 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("focus_stop_signal", JSON.stringify({ time: Date.now(), type: "STOP" }));
 
       localStorage.setItem("focus_checkpoint", JSON.stringify({
-        sessionId: currentSession.id,
+        sessionId: finalSession.id,
         remaining: timeRemaining,
         initialTime: initialSessionTime, 
         stoppedAt: Date.now()
       }));
 
-      if (acquireLock('focus_abort_alert', 5000)) {
+      if (acquireLock(`focus_abort_alert_${finalSession.id}`, 5000)) {
         addNotification('focus', 'Session Ended', 'Logging your focus time to history.', 'medium', '/focus');
       }
     }
 
     const endTime = Date.now();
-    const score = calculateFocusScore(finalElapsed, currentSession.distractions);
+    const finalDistractions = Array.isArray(finalSession.distractions) ? finalSession.distractions : [];
+    const score = calculateFocusScore(finalElapsed, finalDistractions);
 
     const completedSession: FocusSession = {
-      ...currentSession,
-      initialDuration: currentSession.initialDuration || initialSessionTime,
+      ...finalSession,
+      initialDuration: finalSession.initialDuration || initialSessionTime,
       endTime,
       durationSeconds: finalElapsed,
       totalSessionSeconds: finalElapsed,
       extraDuration: finalExtraTime, 
       actualDuration: finalElapsed + finalExtraTime,
-      date: new Date(currentSession.startTime).toISOString(),
+      date: new Date(finalSession.startTime).toISOString(),
       score,
-      distractionCount: currentSession.distractions.length,
+      distractionCount: finalDistractions.length,
       topDistraction: null, 
       avgDistractionGap: 0, 
     };
@@ -616,7 +658,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
           }
         }, 12000);
   
-      if (acquireLock('focus_complete_alert', 15000)) {
+      if (currentSession?.id && acquireLock(`focus_complete_alert_${currentSession.id}`, 15000)) {
         addNotification(
           'focus',
           'Goal Reached',
@@ -637,12 +679,15 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         alarmTimeoutRef.current = null;
       }
     }
-  }, [isSessionComplete, isActive, addNotification]);
+  }, [isSessionComplete, isActive, addNotification, currentSession]);
 
   useEffect(() => {
-    if (!isActive || isPaused) return;
-
     const interval = setInterval(() => {
+      if (!isActiveRef.current || isPausedRef.current) return;
+
+      const session = currentSessionRef.current;
+      if (!session) return;
+
       const rem = getRemainingTime();
       const elapsed = getElapsedTime();
 
@@ -650,29 +695,24 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       setFocusedTime(elapsed);
       setTotalElapsed(elapsed);
 
-      if (currentSession?.completedAt && currentSession?.extraStartTime) {
-        const extra = Math.floor((Date.now() - currentSession.extraStartTime) / 1000);
+      if (session.completedAt && session.extraStartTime) {
+        const extra = Math.floor((Date.now() - session.extraStartTime) / 1000);
         setExtraTime(extra);
       }
 
-      if (currentSession) {
-        localStorage.setItem("focus_active_session", JSON.stringify({
-          ...currentSession,
-          completedAt: currentSession.completedAt,
-          extraStartTime: currentSession.extraStartTime
-        }));
-      }
+      localStorage.setItem("focus_active_session", JSON.stringify(session));
 
-      if (rem <= 0 && currentSession && !currentSession.completedAt) {
+      if (rem <= 0 && !session.completedAt) {
         const now = Date.now();
         
         const updatedSession: ExtendedActiveSession = {
-          ...currentSession,
+          ...session,
           completedAt: now,
           extraStartTime: now
         };
 
         setCurrentSession(updatedSession);
+        currentSessionRef.current = updatedSession; 
         
         if (!alarmPlayedRef.current) {
           setIsSessionComplete(true);
@@ -685,7 +725,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
             try {
               await supabase.from("focus_active_sessions").update({
                 session: updatedSession
-              }).eq("user_id", currentUser.id).throwOnError();
+              }).eq("user_id", currentUser.id).throwOnError(); 
             } catch (err) {
               console.error("❌ Failed to update active session state in DB:", err);
             }
@@ -695,8 +735,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }, 1000);
 
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, isPaused, getRemainingTime, getElapsedTime, currentSession, getExtraTime]); 
+  }, [currentUser?.id, supabase, getRemainingTime, getElapsedTime]); 
 
   useEffect(() => {
     const handleFsChange = () => { if (!document.fullscreenElement) setIsFocusMode(false); };
@@ -744,21 +783,37 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
     if (existing?.session) {
       const remoteSession = existing.session as ExtendedActiveSession;
-      setCurrentSession(remoteSession);
+      let updatedSession = { ...remoteSession };
+
+      const pauseStart = remoteSession.pauseStartTime || currentSession?.pauseStartTime;
+      
+      if (pauseStart) {
+        const pausedDuration = Date.now() - pauseStart;
+        updatedSession.totalPausedDuration = 
+          (remoteSession.totalPausedDuration || currentSession?.totalPausedDuration || 0) + pausedDuration;
+        updatedSession.pauseStartTime = undefined;
+      }
+
+      setCurrentSession(updatedSession);
       setIsActive(true);
       setIsPaused(false);
       
-      const sessionDuration = remoteSession.initialDuration || initialSessionTime;
+      const sessionDuration = updatedSession.initialDuration || initialSessionTime;
       setInitialSessionTime(sessionDuration);
 
-      if (remoteSession.completedAt && remoteSession.extraStartTime) {
+      if (updatedSession.completedAt && updatedSession.extraStartTime) {
         if (!alarmPlayedRef.current) {
           setIsSessionComplete(true);
         }
-        setExtraTime(Math.floor((Date.now() - remoteSession.extraStartTime) / 1000));
+        setExtraTime(Math.floor((Date.now() - updatedSession.extraStartTime) / 1000));
       }
 
-      localStorage.setItem("focus_active_session", JSON.stringify(remoteSession));
+      localStorage.setItem("focus_active_session", JSON.stringify(updatedSession));
+      
+      try {
+        await supabase.from("focus_active_sessions").update({ session: updatedSession }).eq("user_id", currentUser.id).throwOnError();
+      } catch (err) {}
+
       return; 
     }
 
@@ -785,7 +840,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     
     enterFocusMode();
 
-    if (acquireLock('focus_start_alert', 5000)) {
+    if (acquireLock(`focus_start_alert_${newSession.id}`, 5000)) {
       addNotification('focus', 'Deep Work Initiated', 'Distractions suppressed. Maintain your focus.', 'low', '/focus');
     }
 
@@ -794,7 +849,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         user_id: currentUser.id,
         session: newSession,
         last_seen: new Date().toISOString()
-      }).throwOnError();
+      }).throwOnError(); 
     } catch (err) {
       console.error("❌ Failed to start active session in DB:", err);
     }
@@ -821,9 +876,31 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         setMode: setModeHandler, 
         setActiveTask: setActiveTaskId,
         startSession, 
+        
         pauseSession: () => {
+          if (!currentSession || currentSession.pauseStartTime) return; 
+
+          const updatedSession = {
+            ...currentSession,
+            pauseStartTime: Date.now(),
+          };
+
+          setCurrentSession(updatedSession);
           setIsPaused(true);
-          if (acquireLock('focus_pause_alert', 5000)) {
+          localStorage.setItem("focus_active_session", JSON.stringify(updatedSession));
+          
+          if (currentUser?.id && supabase) {
+            // 🔥 FIXED: Wrapped the PostgrestBuilder execution in an async IIFE to await properly
+            (async () => {
+              try {
+                await supabase.from("focus_active_sessions").update({ session: updatedSession }).eq("user_id", currentUser.id).throwOnError();
+              } catch (e) {
+                console.error("Supabase pause error:", e);
+              }
+            })();
+          }
+
+          if (acquireLock(`focus_pause_alert_${updatedSession.id}`, 5000)) {
             addNotification('focus', 'Session Paused', 'Momentum halted. Return as soon as possible.', 'medium', '/focus');
           }
         }, 
@@ -831,27 +908,73 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         getElapsedTime,     
         getRemainingTime,
         getExtraTime,   
+
         addDistraction: (reason: string) => {
-          if (!currentSession) return;
-          const updatedSession = {
-            ...currentSession,
-            distractions: [...currentSession.distractions, { id: crypto.randomUUID(), reason, timestamp: Date.now() }],
-          };
-          setCurrentSession(updatedSession);
-          localStorage.setItem("focus_active_session", JSON.stringify(updatedSession));
-          
-          if (acquireLock('focus_distraction_alert', 2000)) {
-            addNotification('focus', 'Distraction Logged', 'Acknowledged. Now return your attention to the task immediately.', 'low', '/focus');
-          }
+          setCurrentSession((prev) => {
+            if (!prev) return prev;
+        
+            const updated = {
+              ...prev,
+              distractions: [
+                ...(prev.distractions || []),
+                {
+                  id: crypto.randomUUID(),
+                  reason,
+                  timestamp: Date.now(),
+                },
+              ],
+            };
+        
+            localStorage.setItem("focus_active_session", JSON.stringify(updated));
+            
+            if (currentUser?.id && supabase) {
+              // 🔥 FIXED: Wrapped in an async IIFE
+              (async () => {
+                try {
+                  await supabase.from("focus_active_sessions").update({ session: updated }).eq("user_id", currentUser.id).throwOnError();
+                } catch (e) {
+                  console.error("Supabase add distraction error:", e);
+                }
+              })();
+            }
+
+            if (acquireLock(`focus_distraction_alert_${updated.id}`, 2000)) {
+              addNotification(
+                'focus',
+                'Distraction Logged',
+                'Acknowledged. Now return your attention to the task immediately.',
+                'low',
+                '/focus'
+              );
+            }
+
+            return updated;
+          });
         },
         undoDistraction: () => {
-          if (!currentSession || !currentSession.distractions.length) return;
-          const updatedSession = {
-            ...currentSession,
-            distractions: currentSession.distractions.slice(0, -1),
-          };
-          setCurrentSession(updatedSession);
-          localStorage.setItem("focus_active_session", JSON.stringify(updatedSession));
+          setCurrentSession((prev) => {
+            if (!prev || !prev.distractions?.length) return prev;
+            
+            const updated = {
+              ...prev,
+              distractions: prev.distractions.slice(0, -1),
+            };
+            
+            localStorage.setItem("focus_active_session", JSON.stringify(updated));
+            
+            if (currentUser?.id && supabase) {
+              // 🔥 FIXED: Wrapped in an async IIFE
+              (async () => {
+                try {
+                  await supabase.from("focus_active_sessions").update({ session: updated }).eq("user_id", currentUser.id).throwOnError();
+                } catch (e) {
+                  console.error("Supabase undo distraction error:", e);
+                }
+              })();
+            }
+
+            return updated;
+          });
         },
       } as any}
     >

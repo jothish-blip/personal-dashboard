@@ -6,7 +6,7 @@ import TopProgressBar from "@/components/TopProgressBar";
 import OfflineView from "@/app/not-found/OfflineView";
 import PWARegistration from "@/components/PWARegistration";
 import ClientWrapper from "@/components/ClientWrapper";
-
+import ScrollRestoration from "@/app/refresh/ScrollRestoration";
 // 🔥 FIX: Correctly imported FocusProvider instead of useFocusSystem
 import { FocusProvider } from "../components/focus/useFocusSystem";
 
@@ -66,7 +66,7 @@ export default function RootLayout({
             </main>
           </ClientWrapper>
         </FocusProvider>
-
+          <ScrollRestoration />
       </body>
     </html>
   );
