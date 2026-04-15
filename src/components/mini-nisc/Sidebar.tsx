@@ -6,9 +6,13 @@ export default function Sidebar({ system }: any) {
   const { 
     folders, documents, activeFolderId, setActiveFolderId, activeTag, 
     setActiveTag, search, setSearch, setIsSidebarOpen, mediaCounts, 
-    visibleDocs, activeDocId, setActiveDocId, createFolder, createDocument, 
+    visibleDocs, globalSearchResults, 
+    activeDocId, setActiveDocId, createFolder, createDocument, 
     togglePin, deleteDocument, isSidebarOpen 
   } = system;
+
+  const isSearching = search.trim().length > 0;
+  const docsToShow = isSearching ? globalSearchResults : visibleDocs;
 
   return (
     <>
@@ -40,16 +44,16 @@ export default function Sidebar({ system }: any) {
           {/* Folders */}
           <div className="mb-8">
             <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3 px-2">Folders</div>
-            <div onClick={() => { setActiveFolderId(null); setActiveTag(null); setIsSidebarOpen(false); }} className={`px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-2 transition-colors relative overflow-hidden ${!activeFolderId && !activeTag ? 'bg-green-50 border border-green-200 text-green-700' : 'hover:bg-gray-100 text-gray-600 border border-transparent'}`}>
-              {!activeFolderId && !activeTag && <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500" />}
-              <FolderOpen size={16} className={!activeFolderId && !activeTag ? "text-green-600" : "text-gray-400"} /> 
+            <div onClick={() => { setActiveFolderId(null); setActiveTag(null); setSearch(""); setIsSidebarOpen(false); }} className={`px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-2 transition-colors relative overflow-hidden ${!activeFolderId && !activeTag && !isSearching ? 'bg-green-50 border border-green-200 text-green-700' : 'hover:bg-gray-100 text-gray-600 border border-transparent'}`}>
+              {!activeFolderId && !activeTag && !isSearching && <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500" />}
+              <FolderOpen size={16} className={!activeFolderId && !activeTag && !isSearching ? "text-green-600" : "text-gray-400"} /> 
               <span className="font-medium text-sm">All Documents</span>
             </div>
             {folders.map((folder: Folder) => {
               const count = mediaCounts[folder.id] || 0;
-              const isActive = activeFolderId === folder.id;
+              const isActive = activeFolderId === folder.id && !isSearching;
               return (
-                <div key={folder.id} onClick={() => { setActiveFolderId(folder.id); setActiveTag(null); setIsSidebarOpen(false); }} className={`px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-2 mt-1 transition-colors relative overflow-hidden ${isActive ? 'bg-green-50 border border-green-200 text-green-700' : 'hover:bg-gray-100 text-gray-600 border border-transparent'}`}>
+                <div key={folder.id} onClick={() => { setActiveFolderId(folder.id); setActiveTag(null); setSearch(""); setIsSidebarOpen(false); }} className={`px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-2 mt-1 transition-colors relative overflow-hidden ${isActive ? 'bg-green-50 border border-green-200 text-green-700' : 'hover:bg-gray-100 text-gray-600 border border-transparent'}`}>
                   {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500" />}
                   <FolderOpen size={16} className={isActive ? "text-green-600" : "text-gray-400"} />
                   <span className="font-medium text-sm">{folder.name}</span>
@@ -65,9 +69,9 @@ export default function Sidebar({ system }: any) {
             <div className="flex flex-wrap gap-2">
               {Array.from(new Set(documents.flatMap((d: Document) => d.tags || []))).map((tag: unknown) => {
                 const tagStr = tag as string;
-                const isActive = activeTag === tagStr;
+                const isActive = activeTag === tagStr && !isSearching;
                 return (
-                  <div key={tagStr} onClick={() => { setActiveTag(tagStr); setActiveFolderId(null); setIsSidebarOpen(false); }} className={`px-3 py-1.5 text-xs rounded-md cursor-pointer transition-colors flex items-center gap-1 font-semibold ${isActive ? 'bg-green-500 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  <div key={tagStr} onClick={() => { setActiveTag(tagStr); setActiveFolderId(null); setSearch(""); setIsSidebarOpen(false); }} className={`px-3 py-1.5 text-xs rounded-md cursor-pointer transition-colors flex items-center gap-1 font-semibold ${isActive ? 'bg-green-500 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                     <Tag size={12} /> #{tagStr}
                   </div>
                 );
@@ -77,11 +81,13 @@ export default function Sidebar({ system }: any) {
 
           {/* Documents List */}
           <div className="flex justify-between items-center mb-3 px-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Documents</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              {isSearching ? 'Search Results' : 'Documents'}
+            </span>
             <button onClick={() => createDocument(activeFolderId || undefined)} className="text-green-600 hover:text-green-700 transition-colors"><Plus size={16} /></button>
           </div>
           <div className="space-y-1">
-            {visibleDocs.map((doc: Document) => {
+            {docsToShow.map((doc: Document) => {
               const isActive = activeDocId === doc.id;
               return (
                 <div key={doc.id} onClick={() => { setActiveDocId(doc.id); setIsSidebarOpen(false); }} className={`group px-4 py-3 rounded-xl cursor-pointer flex items-center gap-3 transition-colors relative overflow-hidden ${isActive ? "bg-green-50 border border-green-200 text-green-700 shadow-md scale-[1.01]" : "hover:bg-gray-100 border border-transparent text-gray-600"}`}>
@@ -100,7 +106,15 @@ export default function Sidebar({ system }: any) {
                 </div>
               );
             })}
-            {visibleDocs.length === 0 && <div className="px-4 py-8 text-center text-sm font-medium text-gray-400">No documents in this folder.<br/>Create one to get started.</div>}
+            
+            {docsToShow.length === 0 && (
+              <div className="px-4 py-8 text-center text-sm font-medium text-gray-400">
+                {isSearching 
+                  ? `No results for "${search}"`
+                  : <>No documents in this folder.<br/>Create one to get started.</>
+                }
+              </div>
+            )}
           </div>
         </div>
       </aside>

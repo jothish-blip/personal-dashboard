@@ -9,17 +9,25 @@ export interface HistoryEntry {
   title?: string;
 }
 
+export interface LogEntry {
+  type: string;
+  timestamp: number;
+  meta?: any;
+}
+
 export interface Document {
   id: string;
   title: string;
   content: string;
-  folderId: string | null; // 🔥 Strict null for DB
+  folderId: string | null;
   tags: string[];
   pinned: boolean;
   history: HistoryEntry[];
+  logs?: LogEntry[]; 
   mediaIds: string[];
   createdAt: number;
   updatedAt: number;
+  deletedAt?: number;
   version: number;
 }
 
@@ -28,7 +36,7 @@ export interface Media {
   type: "image" | "video";
   url: string;
   name?: string;
-  folderId: string | null; // 🔥 Strict null for DB        
+  folderId: string | null;      
   createdAt: number;
 }
 
