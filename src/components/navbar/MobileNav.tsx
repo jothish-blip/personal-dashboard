@@ -40,7 +40,7 @@ const NAV_ITEMS = [
   { label: "Focus", icon: Brain, path: "/focus", key: "isFocus" },
   { label: "Planner", icon: CalendarDays, path: "/calender-event", key: "isCalendar" },
   { label: "Diary", icon: BookOpen, path: "/diary", key: "isDiary" },
-  { label: "Mini", icon: ListTodo, path: "/mini-nisc", key: "isMini" },
+  { label: "Workspace", icon: ListTodo, path: "/mini-nisc", key: "isMini" },
 ];
 
 export default function MobileNav(props: MobileNavProps) {
