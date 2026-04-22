@@ -155,14 +155,24 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     setIsSessionComplete(true);
   }, []);
 
+  // ✅ FIX 2 — FIX ELAPSED TIME (CRITICAL)
   const getElapsedTime = useCallback(() => {
     const session = currentSessionRef.current;
     if (!session) return 0;
-    
-    const now = session.pauseStartTime ? session.pauseStartTime : Date.now();
-    const pausedTime = session.totalPausedDuration || 0;
-    
-    return Math.floor((now - session.startTime - pausedTime) / 1000);
+  
+    const now = Date.now();
+    const pausedDuration = session.totalPausedDuration || 0;
+  
+    // if currently paused → freeze at pause start
+    const effectiveNow = session.pauseStartTime
+      ? session.pauseStartTime
+      : now;
+  
+    const elapsed = Math.floor(
+      (effectiveNow - session.startTime - pausedDuration) / 1000
+    );
+  
+    return Math.max(0, elapsed);
   }, []);
 
   const getRemainingTime = useCallback(() => {
@@ -632,13 +642,15 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }, 0);
   };
 
+  // ✅ FIX 4 — PREVENT FALSE ALARM TRIGGER
   useEffect(() => {
     if (
       isSessionComplete && 
       isActive && 
       !isPaused && 
       currentSession?.id && 
-      !playedSessionRef.current.has(currentSession.id)
+      !playedSessionRef.current.has(currentSession.id) &&
+      getRemainingTime() <= 0
     ) {
       
       playedSessionRef.current.add(currentSession.id);
@@ -702,12 +714,14 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         alarmTimeoutRef.current = null;
       }
     }
-  }, [isSessionComplete, isActive, isPaused, addNotification, currentSession]);
+  }, [isSessionComplete, isActive, isPaused, addNotification, currentSession, getRemainingTime]);
 
   useEffect(() => {
     const interval = setInterval(() => {
+      // ✅ FIX 6 — HARD GUARD IN INTERVAL
       if (!isActiveRef.current) return;
-      if (!isActiveRef.current || isPausedRef.current) return;
+      if (isPausedRef.current) return;
+      
       const session = currentSessionRef.current;
       if (!session) return;
 
@@ -725,7 +739,14 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
       localStorage.setItem("focus_active_session", JSON.stringify(session));
 
-      if (rem <= 0 && !session.completedAt && !isPausedRef.current) {
+      // ✅ FIX 1 — LOCK COMPLETION PROPERLY
+      const isActuallyComplete =
+        rem <= 0 &&
+        !session.completedAt &&
+        !isPausedRef.current &&
+        isActiveRef.current;
+
+      if (isActuallyComplete) {
         const now = Date.now();
         
         const updatedSession: ExtendedActiveSession = {
@@ -804,12 +825,15 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       const remoteSession = existing.session as ExtendedActiveSession;
       let updatedSession = { ...remoteSession };
 
+      // ✅ FIX 3 — FIX PAUSE RESUME BUG
       const pauseStart = remoteSession.pauseStartTime || currentSession?.pauseStartTime;
-      
+
       if (pauseStart) {
         const pausedDuration = Date.now() - pauseStart;
-        updatedSession.totalPausedDuration = 
-          (remoteSession.totalPausedDuration || currentSession?.totalPausedDuration || 0) + pausedDuration;
+
+        updatedSession.totalPausedDuration =
+          (remoteSession.totalPausedDuration || 0) + pausedDuration;
+
         updatedSession.pauseStartTime = undefined;
       }
 
@@ -897,9 +921,16 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         pauseSession: () => {
           if (!currentSession || currentSession.pauseStartTime) return; 
 
+          // ✅ FIX 5 — STOP ALARM ON PAUSE IMMEDIATELY
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+          }
+
           const updatedSession = {
             ...currentSession,
             pauseStartTime: Date.now(),
+            completedAt: undefined, // ✅ FIX 7 — RESET completedAt ON PAUSE
           };
 
           setCurrentSession(updatedSession);

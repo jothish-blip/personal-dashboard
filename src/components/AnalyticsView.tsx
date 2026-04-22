@@ -10,6 +10,18 @@ import SummaryCards from './analytics/SummaryCards';
 import InsightsPanel from './analytics/InsightsPanel';
 import ChartsGrid from './analytics/ChartsGrid';
 
+// Extend the type to safely include the new delta arrays, net performance, and card deltas
+type ExtendedFilteredData = Omit<FilteredData, 'stats'> & {
+  dailyDeltas: number[];
+  deltaTrend: number[];
+  netPerformance: number;
+  stats: FilteredData['stats'] & {
+    consistencyDelta: number;
+    activeDelta: number;
+    avgDelta: number;
+  };
+};
+
 export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Meta }) {
   const actualToday = getLocalDate(new Date());
   
@@ -20,7 +32,7 @@ export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Me
   const [targetGoal, setTargetGoal] = useState<number>(100);
 
   // --- Logic: Advanced Temporal Aggregation ---
-  const filteredData = useMemo<FilteredData>(() => {
+  const filteredData = useMemo<ExtendedFilteredData>(() => {
     let start: Date, end: Date;
     let prevStart: Date, prevEnd: Date;
 
@@ -80,7 +92,10 @@ export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Me
     const consistencyTrend: number[] = [];
     const weeklyPerformance: Record<string, number> = {};
 
-    rangeDates.forEach(dateStr => {
+    // True Daily Momentum Trend
+    const dailyDeltas: number[] = [];
+
+    rangeDates.forEach((dateStr) => {
       const d = new Date(dateStr);
       let dailyCount = 0;
       
@@ -89,6 +104,14 @@ export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Me
       });
 
       if (dailyCount === 0) zeroCount++;
+
+      // Daily Delta Calculation
+      const todayCount = tasks.filter(t => t.history?.[dateStr]).length;
+      const prevDate = new Date(dateStr);
+      prevDate.setDate(prevDate.getDate() - 1);
+      const prevStr = prevDate.toISOString().split("T")[0];
+      const prevCount = tasks.filter(t => t.history?.[prevStr]).length;
+      dailyDeltas.push(todayCount - prevCount);
 
       const firstDayOfMonth = new Date(d.getFullYear(), d.getMonth(), 1).getDay();
       const weekNum = Math.ceil((d.getDate() + firstDayOfMonth) / 7);
@@ -101,6 +124,9 @@ export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Me
       weekdayTotals[isoDay] += tasks.length;
       weekdayMisses[isoDay] += (tasks.length - dailyCount);
     });
+
+    // Net Performance
+    const netPerformance = dailyDeltas.reduce((acc, d) => acc + d, 0);
 
     if (filterType === 'month') {
       timelineLabels = rangeDates.map(d => d.slice(8));
@@ -127,7 +153,6 @@ export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Me
 
     const totalCompletions = taskTotals.reduce((a, b) => a + b, 0);
     const delta = totalCompletions - prevTotalCompletions;
-    const activeDays = volumeData.filter(v => v > 0).length;
     
     const peakVolume = Math.max(...(volumeData.length ? volumeData : [0]));
     const peakIndex = volumeData.indexOf(peakVolume);
@@ -136,7 +161,25 @@ export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Me
     
     const totalPossible = rangeDates.length * (tasks.length || 1);
     const consistencyPercent = totalPossible === 0 ? 0 : Math.round((totalCompletions / totalPossible) * 100);
-    const avgPerDay = rangeDates.length ? Math.round((totalCompletions / rangeDates.length) * 10) / 10 : 0;
+    
+    // Fix Avg/Day logic to only count active days
+    const activeDays = rangeDates.filter(date =>
+      tasks.some(t => t.history?.[date])
+    ).length;
+    
+    const avgPerDay = activeDays === 0
+      ? 0
+      : Math.round((totalCompletions / activeDays) * 10) / 10;
+
+    // 🔥 FIX: Calculate PREVIOUS range metrics to generate real deltas for the SummaryCards
+    const prevActiveDays = prevRangeDates.filter(date => tasks.some(t => t.history?.[date])).length;
+    const prevAvgPerDay = prevActiveDays === 0 ? 0 : Math.round((prevTotalCompletions / prevActiveDays) * 10) / 10;
+    const prevTotalPossible = prevRangeDates.length * (tasks.length || 1);
+    const prevConsistencyPercent = prevTotalPossible === 0 ? 0 : Math.round((prevTotalCompletions / prevTotalPossible) * 100);
+
+    const consistencyDelta = consistencyPercent - prevConsistencyPercent;
+    const activeDelta = activeDays - prevActiveDays;
+    const avgDelta = Math.round((avgPerDay - prevAvgPerDay) * 10) / 10;
 
     let worstDayIdx = 0;
     let worstMissRate = 0;
@@ -157,26 +200,64 @@ export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Me
     const cumulativeTarget = volumeData.map((_, i) => Math.round((targetGoal / volumeData.length) * (i + 1)));
 
     return {
-      labels: tasks.map(t => t.name), taskTotals, volumeData, timelineLabels, consistencyTrend,
+      labels: tasks.map(t => t.name), 
+      taskTotals, 
+      volumeData, 
+      timelineLabels, 
+      consistencyTrend,
       weeklyPerformance: { labels: Object.keys(weeklyPerformance), values: Object.values(weeklyPerformance) },
-      cumulativeActual, cumulativeTarget,
-      stats: { totalCompletions, delta, activeDays, peakVolume, peakText, consistencyPercent, avgPerDay, worstDayInsight, zeroDays: zeroCount }
-    };
+      cumulativeActual, 
+      cumulativeTarget,
+      dailyDeltas,
+      deltaTrend: dailyDeltas, // Map for downstream charts
+      netPerformance,
+      stats: { 
+        totalCompletions, 
+        delta, 
+        activeDays, 
+        peakVolume, 
+        peakText, 
+        consistencyPercent, 
+        avgPerDay, 
+        worstDayInsight, 
+        zeroDays: zeroCount,
+        consistencyDelta, // Added
+        activeDelta,      // Added
+        avgDelta          // Added
+      }
+    } as ExtendedFilteredData;
   }, [tasks, filterType, selectedMonth, selectedYear, customRange, targetGoal]);
 
+  // Safely compute momentum
   const momentum = useMemo(() => {
+    if (!tasks.length) return 0;
+
     const todayCount = tasks.filter(t => t.history?.[actualToday]).length;
     const d = new Date(actualToday);
     d.setDate(d.getDate() - 1);
-    const yesterdayCount = tasks.filter(t => t.history?.[getLocalDate(d)]).length;
+    const yesterday = getLocalDate(d);
+    const yesterdayCount = tasks.filter(t => t.history?.[yesterday]).length;
+
     return todayCount - yesterdayCount;
   }, [tasks, actualToday]);
 
-  const anomaly = momentum < 0 && filteredData.stats.consistencyPercent < 50
-    ? "Performance drop detected. Intervention required."
-    : filteredData.stats.zeroDays > 2
-    ? "Execution gaps increasing. Chain is breaking."
-    : null;
+  // True System Status based on Momentum
+  const systemStatus = useMemo(() => {
+    if (momentum < 0) return "Degrading";
+    if (momentum > 0) return "Improving";
+    return "Stable";
+  }, [momentum]);
+
+  // Strong Anomaly Detection using real Daily Deltas
+  const anomaly = useMemo(() => {
+    const recentDrop = filteredData.dailyDeltas.slice(-3).every(d => d < 0) && filteredData.dailyDeltas.length >= 3;
+
+    if (recentDrop) return "3-day performance drop detected.";
+    if (filteredData.stats.zeroDays >= 3) return "Multiple inactivity days detected.";
+    if (momentum < 0) return "Recent performance decline.";
+
+    return null;
+  }, [filteredData.dailyDeltas, filteredData.stats.zeroDays, momentum]);
 
   const loadLevel = filteredData.stats.avgPerDay > tasks.length * 0.7 ? "High" :
                     filteredData.stats.avgPerDay > tasks.length * 0.4 ? "Moderate" : "Low";
@@ -188,14 +269,32 @@ export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Me
         {/* 1. SYSTEM STATUS BAR */}
         <div className="bg-white border border-gray-200 rounded-xl p-4 flex justify-between items-center shadow-sm">
           <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full shadow-inner ${filteredData.stats.consistencyPercent >= 70 ? 'bg-green-500' : filteredData.stats.consistencyPercent >= 40 ? 'bg-orange-500' : 'bg-red-500'}`} />
+            <div className={`w-3 h-3 rounded-full shadow-inner ${
+              systemStatus === "Improving" ? "bg-green-500" :
+              systemStatus === "Degrading" ? "bg-red-500" :
+              "bg-gray-400"
+            }`} />
             <span className="text-sm font-bold text-gray-800">
-              {filteredData.stats.consistencyPercent >= 70 ? "System Stable" : filteredData.stats.consistencyPercent >= 40 ? "System Fluctuating" : "System Degrading"}
+              {systemStatus === "Improving" && "System Improving"}
+              {systemStatus === "Degrading" && "System Dropping"}
+              {systemStatus === "Stable" && "System Stable"}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <Clock size={12} className="text-gray-400" />
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Updated just now</span>
+          
+          <div className="flex items-center gap-4">
+            {/* NET PERFORMANCE BADGE */}
+            <div className={`text-[11px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border ${
+              filteredData.netPerformance > 0 ? "bg-green-50 text-green-600 border-green-200" :
+              filteredData.netPerformance < 0 ? "bg-red-50 text-red-600 border-red-200" :
+              "bg-gray-50 text-gray-500 border-gray-200"
+            }`}>
+              Net: {filteredData.netPerformance > 0 ? `+${filteredData.netPerformance}` : filteredData.netPerformance}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Clock size={12} className="text-gray-400" />
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Updated just now</span>
+            </div>
           </div>
         </div>
 
@@ -214,13 +313,14 @@ export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Me
           customRange={customRange} setCustomRange={setCustomRange}
         />
 
-        {/* 4. SUMMARY METRICS (🔥 FIXED: Passed momentum prop) */}
+        {/* 4. SUMMARY METRICS */}
         <SummaryCards stats={filteredData.stats} momentum={momentum} />
 
         {/* 5. INSIGHT & FOCUS TARGET */}
         <InsightsPanel stats={filteredData.stats} momentum={momentum} loadLevel={loadLevel as 'High' | 'Moderate' | 'Low'} />
 
         {/* 6. PRIMARY CHARTS GRID */}
+        {/* Pass filteredData which now contains the deltaTrend specifically for charting */}
         <ChartsGrid data={filteredData} targetGoal={targetGoal} setTargetGoal={setTargetGoal} />
         
       </div>

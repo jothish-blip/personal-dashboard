@@ -8,6 +8,7 @@ import {
   Thermometer, MessageSquare, Fingerprint
 } from 'lucide-react';
 import { Task, Meta } from '../types';
+import { getSupabaseClient } from "@/lib/supabase";
 
 import { getLocalDate, getISODay, calculateBestStreak } from './stats/utils';
 import OnboardingFlow from './stats/OnboardingFlow';
@@ -51,6 +52,7 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activePreset, setActivePreset] = useState<number>(30);
   const [targetGoal, setTargetGoal] = useState<number>(100);
+  const [dailyStats, setDailyStats] = useState<any[]>([]);
   
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -72,6 +74,27 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
   }, []);
 
   const handleInitialize = () => setShowOnboarding(false);
+
+  // 🔹 FETCH DB STATS
+  useEffect(() => {
+    const fetchStats = async () => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("daily_stats")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("date", { ascending: true });
+
+      setDailyStats(data || []);
+    };
+
+    fetchStats();
+  }, [tasks]); // Re-fetch when tasks update so UI stays fresh
 
   const applyPreset = (days: number) => {
     const end = getLocalDate(new Date());
@@ -107,11 +130,26 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
       });
       if (dailyCount === 0) zeroCount++;
       dayCounts[dateStr] = dailyCount;
+
+      const prevDate = new Date(dateStr);
+      prevDate.setDate(prevDate.getDate() - 1);
+      const prevStr = getLocalDate(prevDate);
+      const prevCount = tasks.filter(t => t.history?.[prevStr]).length;
+      const delta = dailyCount - prevCount;
       
+      const intensity = tasks.length === 0 ? 0 : dailyCount / tasks.length;
+      
+      let mappedColor = "bg-green-600";
+      if (dailyCount === 0) mappedColor = "bg-red-200";
+      else if (intensity < 0.4) mappedColor = "bg-red-400";
+      else if (intensity < 0.7) mappedColor = "bg-green-300";
+
       return { 
         date: dateStr, 
         count: dailyCount, 
-        intensity: tasks.length === 0 ? 0 : dailyCount / tasks.length,
+        delta,
+        intensity,
+        color: mappedColor,
         jitter: (dateStr.charCodeAt(dateStr.length - 1) % 3)
       };
     });
@@ -135,14 +173,7 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
     };
   }, [rangeDates, tasks]);
 
-  const momentum = useMemo(() => {
-    const todayCount = tasks.filter(t => t.history?.[actualToday]).length;
-    const d = new Date(actualToday);
-    d.setDate(d.getDate() - 1);
-    const yesterdayCount = tasks.filter(t => t.history?.[getLocalDate(d)]).length;
-    return todayCount - yesterdayCount;
-  }, [tasks, actualToday]);
-
+  // --- MOMENTUM & STREAKS ---
   const currentStreak = useMemo(() => {
     let streak = 0;
     const d = new Date(actualToday);
@@ -164,8 +195,61 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
     return streak;
   }, [tasks, actualToday]);
 
-  // --- REFINED INTELLIGENCE LOGIC ---
+  // --- DB BACKED DELTA CALCULATIONS ---
+  const yesterday = new Date(actualToday);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yStr = getLocalDate(yesterday);
 
+  // Derive Momentum from DB
+  const momentum = useMemo(() => {
+    if (dailyStats.length === 0) {
+      // Fallback local calc if DB loading
+      const tCount = tasks.filter(t => t.history?.[actualToday]).length;
+      const yCount = tasks.filter(t => t.history?.[yStr]).length;
+      return tCount - yCount;
+    }
+    
+    const todayStat = dailyStats.find(s => s.date === actualToday);
+    const yesterdayStat = dailyStats.find(s => s.date === yStr);
+
+    const tScore = todayStat ? todayStat.score : 0;
+    const yScore = yesterdayStat ? yesterdayStat.score : 0;
+
+    return tScore - yScore;
+  }, [dailyStats, tasks, actualToday, yStr]);
+
+  const avgDelta = momentum; // Functionally matches delta for UI
+
+  const consistencyDelta = useMemo(() => {
+    const getConsistencyForDate = (dateStr: string) => {
+      const dates = rangeDates.filter(d => d <= dateStr);
+      const activeDays = dates.filter(date =>
+        tasks.some(t => t.history?.[date])
+      ).length;
+      return dates.length === 0 ? 0 : Math.round((activeDays / dates.length) * 100);
+    };
+
+    const todayValue = getConsistencyForDate(actualToday);
+    const yesterdayValue = getConsistencyForDate(yStr);
+
+    return todayValue - yesterdayValue;
+  }, [tasks, actualToday, yStr, rangeDates]);
+
+  // Use DB data strictly to calculate Discipline Difference
+  const disciplineDelta = useMemo(() => {
+    if (dailyStats.length < 2) return momentum * 5; // Loading fallback
+
+    const todayStat = dailyStats.find(s => s.date === actualToday);
+    const yesterdayStat = dailyStats.find(s => s.date === yStr);
+
+    const tScore = todayStat ? todayStat.score : 0;
+    const yScore = yesterdayStat ? yesterdayStat.score : 0;
+
+    return tScore - yScore;
+  }, [dailyStats, actualToday, yStr, momentum]);
+
+
+  // --- REFINED INTELLIGENCE LOGIC ---
   const disciplineScore = useMemo(() => {
     let score = 0;
     score += consistencyPercent * 0.6;
@@ -173,6 +257,12 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
     score += momentum > 0 ? 10 : momentum < 0 ? -5 : 5;
     return Math.max(0, Math.min(100, Math.round(score)));
   }, [consistencyPercent, zeroDays, momentum]);
+
+  const getDisciplineColor = (score: number) => {
+    if (score >= 70) return "bg-green-50 text-green-600 border-green-200";
+    if (score <= 40) return "bg-red-50 text-red-600 border-red-200";
+    return "bg-gray-50 text-gray-600 border-gray-200";
+  };
 
   const riskScore = useMemo(() => {
     if (disciplineScore < 40) return 'High';
@@ -193,22 +283,25 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
     return "Stable Load";
   }, [avgPerActiveDay, momentum]);
 
+  const motivationBg = useMemo(() => {
+    if (momentum > 0) return "from-green-500 to-emerald-600";
+    if (momentum < 0) return "from-red-500 to-rose-600";
+    return "from-orange-500 to-amber-600";
+  }, [momentum]);
+
   const motivation = useMemo(() => {
     const hour = new Date().getHours();
 
-    // --- TIME CONTEXT ---
     let timeContext = "";
     if (hour < 12) timeContext = "morning";
     else if (hour < 18) timeContext = "afternoon";
     else timeContext = "night";
 
-    // --- PERFORMANCE STATE ---
     const isStruggling = zeroDays > 2 || consistencyPercent < 50;
     const isDropping = momentum < 0;
     const isStrong = consistencyPercent > 80 && momentum >= 0;
     const isBurningOut = avgPerActiveDay > 7 && momentum < 0;
 
-    // --- STREAK CONTEXT ---
     if (currentStreak >= 7 && !isBurningOut) {
         return timeContext === "morning"
           ? `Protect the ${currentStreak}-day streak. Start strong.`
@@ -221,7 +314,6 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
            : "Zero streak detected. Execute a single task to reboot the system.";
     }
 
-    // --- MOTIVATION ENGINE ---
     if (isBurningOut) {
       return timeContext === "night"
         ? "High load detected. Initiate recovery protocols. Rest is part of discipline."
@@ -267,6 +359,8 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
   }, [momentum, consistencyPercent]);
 
   const goalProgress = Math.min(Math.round((totalReps / targetGoal) * 100), 100);
+  const progressColor = goalProgress >= 100 ? "bg-green-500" : goalProgress < 50 ? "bg-red-500" : "bg-orange-500";
+  const progressTextColor = goalProgress >= 100 ? "text-green-500" : goalProgress < 50 ? "text-red-500" : "text-orange-500";
 
   return (
     <div className="flex-1 p-4 md:p-8 max-w-[1200px] mx-auto w-full flex flex-col gap-8 pb-24 relative bg-white text-gray-900 selection:bg-gray-200">
@@ -279,12 +373,19 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-gray-900 tracking-tight">Performance Intelligence</h1>
-              <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-50 border border-gray-200 ${momentum >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${momentum > 0 ? 'text-green-500 bg-green-50 border-green-200' : momentum < 0 ? 'text-red-500 bg-red-50 border-red-200' : 'text-gray-400 bg-gray-50 border-gray-200'}`}>
                 {momentum > 0 ? <ChevronUp size={12}/> : momentum < 0 ? <ChevronDown size={12}/> : <Minus size={12}/>}
-                {momentum !== 0 ? Math.abs(momentum) : 'Stable'}
+                {momentum > 0 && `+${momentum}`}
+                {momentum < 0 && `${momentum}`}
+                {momentum === 0 && `0`}
               </div>
             </div>
             <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-widest font-bold">Diagnostic Engine v2.0</p>
+            <p className={`text-[11px] font-semibold mt-1 ${momentum > 0 ? 'text-green-600' : momentum < 0 ? 'text-red-600' : 'text-gray-500'}`}>
+              {momentum > 0 && `You scored ${momentum} points higher than yesterday.`}
+              {momentum < 0 && `You scored ${Math.abs(momentum)} points lower than yesterday.`}
+              {momentum === 0 && `Stable performance output.`}
+            </p>
           </div>
           <div className="flex gap-2 bg-gray-100 p-1 rounded-xl border border-gray-200">
             {presets.map(p => (
@@ -302,7 +403,7 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
         {/* SYSTEM STATUS STRIP */}
         <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-gray-500 flex justify-between items-center">
           <span className="flex items-center gap-2"><Fingerprint size={12}/> System Status</span>
-          <span className={`${disciplineScore > 70 ? "text-green-500" : "text-orange-500"}`}>
+          <span className={`${disciplineScore > 70 ? "text-green-500" : "text-red-500"}`}>
             {disciplineScore > 70 ? "Optimized" : "Needs Stabilization"}
           </span>
         </div>
@@ -314,12 +415,12 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           
           {/* Motivation - PRIMARY */}
-          <div className="md:col-span-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-[24px] p-6 text-white shadow-md flex items-center gap-4 hover:shadow-lg transition-all duration-200 group relative overflow-hidden">
+          <div className={`md:col-span-2 bg-gradient-to-r ${motivationBg} rounded-[24px] p-6 text-white shadow-md flex items-center gap-4 hover:shadow-lg transition-all duration-200 group relative overflow-hidden`}>
             <div className="bg-white/20 border border-white/10 p-3 rounded-2xl group-hover:rotate-12 transition-transform z-10 backdrop-blur-sm">
                 <Sparkles size={24} className="text-white" />
             </div>
             <div className="z-10">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-blue-100 mb-1">Current Directive</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/80 mb-1">Current Directive</p>
                 <p className="text-lg font-semibold leading-snug">{motivation}</p>
             </div>
           </div>
@@ -331,10 +432,8 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
               <p className="text-4xl font-black text-gray-900 leading-none">{disciplineScore}</p>
               <p className="text-sm font-bold text-gray-400">/ 100</p>
             </div>
-            <div className={`mt-3 inline-block w-max text-[10px] font-black px-2 py-0.5 rounded-md border ${
-              disciplineScore > 80 ? "bg-green-50 text-green-600 border-green-200" : "bg-blue-50 text-blue-600 border-blue-200"
-            }`}>
-              {disciplineScore > 80 ? "ELITE" : disciplineScore > 50 ? "STABLE" : "AT RISK"}
+            <div className={`mt-3 inline-block w-max text-[10px] font-black px-2 py-0.5 rounded-md border ${getDisciplineColor(disciplineScore)}`}>
+              {disciplineScore >= 70 ? "ELITE" : disciplineScore <= 40 ? "AT RISK" : "STABLE"}
             </div>
           </div>
         </div>
@@ -377,7 +476,11 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
 
       <Metrics 
         consistencyPercent={consistencyPercent} 
+        consistencyDelta={consistencyDelta}
         avgPerDay={avgPerActiveDay} 
+        avgDelta={avgDelta}
+        disciplineScore={disciplineScore}
+        disciplineDelta={disciplineDelta}
         momentum={momentum} 
         bestStreak={calculateBestStreak(tasks)} 
         currentGlobalStreak={currentStreak} 
@@ -411,14 +514,14 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
               <span className="text-3xl font-black text-gray-900">{totalReps}</span>
               <span className="text-sm font-bold text-gray-400">/ {targetGoal}</span>
             </div>
-            <div className={`text-lg font-bold ${goalProgress >= 100 ? "text-green-500" : "text-blue-500"}`}>
+            <div className={`text-lg font-bold ${progressTextColor}`}>
               {goalProgress}%
             </div>
           </div>
 
           <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden border border-gray-200">
             <div
-              className={`h-full rounded-full transition-all duration-1000 ease-out ${goalProgress >= 100 ? "bg-green-500" : "bg-blue-500"}`}
+              className={`h-full rounded-full transition-all duration-1000 ease-out ${progressColor}`}
               style={{ width: `${goalProgress}%` }}
             />
           </div>
@@ -457,18 +560,23 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
               <BarChart3 size={14} className="mr-2"/> Output Trend
             </h3>
           </div>
-          <div className="flex items-end gap-[6px] h-24 w-full px-6 overflow-hidden">
+          <div className="flex items-end gap-[6px] h-28 w-full px-6 overflow-hidden pt-4">
             {heatmapData.slice(-14).map((d, i) => (
               <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group relative">
                 <div
-                  title={`${d.date}: ${d.count} tasks`}
+                  title={`${d.date}\nTasks: ${d.count}\nChange: ${d.delta > 0 ? '+' + d.delta : d.delta}`}
                   className={`w-full max-w-[12px] rounded-t-sm transition-all duration-300 cursor-pointer ${
-                    d.intensity === 0 ? "bg-gray-100" : 
-                    d.intensity < 0.4 ? "bg-gray-300" : 
-                    d.intensity < 0.7 ? "bg-blue-400" : "bg-blue-600"
+                    d.intensity === 0 ? "bg-red-200" : 
+                    d.intensity < 0.4 ? "bg-red-400" : 
+                    d.intensity < 0.7 ? "bg-green-400" : "bg-green-600"
                   }`}
                   style={{ height: `${Math.max(10, (d.intensity * 100) + d.jitter)}%` }}
                 />
+                {d.delta !== 0 && (
+                  <span className={`text-[8px] font-bold mt-1 ${d.delta > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {d.delta > 0 ? `+${d.delta}` : d.delta}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -495,7 +603,7 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
                         style={{ bottom: `${Math.max(15, value)}%`, width: "100%", transform: `rotate(${Math.atan2(nextValue - value, 100) * (180 / Math.PI)}deg)` }}
                       />
                     )}
-                    <div className="absolute w-2 h-2 bg-blue-500 rounded-full z-10 shadow-sm border border-white" style={{ bottom: `${Math.max(15, value)}%`, transform: 'translateY(50%)' }} />
+                    <div className={`absolute w-2 h-2 rounded-full z-10 shadow-sm border border-white ${value >= 50 ? "bg-green-500" : "bg-red-500"}`} style={{ bottom: `${Math.max(15, value)}%`, transform: 'translateY(50%)' }} />
                   </div>
                 );
               })}
