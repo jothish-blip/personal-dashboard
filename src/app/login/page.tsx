@@ -21,6 +21,7 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const supabase = getSupabaseClient();
   
+  const [checkingSession, setCheckingSession] = useState(true);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -32,26 +33,31 @@ function LoginContent() {
     }
   }, [searchParams]);
 
-  // Session State Awareness
+  // Session State Awareness (Fixed Flicker)
   useEffect(() => {
     const checkUser = async () => {
+      if (!supabase) {
+        setCheckingSession(false);
+        return;
+      }
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         router.replace("/"); 
+      } else {
+        setCheckingSession(false);
       }
     };
     checkUser();
   }, [router, supabase]);
 
   const handleSocialLogin = async (provider: string) => {
-    if (loadingProvider) return; 
+    if (loadingProvider || !supabase) return; 
     
     setLoadingProvider(provider);
     setError("");
     setSuccessMsg("");
     
     try {
-      // FIX: Destructure the error object as authError
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: provider as any,
         options: {
@@ -69,6 +75,18 @@ function LoginContent() {
       setLoadingProvider(null);
     }
   };
+
+  // Prevent silent crashes if environment variables are missing
+  if (!supabase) return null;
+
+  // Block UI rendering until session is checked to prevent flicker
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
+        <Loader2 className="w-8 h-8 text-gray-900 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-[#FAFAFA] text-gray-900 relative overflow-hidden selection:bg-indigo-100">

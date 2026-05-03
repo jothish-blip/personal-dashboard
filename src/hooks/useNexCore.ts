@@ -34,10 +34,7 @@ const checkMomentum = (tasks: Task[], dateStr: string) => {
 };
 
 export function useNexCore() {
-  // 🔹 AUTH STATE
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-
-  // 🔹 NOTIFICATION SYSTEM
   const { addNotification } = useNotificationSystem(currentUser?.id);
 
   const [state, setState] = useState<NexState>({
@@ -78,12 +75,10 @@ export function useNexCore() {
     }
   };
 
-  // 🔹 LOGGING ENGINE
   const logAction = (action: string, name: string, detail: string, currentState: NexState): Log[] => {
     return [{ id: crypto.randomUUID(), time: new Date().toISOString(), action, name, detail }, ...currentState.logs].slice(0, 100);
   };
 
-  // 🔹 OFFLINE QUEUE SYSTEM
   const addToQueue = (action: QueueAction) => {
     const queue: QueueAction[] = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]");
     queue.push({ ...action, retryCount: 0 });
@@ -107,10 +102,7 @@ export function useNexCore() {
       const action = queue[i];
       action.retryCount = (action.retryCount || 0) + 1;
 
-      if (action.retryCount > 3) {
-        console.warn("Action failed 3 times, dropping from queue:", action);
-        continue;
-      }
+      if (action.retryCount > 3) continue;
 
       try {
         const table = supabase.from("tasks") as any;
@@ -128,7 +120,6 @@ export function useNexCore() {
           if (error) throw error;
         }
       } catch (e) {
-        console.error("Queue processing error:", e);
         remainingQueue.push(action);
         continue; 
       }
@@ -143,7 +134,6 @@ export function useNexCore() {
     setIsSyncing(false);
   };
 
-  // 🔹 DAILY STATS ENGINE (NEW)
   const storeDailyStats = async (tasks: Task[], userId: string) => {
     const supabase = getSupabaseClient();
     if (!supabase) return;
@@ -157,15 +147,25 @@ export function useNexCore() {
 
     const total = tasks.length;
     const missed = total - completed;
-    const score = completed - missed;
+    
+    const efficiency = total === 0 ? 0 : completed / total;
+    let score = 0;
+    
+    if (efficiency === 1) score = 15;
+    else if (efficiency >= 0.7) score = 8;
+    else if (efficiency >= 0.4) score = 2;
+    else score = -15;
 
-    // Using UPSERT to ensure the score updates live as tasks are checked off throughout the day
+    const is_missed = completed === 0 && total > 0;
+    if (is_missed) score = -20;
+
     await supabase.from("daily_stats").upsert({
       user_id: userId,
       date: today,
       completed,
       missed,
-      score
+      score,
+      is_missed
     }, { onConflict: 'user_id, date' });
   };
 
@@ -181,42 +181,57 @@ export function useNexCore() {
       .limit(1)
       .maybeSingle();
 
-    if (!lastEntry) return;
-
     const todayStr = getTodayLocal();
     const todayDate = new Date(todayStr);
-    const lastDate = new Date(lastEntry.date);
 
-    const d = new Date(lastDate);
+    let startDate = lastEntry ? new Date(lastEntry.date) : null;
+
+    if (!startDate) {
+      startDate = new Date(todayDate);
+      startDate.setDate(startDate.getDate() - 1);
+    }
+
+    const d = new Date(startDate);
     d.setDate(d.getDate() + 1);
 
     const missingEntries = [];
 
-    while (d < todayDate) {
+    while (d <= todayDate) {
       const dateStr = d.toISOString().split("T")[0];
-      if (dateStr === todayStr) break;
 
       const total = tasks.length;
-      const missed = total; // User did not log in, 100% missed
-      const score = -missed;
+      const completed = tasks.filter(t => t.history?.[dateStr]).length;
+      const missed = total - completed;
+      
+      const efficiency = total === 0 ? 0 : completed / total;
+      let score = 0;
+      if (efficiency === 1) score = 15;
+      else if (efficiency >= 0.7) score = 8;
+      else if (efficiency >= 0.4) score = 2;
+      else score = -15;
+
+      const is_missed = completed === 0 && total > 0;
+      if (is_missed) score = -20;
 
       missingEntries.push({
         user_id: userId,
         date: dateStr,
-        completed: 0,
+        completed,
         missed,
-        score
+        score,
+        is_missed
       });
 
       d.setDate(d.getDate() + 1);
     }
 
     if (missingEntries.length > 0) {
-      await supabase.from("daily_stats").insert(missingEntries);
+      await supabase.from("daily_stats").upsert(missingEntries, {
+        onConflict: "user_id, date"
+      });
     }
   };
 
-  // 🔹 DB FETCH LOGIC
   const fetchTasksFromDB = async () => {
     const user = userRef.current;
     if (!user) return;
@@ -232,24 +247,24 @@ export function useNexCore() {
       return;
     }
 
+    const newTasks = (data as any[] || []).map(t => ({
+      id: t.id,
+      name: t.name,
+      group: t.group_name,
+      history: t.history || {}
+    }));
+
     setState(prev => {
-      const newTasks = (data as any[] || []).map(t => ({
-        id: t.id,
-        name: t.name,
-        group: t.group_name,
-        history: t.history || {}
-      }));
-      
       const newState = { ...prev, tasks: newTasks };
       debouncedSave(KEY, newState);
       return newState;
     });
 
-    // Run backfill sequence after tasks load
-    backfillMissedDays(data || [], user.id);
+    // Run backfill AND instantly sync today's actual score so UI reflects reality immediately
+    await backfillMissedDays(newTasks, user.id);
+    await storeDailyStats(newTasks, user.id); 
   };
 
-  // 🔹 REALTIME ENGINE
   const setupRealtime = () => {
     const user = userRef.current;
     if (!user) return null; 
@@ -274,7 +289,6 @@ export function useNexCore() {
 
     channel.subscribe((status: any) => {
       if (status === 'SUBSCRIBED') {
-        console.log("Realtime connected.");
         fetchTasksFromDB(); 
       }
     });
@@ -287,15 +301,11 @@ export function useNexCore() {
     return cleanup;
   };
 
-  // 🔹 AUTHENTICATION STATE LISTENER
   useEffect(() => {
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      console.error("Supabase client is null. Check environment variables.");
-      return; 
-    }
+    if (!supabase) return; 
 
-    const handleAuthChange = (session: Session | null) => {
+    const handleAuthChange = async (session: Session | null) => {
       const newUser = session?.user ?? null;
       
       if (newUser?.id !== userRef.current?.id) {
@@ -303,7 +313,7 @@ export function useNexCore() {
         setCurrentUser(newUser); 
         
         if (newUser) {
-          fetchTasksFromDB();
+          await fetchTasksFromDB();
           setupRealtime(); 
         } else {
           if (cleanupRef.current) cleanupRef.current();
@@ -313,20 +323,16 @@ export function useNexCore() {
     };
 
     supabase.auth.getSession().then((res: { data: { session: Session | null } }) => {
-      const session = res.data.session;
-      handleAuthChange(session);
+      handleAuthChange(res.data.session);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       handleAuthChange(session);
     });
 
-    return () => {
-      listener?.subscription?.unsubscribe();
-    };
+    return () => listener?.subscription?.unsubscribe();
   }, []);
 
-  // 🔹 INITIAL LOAD & EVENT LISTENERS
   useEffect(() => {
     const init = async () => {
       if (typeof window === "undefined") return;
@@ -358,15 +364,9 @@ export function useNexCore() {
       processQueue();
       fetchTasksFromDB();
     };
-
-    const handleOffline = () => {
-      addNotification("system", "Offline", "No internet connection. Actions will be queued.", "high");
-    };
-
+    const handleOffline = () => addNotification("system", "Offline", "No internet connection. Actions will be queued.", "high");
     const handleFocus = () => fetchTasksFromDB();
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") fetchTasksFromDB();
-    };
+    const handleVisibility = () => { if (document.visibilityState === "visible") fetchTasksFromDB(); };
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
@@ -382,7 +382,6 @@ export function useNexCore() {
     };
   }, []);
 
-  // 🔹 PERIODIC SYNC & STATS INTERVAL
   useEffect(() => {
     const interval = setInterval(() => {
       if (navigator.onLine && userRef.current) {
@@ -390,12 +389,11 @@ export function useNexCore() {
         fetchTasksFromDB(); 
         storeDailyStats(state.tasks, userRef.current.id); 
       }
-    }, 30000); // Trigger every 30 seconds as requested
+    }, 30000); 
 
     return () => clearInterval(interval);
   }, [state.tasks, addNotification]);
 
-  // 🔹 ACTIONS
   const addTask = async (name: string, group: string) => {
     if (!name.trim()) return;
     
@@ -411,7 +409,6 @@ export function useNexCore() {
 
     setState(prev => {
       if (prev.tasks.some(t => t.id === newId)) return prev;
-
       const newState = {
         ...prev,
         tasks: [...prev.tasks, { id: newId, name: name.trim(), group: groupName, history: {} }],
@@ -430,8 +427,6 @@ export function useNexCore() {
 
     const { error } = await (supabase.from("tasks") as any).insert(newTaskDB);
     if (error) {
-      console.error("Insert error:", error);
-      addNotification("system", "Sync Error", "Failed to save to cloud. Queued.", "high");
       addToQueue({ type: "ADD", payload: newTaskDB });
     }
   };
@@ -466,6 +461,7 @@ export function useNexCore() {
     });
     
     if (status) handleTaskUpdate(addNotification, updatedTasksArray, dateStr); 
+    storeDailyStats(updatedTasksArray, user.id); 
 
     const supabase = getSupabaseClient();
 
@@ -476,7 +472,6 @@ export function useNexCore() {
 
     const { error } = await (supabase.from("tasks") as any).update({ history: updatedHistory }).eq("id", id);
     if (error) {
-      addNotification("system", "Sync Error", "Failed to sync checkmark. Queued.", "high");
       addToQueue({ type: "UPDATE", id, payload: { history: updatedHistory } });
     }
   };
@@ -485,10 +480,7 @@ export function useNexCore() {
     if (!window.confirm("Delete objective?")) return;
     
     const user = userRef.current;
-    if (!user) {
-      addNotification("system", "Auth Error", "User not ready. Try again.", "high");
-      return;
-    }
+    if (!user) return;
 
     const taskToDelete = state.tasks.find(t => t.id === id);
 
@@ -503,7 +495,6 @@ export function useNexCore() {
     });
 
     const supabase = getSupabaseClient();
-
     if (!navigator.onLine || !supabase) { 
       addToQueue({ type: "DELETE", id });
       return;
@@ -511,7 +502,6 @@ export function useNexCore() {
 
     const { error } = await (supabase.from("tasks") as any).delete().eq("id", id);
     if (error) {
-      addNotification("system", "Sync Error", "Failed to delete from cloud. Queued.", "high");
       addToQueue({ type: "DELETE", id });
     }
   };
@@ -587,17 +577,11 @@ export function useNexCore() {
 
   const clearAllLogs = () => {
     if (!window.confirm("Delete all audit logs? This action cannot be undone.")) return;
-
     setState(prev => {
-      const newState = { 
-        ...prev, 
-        logs: [] 
-      };
+      const newState = { ...prev, logs: [] };
       debouncedSave(KEY, newState);
       return newState;
     });
-
-    addNotification("system", "Logs Cleared", "All audit logs removed.", "low");
   };
 
   return {

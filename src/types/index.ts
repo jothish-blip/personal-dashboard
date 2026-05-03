@@ -31,7 +31,7 @@ export interface NexState {
   meta: Meta;
 }
 
-// ✅ Profile (UPDATED - matches your DB)
+// ✅ Profile (Matches Supabase DB Schema)
 export interface Profile {
   id: string;
   full_name: string | null;

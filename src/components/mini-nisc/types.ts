@@ -1,6 +1,8 @@
 export interface Folder {
   id: string;
   name: string;
+  parentId: string | null;
+  workspaceId: string | null; // 🔥 Added workspaceId
 }
 
 export interface HistoryEntry {
@@ -19,7 +21,9 @@ export interface Document {
   id: string;
   title: string;
   content: string;
+  type?: string; 
   folderId: string | null;
+  workspaceId: string | null; // 🔥 Added workspaceId
   tags: string[];
   pinned: boolean;
   history: HistoryEntry[];
@@ -37,6 +41,7 @@ export interface Media {
   url: string;
   name?: string;
   folderId: string | null;      
+  workspaceId: string | null; // 🔥 Added workspaceId
   createdAt: number;
 }
 

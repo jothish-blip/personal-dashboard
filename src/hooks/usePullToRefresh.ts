@@ -1,78 +1,84 @@
-"use client";
+import { useEffect, useState, useRef } from "react";
 
-import { useEffect, useRef, useState } from "react";
-
-export const usePullToRefresh = (onRefresh: () => void) => {
+export function usePullToRefresh(onRefresh: () => void) {
   const [pullDistance, setPullDistance] = useState(0);
-  const [readyToRefresh, setReadyToRefresh] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [readyToRefresh, setReadyToRefresh] = useState(false);
 
   const startY = useRef(0);
-  const pullingRef = useRef(false);
+  const startX = useRef(0);
+  const isPulling = useRef(false);
+
+  const THRESHOLD = 70;
 
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
-      if (window.scrollY === 0) {
-        startY.current = e.touches[0].clientY;
-        pullingRef.current = true;
-      }
+      // ✅ Only start if at top of page
+      if (window.scrollY > 0) return;
+
+      startY.current = e.touches[0].clientY;
+      startX.current = e.touches[0].clientX;
+      isPulling.current = true;
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (!pullingRef.current) return;
+      if (!isPulling.current) return;
 
       const currentY = e.touches[0].clientY;
-      const diff = currentY - startY.current;
+      const currentX = e.touches[0].clientX;
 
-      // Only act if pulling down while at the top of the page
-      if (diff > 0 && window.scrollY === 0) {
-        // Prevent default browser refresh UI from appearing
-        if (e.cancelable) e.preventDefault(); 
+      const diffY = currentY - startY.current;
+      const diffX = currentX - startX.current;
 
-        // Apply resistance so it feels like a physical pull
-        const limited = Math.min(diff * 0.4, 150); 
-        setPullDistance(limited);
+      // 🔥 CRITICAL FIX: Ignore horizontal scroll
+      if (Math.abs(diffX) > Math.abs(diffY)) {
+        isPulling.current = false;
+        return;
+      }
 
-        if (limited > 60) {
-          setReadyToRefresh((prev) => {
-            if (!prev && navigator.vibrate) {
-              navigator.vibrate(40); // Gentle haptic pop when threshold is reached
-            }
-            return true;
-          });
-        } else {
-          setReadyToRefresh(false);
-        }
+      // Only allow downward pull
+      if (diffY <= 0) return;
+
+      setPullDistance(diffY);
+
+      if (diffY > THRESHOLD) {
+        setReadyToRefresh(true);
+      } else {
+        setReadyToRefresh(false);
       }
     };
 
-    const handleTouchEnd = () => {
-      if (!pullingRef.current) return;
-      pullingRef.current = false;
+    const handleTouchEnd = async () => {
+      if (!isPulling.current) return;
 
-      setReadyToRefresh((ready) => {
-        if (ready) {
-          if (navigator.vibrate) navigator.vibrate([20, 50, 20]); // Success vibration
-          setIsRefreshing(true);
-          onRefresh();
-        }
-        return false;
-      });
-      
+      if (readyToRefresh) {
+        setIsRefreshing(true);
+
+        await onRefresh();
+
+        setIsRefreshing(false);
+      }
+
+      // reset
       setPullDistance(0);
+      setReadyToRefresh(false);
+      isPulling.current = false;
     };
 
-    // passive: false is REQUIRED to use e.preventDefault() on touchmove
-    window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    window.addEventListener("touchmove", handleTouchMove, { passive: false });
-    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+    window.addEventListener("touchstart", handleTouchStart);
+    window.addEventListener("touchmove", handleTouchMove);
+    window.addEventListener("touchend", handleTouchEnd);
 
     return () => {
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [onRefresh]);
+  }, [readyToRefresh, onRefresh]);
 
-  return { pullDistance, readyToRefresh, isRefreshing };
-};
+  return {
+    pullDistance,
+    isRefreshing,
+    readyToRefresh,
+  };
+}

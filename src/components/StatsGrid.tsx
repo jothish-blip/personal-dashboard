@@ -5,7 +5,7 @@ import {
   Target, AlertTriangle, Activity, BrainCircuit, TrendingUp, 
   TrendingDown, Zap, ChevronUp, ChevronDown, Minus, Info,
   CheckCircle2, BarChart3, LineChart, Sparkles, ShieldCheck,
-  Thermometer, MessageSquare, Fingerprint
+  Thermometer, MessageSquare, Fingerprint, History
 } from 'lucide-react';
 import { Task, Meta } from '../types';
 import { getSupabaseClient } from "@/lib/supabase";
@@ -53,6 +53,7 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
   const [activePreset, setActivePreset] = useState<number>(30);
   const [targetGoal, setTargetGoal] = useState<number>(100);
   const [dailyStats, setDailyStats] = useState<any[]>([]);
+  const [showDisciplineBreakdown, setShowDisciplineBreakdown] = useState(false);
   
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -75,7 +76,6 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
 
   const handleInitialize = () => setShowOnboarding(false);
 
-  // 🔹 FETCH DB STATS
   useEffect(() => {
     const fetchStats = async () => {
       const supabase = getSupabaseClient();
@@ -94,7 +94,7 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
     };
 
     fetchStats();
-  }, [tasks]); // Re-fetch when tasks update so UI stays fresh
+  }, [tasks]); 
 
   const applyPreset = (days: number) => {
     const end = getLocalDate(new Date());
@@ -118,10 +118,29 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
 
   const {
     totalReps, consistencyPercent, avgPerActiveDay,
-    peakDay, heatmapData, zeroDays
+    peakDay, heatmapData, zeroDays, currentStreak, previousStreak
   } = useMemo(() => {
     let reps = 0, zeroCount = 0;
     const dayCounts: Record<string, number> = {};
+
+    let streak = 0;
+    let prevStreak = 0;
+    let countingCurrent = true;
+    
+    const streakDates = [...rangeDates].reverse();
+    for (let i = 0; i < streakDates.length; i++) {
+        const dateStr = streakDates[i];
+        const isActive = tasks.some(t => t.history?.[dateStr]);
+        
+        if (isActive) {
+            if (countingCurrent) streak++;
+            else prevStreak++;
+        } else {
+            if (i === 0 && dateStr === actualToday) continue;
+            countingCurrent = false;
+            if (prevStreak > 0) break;
+        }
+    }
 
     const heatmap = rangeDates.map(dateStr => {
       let dailyCount = 0;
@@ -131,25 +150,29 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
       if (dailyCount === 0) zeroCount++;
       dayCounts[dateStr] = dailyCount;
 
-      const prevDate = new Date(dateStr);
-      prevDate.setDate(prevDate.getDate() - 1);
-      const prevStr = getLocalDate(prevDate);
-      const prevCount = tasks.filter(t => t.history?.[prevStr]).length;
-      const delta = dailyCount - prevCount;
-      
       const intensity = tasks.length === 0 ? 0 : dailyCount / tasks.length;
+      const dayStat = dailyStats.find(s => s.date === dateStr);
+      const scoreForDay = dayStat ? dayStat.score : 0;
       
       let mappedColor = "bg-green-600";
-      if (dailyCount === 0) mappedColor = "bg-red-200";
-      else if (intensity < 0.4) mappedColor = "bg-red-400";
-      else if (intensity < 0.7) mappedColor = "bg-green-300";
+      let borderClass = "border border-transparent";
+      
+      if (dailyCount === 0 && tasks.length > 0) {
+        mappedColor = "bg-red-50"; 
+        borderClass = "border border-red-500 z-10"; 
+      } else if (intensity < 0.4) {
+        mappedColor = "bg-yellow-400";
+      } else if (intensity < 0.7) {
+        mappedColor = "bg-green-400";
+      }
 
       return { 
         date: dateStr, 
         count: dailyCount, 
-        delta,
+        delta: scoreForDay, 
         intensity,
         color: mappedColor,
+        border: borderClass,
         jitter: (dateStr.charCodeAt(dateStr.length - 1) % 3)
       };
     });
@@ -169,100 +192,82 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
       avgPerActiveDay: avgPerActive,
       peakDay: peak, 
       heatmapData: heatmap, 
-      zeroDays: zeroCount
+      zeroDays: zeroCount,
+      currentStreak: streak,
+      previousStreak: prevStreak
     };
-  }, [rangeDates, tasks]);
+  }, [rangeDates, tasks, actualToday, dailyStats]);
 
-  // --- MOMENTUM & STREAKS ---
-  const currentStreak = useMemo(() => {
-    let streak = 0;
-    const d = new Date(actualToday);
-    
-    let currentDateStr = getLocalDate(d);
-    let todayActive = tasks.some(t => t.history?.[currentDateStr]);
-    
-    if (!todayActive) {
-        d.setDate(d.getDate() - 1);
-        currentDateStr = getLocalDate(d);
-    }
-
-    while (tasks.some(t => t.history?.[currentDateStr])) {
-      streak++;
-      d.setDate(d.getDate() - 1);
-      currentDateStr = getLocalDate(d);
-    }
-    
-    return streak;
-  }, [tasks, actualToday]);
-
-  // --- DB BACKED DELTA CALCULATIONS ---
   const yesterday = new Date(actualToday);
   yesterday.setDate(yesterday.getDate() - 1);
   const yStr = getLocalDate(yesterday);
 
-  // Derive Momentum from DB
-  const momentum = useMemo(() => {
-    if (dailyStats.length === 0) {
-      // Fallback local calc if DB loading
-      const tCount = tasks.filter(t => t.history?.[actualToday]).length;
-      const yCount = tasks.filter(t => t.history?.[yStr]).length;
-      return tCount - yCount;
-    }
-    
+  // 🔹 CORE DELTA LOGIC - Returns null if not enough data to prevent fake zeros
+  const scoreDelta = useMemo(() => {
+    if (dailyStats.length < 2) return null;
     const todayStat = dailyStats.find(s => s.date === actualToday);
     const yesterdayStat = dailyStats.find(s => s.date === yStr);
+    if (!todayStat || !yesterdayStat) return null;
+    return todayStat.score - yesterdayStat.score;
+  }, [dailyStats, actualToday, yStr]);
 
+  const getIntensityColor = (delta: number | null, type: 'bg' | 'text') => {
+      if (delta === null) return type === 'bg' ? 'bg-transparent text-transparent' : 'text-transparent';
+      if (delta > 10) return type === 'bg' ? 'bg-green-100 border-green-300 text-green-700' : 'text-green-600';
+      if (delta > 0) return type === 'bg' ? 'bg-green-50 border-green-200 text-green-500' : 'text-green-500';
+      if (delta < -10) return type === 'bg' ? 'bg-red-100 border-red-300 text-red-700' : 'text-red-600';
+      if (delta < 0) return type === 'bg' ? 'bg-red-50 border-red-200 text-red-500' : 'text-red-500';
+      return type === 'bg' ? 'bg-gray-50 border-gray-200 text-gray-400' : 'text-gray-400';
+  };
+
+  const momentum = useMemo(() => {
+    if (dailyStats.length === 0) return 0;
+    const todayStat = dailyStats.find(s => s.date === actualToday);
     const tScore = todayStat ? todayStat.score : 0;
-    const yScore = yesterdayStat ? yesterdayStat.score : 0;
+    const past3Days = [1, 2, 3].map(days => {
+      const d = new Date(actualToday);
+      d.setDate(d.getDate() - days);
+      return getLocalDate(d);
+    });
+    const recentStats = dailyStats.filter(s => past3Days.includes(s.date));
+    const avg3DayScore = recentStats.length 
+        ? recentStats.reduce((sum, s) => sum + s.score, 0) / recentStats.length 
+        : 0;
+    return Math.round(tScore - avg3DayScore);
+  }, [dailyStats, actualToday]);
 
-    return tScore - yScore;
-  }, [dailyStats, tasks, actualToday, yStr]);
-
-  const avgDelta = momentum; // Functionally matches delta for UI
+  const avgDelta = momentum;
 
   const consistencyDelta = useMemo(() => {
     const getConsistencyForDate = (dateStr: string) => {
       const dates = rangeDates.filter(d => d <= dateStr);
-      const activeDays = dates.filter(date =>
-        tasks.some(t => t.history?.[date])
-      ).length;
+      const activeDays = dates.filter(date => tasks.some(t => t.history?.[date])).length;
       return dates.length === 0 ? 0 : Math.round((activeDays / dates.length) * 100);
     };
-
-    const todayValue = getConsistencyForDate(actualToday);
-    const yesterdayValue = getConsistencyForDate(yStr);
-
-    return todayValue - yesterdayValue;
+    return getConsistencyForDate(actualToday) - getConsistencyForDate(yStr);
   }, [tasks, actualToday, yStr, rangeDates]);
 
-  // Use DB data strictly to calculate Discipline Difference
-  const disciplineDelta = useMemo(() => {
-    if (dailyStats.length < 2) return momentum * 5; // Loading fallback
+  const disciplineDelta = scoreDelta || 0;
 
-    const todayStat = dailyStats.find(s => s.date === actualToday);
-    const yesterdayStat = dailyStats.find(s => s.date === yStr);
+  const { disciplineScore, breakdown } = useMemo(() => {
+    const inactivityPenalty = zeroDays * 5;
+    const streakDecay = zeroDays >= 3 ? zeroDays * 2 : 0;
+    const consistencyPoints = consistencyPercent * 0.6;
+    const basePoints = Math.max(0, 20 - inactivityPenalty);
+    const momentumPoints = momentum > 0 ? 10 : momentum < 0 ? -5 : 5;
 
-    const tScore = todayStat ? todayStat.score : 0;
-    const yScore = yesterdayStat ? yesterdayStat.score : 0;
+    let score = consistencyPoints + basePoints + momentumPoints - streakDecay;
+    const finalScore = Math.max(0, Math.min(100, Math.round(score)));
 
-    return tScore - yScore;
-  }, [dailyStats, actualToday, yStr, momentum]);
-
-
-  // --- REFINED INTELLIGENCE LOGIC ---
-  const disciplineScore = useMemo(() => {
-    let score = 0;
-    score += consistencyPercent * 0.6;
-    score += Math.max(0, 20 - zeroDays * 5);
-    score += momentum > 0 ? 10 : momentum < 0 ? -5 : 5;
-    return Math.max(0, Math.min(100, Math.round(score)));
+    return {
+        disciplineScore: finalScore,
+        breakdown: {
+            consistency: Math.round(consistencyPoints),
+            momentum: momentumPoints,
+            inactivity: -(inactivityPenalty + streakDecay)
+        }
+    };
   }, [consistencyPercent, zeroDays, momentum]);
-
-  const getDisciplineColor = (score: number) => {
-    if (score >= 70) return "bg-green-50 text-green-600 border-green-200";
-    if (score <= 40) return "bg-red-50 text-red-600 border-red-200";
-    return "bg-gray-50 text-gray-600 border-gray-200";
-  };
 
   const riskScore = useMemo(() => {
     if (disciplineScore < 40) return 'High';
@@ -270,12 +275,12 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
     return 'Low';
   }, [disciplineScore]);
 
-  const dailySummary = useMemo(() => {
-    if (zeroDays > 2) return "System underperforming due to missed execution windows. Consistency takes priority over raw intensity.";
-    if (momentum < 0) return "Output velocity dropping compared to previous cycle. Reduce friction points and initiate restart.";
-    if (consistencyPercent > 80) return "Execution parameters optimal. You are reinforcing a highly stable habit loop.";
-    return "Stable progress detected. The primary directive is eliminating system inconsistency.";
-  }, [zeroDays, momentum, consistencyPercent]);
+  const motivationBg = useMemo(() => {
+    if (zeroDays >= 3) return "from-red-600 to-red-800";
+    if (momentum > 0) return "from-green-500 to-emerald-600";
+    if (momentum < 0) return "from-orange-500 to-rose-500";
+    return "from-gray-800 to-black";
+  }, [momentum, zeroDays]);
 
   const burnoutRisk = useMemo(() => {
     if (avgPerActiveDay > 7 && momentum < 0) return "High Burnout Risk";
@@ -283,82 +288,44 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
     return "Stable Load";
   }, [avgPerActiveDay, momentum]);
 
-  const motivationBg = useMemo(() => {
-    if (momentum > 0) return "from-green-500 to-emerald-600";
-    if (momentum < 0) return "from-red-500 to-rose-600";
-    return "from-orange-500 to-amber-600";
-  }, [momentum]);
-
   const motivation = useMemo(() => {
-    const hour = new Date().getHours();
-
-    let timeContext = "";
-    if (hour < 12) timeContext = "morning";
-    else if (hour < 18) timeContext = "afternoon";
-    else timeContext = "night";
-
-    const isStruggling = zeroDays > 2 || consistencyPercent < 50;
+    if (zeroDays >= 3) return "Execution chain broken. Identity reset required. Restart immediately with 1 small task.";
+    if (currentStreak === 0 && previousStreak >= 3) return `You lost a ${previousStreak}-day streak. Do not let the gap widen. Reboot today.`;
     const isDropping = momentum < 0;
-    const isStrong = consistencyPercent > 80 && momentum >= 0;
-    const isBurningOut = avgPerActiveDay > 7 && momentum < 0;
+    const isBurningOut = avgPerActiveDay > 7 && isDropping;
 
-    if (currentStreak >= 7 && !isBurningOut) {
-        return timeContext === "morning"
-          ? `Protect the ${currentStreak}-day streak. Start strong.`
-          : "Streak integrity verified. Keep the unbroken chain.";
-    }
-
-    if (currentStreak === 0 && isStruggling) {
-        return timeContext === "morning"
-           ? "Identity reset required. One completed task starts the engine."
-           : "Zero streak detected. Execute a single task to reboot the system.";
-    }
-
-    if (isBurningOut) {
-      return timeContext === "night"
-        ? "High load detected. Initiate recovery protocols. Rest is part of discipline."
-        : "Reduce operational intensity. Sustain the system, not just the output.";
-    }
-
-    if (isStruggling) {
-      return timeContext === "morning"
-        ? "Initialize small operations today. One execution restarts momentum."
-        : "Break the zero-day cycle. A single completion alters the trajectory.";
-    }
-
-    if (isDropping) {
-      return timeContext === "afternoon"
-        ? "Execution slipping. Reset parameters now before the day closes."
-        : "Momentum drop detected. Isolate focus on finishing one core task.";
-    }
-
-    if (isStrong) {
-      return timeContext === "morning"
-        ? "System in optimal control. Execute operations without hesitation."
-        : "Strong consistency threshold met. Continue stacking wins.";
-    }
-
-    return timeContext === "night"
-      ? "Close the daily cycle with intent. Finish what matters."
-      : "Maintain consistency. That is your primary structural advantage.";
-  }, [consistencyPercent, zeroDays, momentum, avgPerActiveDay, currentStreak]);
+    if (isBurningOut) return "High load detected. Initiate recovery protocols. Rest is part of discipline.";
+    if (currentStreak >= 7) return `Protect the ${currentStreak}-day streak. Keep the unbroken chain.`;
+    if (isDropping) return "Execution slipping. Reset parameters now before the day closes.";
+    
+    return "System in optimal control. Execute operations without hesitation.";
+  }, [zeroDays, momentum, avgPerActiveDay, currentStreak, previousStreak]);
 
   const behaviorType = useMemo(() => {
+    if (zeroDays >= 3) return "Recovery Phase";
     if (consistencyPercent > 85) return "Consistent Executor";
     if (zeroDays > 4) return "Irregular Performer";
     if (avgPerActiveDay > 5) return "High-Intensity Burst";
     return "Building Discipline";
   }, [consistencyPercent, zeroDays, avgPerActiveDay]);
 
+  const dailySummary = useMemo(() => {
+    if (zeroDays >= 3) return "System failure detected due to prolonged inactivity. Entering recovery mode.";
+    if (scoreDelta !== null && scoreDelta < -10) return "Severe drop in daily impact detected. Course correct immediately.";
+    if (momentum < 0) return "Output velocity dropping compared to recent baseline. Reduce friction points.";
+    if (consistencyPercent > 80) return "Execution parameters optimal. You are reinforcing a highly stable habit loop.";
+    return "Stable progress detected. The primary directive is eliminating system inconsistency.";
+  }, [zeroDays, momentum, consistencyPercent, scoreDelta]);
+
+  // RESTORED FOCUS PREDICTION
   const focusPrediction = useMemo(() => {
-    if (momentum > 0 && consistencyPercent > 70)
-      return "High momentum probability. You are positioned to perform at peak capacity tomorrow.";
-    if (momentum < 0)
-      return "Execution velocity slowing. Focus strictly on completing one micro-task tomorrow.";
+    if (momentum > 0 && consistencyPercent > 70) return "High momentum probability. You are positioned to perform at peak capacity tomorrow.";
+    if (momentum < 0 || zeroDays >= 3) return "Forecast critical. Isolate focus strictly on completing one micro-task tomorrow.";
     return "Forecast stable. Consistency remains the primary growth lever.";
-  }, [momentum, consistencyPercent]);
+  }, [momentum, consistencyPercent, zeroDays]);
 
   const goalProgress = Math.min(Math.round((totalReps / targetGoal) * 100), 100);
+  const remainingTarget = Math.max(0, targetGoal - totalReps);
   const progressColor = goalProgress >= 100 ? "bg-green-500" : goalProgress < 50 ? "bg-red-500" : "bg-orange-500";
   const progressTextColor = goalProgress >= 100 ? "text-green-500" : goalProgress < 50 ? "text-red-500" : "text-orange-500";
 
@@ -367,24 +334,53 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
       
       {showOnboarding && <OnboardingFlow onComplete={handleInitialize} />}
 
+      {/* BEHAVIORAL WARNINGS */}
+      {zeroDays >= 3 && (
+        <div className="bg-red-50 border border-red-200 rounded-[20px] p-5 flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-4">
+          <div className="bg-white p-2.5 rounded-xl border border-red-200 shadow-sm mt-1">
+            <AlertTriangle className="text-red-500" size={20} />
+          </div>
+          <div>
+            <h3 className="font-bold text-red-900 text-sm tracking-tight mb-1">Inactivity Detected</h3>
+            <p className="text-xs text-red-700 leading-relaxed font-medium">You missed {zeroDays} days in this range. Discipline score was heavily penalized. <br/><b>Recovery Mode Activated:</b> Goal is to complete 1 task today.</p>
+          </div>
+        </div>
+      )}
+
+      {currentStreak === 0 && previousStreak >= 3 && zeroDays < 3 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-[20px] p-5 flex items-start gap-4 shadow-sm">
+          <div className="bg-white p-2.5 rounded-xl border border-orange-200 shadow-sm mt-1">
+            <History className="text-orange-500" size={20} />
+          </div>
+          <div>
+            <h3 className="font-bold text-orange-900 text-sm tracking-tight mb-1">Streak Lost ⚠️</h3>
+            <p className="text-xs text-orange-700 leading-relaxed font-medium">You had a <b>{previousStreak}-day streak</b> going. Restart the engine today before momentum fades entirely.</p>
+          </div>
+        </div>
+      )}
+
       {/* HEADER SECTION */}
       <div className="space-y-4">
         <div className="bg-white border border-gray-200 shadow-sm rounded-[20px] p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-gray-900 tracking-tight">Performance Intelligence</h1>
-              <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${momentum > 0 ? 'text-green-500 bg-green-50 border-green-200' : momentum < 0 ? 'text-red-500 bg-red-50 border-red-200' : 'text-gray-400 bg-gray-50 border-gray-200'}`}>
-                {momentum > 0 ? <ChevronUp size={12}/> : momentum < 0 ? <ChevronDown size={12}/> : <Minus size={12}/>}
-                {momentum > 0 && `+${momentum}`}
-                {momentum < 0 && `${momentum}`}
-                {momentum === 0 && `0`}
-              </div>
+              {scoreDelta !== null && scoreDelta !== 0 && (
+                <div className={`flex items-center gap-2 text-sm font-extrabold px-3 py-1 rounded-full border ${getIntensityColor(scoreDelta, 'bg')}`}>
+                  {scoreDelta > 0 ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                  <span className="text-lg">
+                    {scoreDelta > 0 ? `+${scoreDelta}` : scoreDelta}
+                  </span>
+                </div>
+              )}
             </div>
             <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-widest font-bold">Diagnostic Engine v2.0</p>
-            <p className={`text-[11px] font-semibold mt-1 ${momentum > 0 ? 'text-green-600' : momentum < 0 ? 'text-red-600' : 'text-gray-500'}`}>
-              {momentum > 0 && `You scored ${momentum} points higher than yesterday.`}
-              {momentum < 0 && `You scored ${Math.abs(momentum)} points lower than yesterday.`}
-              {momentum === 0 && `Stable performance output.`}
+            <p className={`text-[11px] font-semibold mt-1 ${scoreDelta !== null ? getIntensityColor(scoreDelta, 'text') : 'text-gray-500'}`}>
+              {scoreDelta !== null && scoreDelta !== 0 && (
+                scoreDelta > 0
+                  ? `+${scoreDelta} improvement from yesterday`
+                  : `${scoreDelta} drop from yesterday`
+              )}
             </p>
           </div>
           <div className="flex gap-2 bg-gray-100 p-1 rounded-xl border border-gray-200">
@@ -399,23 +395,15 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
             ))}
           </div>
         </div>
-
-        {/* SYSTEM STATUS STRIP */}
-        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-gray-500 flex justify-between items-center">
-          <span className="flex items-center gap-2"><Fingerprint size={12}/> System Status</span>
-          <span className={`${disciplineScore > 70 ? "text-green-500" : "text-red-500"}`}>
-            {disciplineScore > 70 ? "Optimized" : "Needs Stabilization"}
-          </span>
-        </div>
       </div>
 
       {/* 🥇 PRIMARY INTELLIGENCE LAYER */}
       <div className="space-y-4">
         <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest px-1">Primary Signals</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           
           {/* Motivation - PRIMARY */}
-          <div className={`md:col-span-2 bg-gradient-to-r ${motivationBg} rounded-[24px] p-6 text-white shadow-md flex items-center gap-4 hover:shadow-lg transition-all duration-200 group relative overflow-hidden`}>
+          <div className={`md:col-span-2 bg-gradient-to-r ${motivationBg} rounded-[24px] p-6 text-white shadow-md flex items-center gap-4 transition-all duration-200 group relative overflow-hidden`}>
             <div className="bg-white/20 border border-white/10 p-3 rounded-2xl group-hover:rotate-12 transition-transform z-10 backdrop-blur-sm">
                 <Sparkles size={24} className="text-white" />
             </div>
@@ -426,15 +414,53 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
           </div>
 
           {/* Discipline Score - PRIMARY */}
-          <div className="bg-white border border-gray-200 shadow-sm rounded-[24px] p-6 transition-all duration-200 flex flex-col justify-center">
-            <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Discipline Score</p>
+          <div 
+             className="bg-white border border-gray-200 shadow-sm rounded-[24px] p-6 transition-all duration-200 flex flex-col justify-center relative group cursor-pointer"
+             onMouseEnter={() => setShowDisciplineBreakdown(true)}
+             onMouseLeave={() => setShowDisciplineBreakdown(false)}
+          >
+            <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1 flex items-center gap-1">
+                Discipline Score <Info size={10} className="text-gray-400"/>
+            </p>
             <div className="flex items-baseline gap-1">
               <p className="text-4xl font-black text-gray-900 leading-none">{disciplineScore}</p>
               <p className="text-sm font-bold text-gray-400">/ 100</p>
             </div>
-            <div className={`mt-3 inline-block w-max text-[10px] font-black px-2 py-0.5 rounded-md border ${getDisciplineColor(disciplineScore)}`}>
+            <div className={`mt-3 inline-block w-max text-[10px] font-black px-2 py-0.5 rounded-md border ${
+               disciplineScore >= 70 ? "bg-green-50 text-green-600 border-green-200" : 
+               disciplineScore <= 40 ? "bg-red-50 text-red-600 border-red-200" : 
+               "bg-gray-50 text-gray-600 border-gray-200"
+            }`}>
               {disciplineScore >= 70 ? "ELITE" : disciplineScore <= 40 ? "AT RISK" : "STABLE"}
             </div>
+
+            {showDisciplineBreakdown && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 text-white rounded-xl p-4 shadow-xl z-50 text-xs font-medium border border-gray-700 animate-in fade-in slide-in-from-top-2">
+                    <p className="font-bold text-[10px] uppercase tracking-widest text-gray-400 mb-2 border-b border-gray-700 pb-2">Score Breakdown</p>
+                    <div className="flex justify-between py-1"><span>Consistency Base</span> <span className="text-green-400">+{breakdown.consistency}</span></div>
+                    <div className="flex justify-between py-1"><span>Momentum Shift</span> <span className={breakdown.momentum > 0 ? "text-green-400" : "text-red-400"}>{breakdown.momentum > 0 ? '+' : ''}{breakdown.momentum}</span></div>
+                    <div className="flex justify-between py-1 border-t border-gray-700 mt-1 pt-2"><span>Inactivity Penality</span> <span className="text-red-400">{breakdown.inactivity}</span></div>
+                </div>
+            )}
+          </div>
+
+          {/* Daily Impact - UPDATED PRIMARY CARD */}
+          <div className="bg-white border border-gray-200 shadow-sm rounded-[24px] p-6 transition-all duration-200 flex flex-col justify-center relative">
+            <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1 flex items-center gap-1">Daily Impact</p>
+            <div className="flex flex-col mt-1">
+              <p className={`text-5xl font-black tracking-tight ${
+                scoreDelta !== null && scoreDelta > 0 ? "text-green-600" :
+                scoreDelta !== null && scoreDelta < 0 ? "text-red-600" : "text-gray-400"
+              }`}>
+                {scoreDelta !== null && scoreDelta !== 0 ? (scoreDelta > 0 ? `+${scoreDelta}` : scoreDelta) : "-"}
+              </p>
+              {scoreDelta !== null && scoreDelta !== 0 && (
+                <p className={`text-xs font-bold mt-2 uppercase tracking-widest ${scoreDelta > 0 ? "text-green-600" : "text-red-600"}`}>
+                  {scoreDelta > 0 ? "GAIN" : "LOSS"}
+                </p>
+              )}
+            </div>
+            <p className="text-[10px] font-bold text-gray-400 mt-3 tracking-widest uppercase">Compared to Yesterday</p>
           </div>
         </div>
 
@@ -451,8 +477,8 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
             </div>
           </div>
 
-          <div className="bg-orange-500 rounded-[20px] p-5 text-white flex flex-col justify-between hover:shadow-md transition-all shadow-sm relative overflow-hidden">
-            <div className="flex items-center gap-2 font-bold uppercase text-[10px] tracking-widest text-orange-100">
+          <div className={`${zeroDays >= 3 ? 'bg-red-500' : 'bg-gray-900'} rounded-[20px] p-5 text-white flex flex-col justify-between hover:shadow-md transition-all shadow-sm relative overflow-hidden`}>
+            <div className="flex items-center gap-2 font-bold uppercase text-[10px] tracking-widest text-white/70">
                 <Zap size={14} /> Forecast
             </div>
             <p className="text-xs font-bold mt-2 leading-relaxed z-10">{focusPrediction}</p>
@@ -514,14 +540,17 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
               <span className="text-3xl font-black text-gray-900">{totalReps}</span>
               <span className="text-sm font-bold text-gray-400">/ {targetGoal}</span>
             </div>
-            <div className={`text-lg font-bold ${progressTextColor}`}>
-              {goalProgress}%
+            <div className="flex flex-col items-end">
+                <div className={`text-lg font-bold leading-none ${progressTextColor}`}>
+                {goalProgress}%
+                </div>
+                <div className="text-[10px] font-bold text-gray-400 mt-1">{remainingTarget} remaining</div>
             </div>
           </div>
 
-          <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden border border-gray-200">
+          <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden border border-gray-200 relative">
             <div
-              className={`h-full rounded-full transition-all duration-1000 ease-out ${progressColor}`}
+              className={`absolute top-0 bottom-0 left-0 transition-all duration-1000 ease-out ${progressColor}`}
               style={{ width: `${goalProgress}%` }}
             />
           </div>
@@ -542,12 +571,12 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
           </div>
           <div className="flex items-start gap-4 p-4 rounded-xl bg-gray-50 border border-gray-200">
             <div className="p-2.5 bg-white border border-gray-200 rounded-xl shadow-sm">
-              <Activity className="text-blue-500" size={18} />
+              <Activity className={zeroDays >= 3 ? "text-red-500" : "text-blue-500"} size={18} />
             </div>
             <div>
               <p className="text-sm font-bold text-gray-900">{behaviorType}</p>
               <div className="text-[10px] font-bold text-gray-500 mt-1 uppercase tracking-tight">
-                {zeroDays > 2 ? "Friction detected in range" : "Habit structural integrity is high"}
+                {zeroDays >= 3 ? "Severe friction detected. Habit collapsing." : zeroDays > 2 ? "Friction detected in range" : "Habit structural integrity is high"}
               </div>
             </div>
           </div>
@@ -564,12 +593,8 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
             {heatmapData.slice(-14).map((d, i) => (
               <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group relative">
                 <div
-                  title={`${d.date}\nTasks: ${d.count}\nChange: ${d.delta > 0 ? '+' + d.delta : d.delta}`}
-                  className={`w-full max-w-[12px] rounded-t-sm transition-all duration-300 cursor-pointer ${
-                    d.intensity === 0 ? "bg-red-200" : 
-                    d.intensity < 0.4 ? "bg-red-400" : 
-                    d.intensity < 0.7 ? "bg-green-400" : "bg-green-600"
-                  }`}
+                  title={`${d.date}\nTasks: ${d.count}\nChange: ${d.delta !== null && d.delta > 0 ? '+' + d.delta : d.delta}`}
+                  className={`w-full max-w-[12px] rounded-t-sm transition-all duration-300 cursor-pointer ${d.color} ${d.border}`}
                   style={{ height: `${Math.max(10, (d.intensity * 100) + d.jitter)}%` }}
                 />
                 {d.delta !== 0 && (

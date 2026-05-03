@@ -20,15 +20,22 @@ function RegisterContent() {
   const router = useRouter();
   const supabase = getSupabaseClient();
   
+  const [checkingSession, setCheckingSession] = useState(true);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  // Session State Awareness - Redirect if already logged in
+  // Session State Awareness (Fixed Flicker)
   useEffect(() => {
     const checkUser = async () => {
+      if (!supabase) {
+        setCheckingSession(false);
+        return;
+      }
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         router.replace("/"); // Redirect to dashboard/home
+      } else {
+        setCheckingSession(false);
       }
     };
     checkUser();
@@ -36,7 +43,7 @@ function RegisterContent() {
 
   // Progressive enhancement: OAuth handles both Sign Up and Sign In automatically
   const handleSocialLogin = async (provider: string) => {
-    if (loadingProvider) return; 
+    if (loadingProvider || !supabase) return; 
     
     setLoadingProvider(provider);
     setError("");
@@ -59,6 +66,18 @@ function RegisterContent() {
       setLoadingProvider(null);
     }
   };
+
+  // Prevent silent crashes if environment variables are missing
+  if (!supabase) return null;
+
+  // Block UI rendering until session is checked to prevent flicker
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
+        <Loader2 className="w-8 h-8 text-gray-900 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-[#FAFAFA] text-gray-900 relative overflow-hidden selection:bg-indigo-100">
