@@ -40,6 +40,7 @@ export default function FocusStatsCard() {
     startSession,
     dailyGoal,
     isActive,
+    isPaused,
     currentSession
   } = useFocusSystem();
   
@@ -52,8 +53,16 @@ export default function FocusStatsCard() {
   // 🔥 LIVE FOCUS SIGNAL STATE
   const [focusSignal, setFocusSignal] = useState<number[]>(Array(40).fill(50));
 
+  // 🔥 Reset signal when session ends
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive) {
+      setFocusSignal(Array(40).fill(50));
+    }
+  }, [isActive]);
+
+  // 🔥 Update signal ONLY when active and NOT paused
+  useEffect(() => {
+    if (!isActive || isPaused) return;
 
     const interval = setInterval(() => {
       setFocusSignal(prev => {
@@ -70,13 +79,23 @@ export default function FocusStatsCard() {
           next = Math.min(100, last + Math.random() * 5); // slow rise
         }
 
-        const updated = [...prev, next];
-        return updated.slice(-40);
+        return [...prev.slice(1), next];
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isActive, currentSession]);
+  }, [isActive, isPaused, currentSession]);
+
+  const currentSignal = focusSignal[focusSignal.length - 1] || 50;
+  const prevSignal = focusSignal[focusSignal.length - 2] || 50;
+  const trend = currentSignal - prevSignal;
+
+  const recentDistraction = useMemo(() => {
+    if (!currentSession?.distractions) return false;
+    return currentSession.distractions.some(
+      (d: DistractionEvent) => Date.now() - d.timestamp < 5000
+    );
+  }, [currentSession?.distractions, focusSignal]); // Updates alongside interval ticks
 
   // --- TIME TRAVEL & DATE MATH ---
   const { 
@@ -502,11 +521,29 @@ export default function FocusStatsCard() {
           {/* 🔥 1. LIVE FOCUS SIGNAL BLOCK */}
           {isActive && (
             <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm relative overflow-hidden">
-              <div className="text-[10px] text-gray-400 uppercase font-bold mb-3 flex items-center gap-1.5">
-                <Activity size={14} className="text-blue-500 animate-pulse" /> Live Focus Signal
+              
+              {/* Overlay for Paused State */}
+              {isPaused && (
+                <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-20 rounded-2xl">
+                  <span className="text-xs font-semibold text-gray-600">
+                    ⏸ Monitoring Paused
+                  </span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-start mb-3">
+                <div className={`text-[10px] uppercase font-bold flex items-center gap-1.5 ${isPaused ? 'text-gray-400' : 'text-gray-400'}`}>
+                  <Activity size={14} className={isPaused ? "text-gray-400" : "text-blue-500 animate-pulse"} /> 
+                  {isPaused ? "Monitoring Paused" : "Live Focus Signal"}
+                </div>
+                {recentDistraction && !isPaused && (
+                  <span className="text-[10px] text-red-500 font-bold animate-pulse">
+                    ⚠ Distraction detected
+                  </span>
+                )}
               </div>
 
-              <div className="relative flex items-end gap-[2px] h-20 w-full z-10 border-b border-gray-100">
+              <div className={`relative flex items-end gap-[2px] h-20 w-full z-10 border-b border-gray-100 ${isPaused ? "opacity-60" : ""}`}>
                 {currentSession?.distractions?.map((d: DistractionEvent, idx: number) => {
                   const ageSeconds = (Date.now() - d.timestamp) / 1000;
                   if (ageSeconds > 40) return null;
@@ -539,16 +576,30 @@ export default function FocusStatsCard() {
               </div>
 
               <div className="text-[11px] font-bold mt-3 flex items-center justify-between">
-                <span className={
-                  (focusSignal.at(-1) || 50) > 70 ? "text-green-600" :
-                  (focusSignal.at(-1) || 50) > 40 ? "text-blue-600" :
-                  (focusSignal.at(-1) || 50) > 20 ? "text-orange-500" : "text-red-600"
-                }>
-                  {(focusSignal.at(-1) || 50) > 70 ? "Deep focus" :
-                   (focusSignal.at(-1) || 50) > 40 ? "Stable" :
-                   (focusSignal.at(-1) || 50) > 20 ? "Losing focus" : "Disrupted"}
-                </span>
-                <span className="text-[9px] text-gray-400 uppercase tracking-wider">Live Monitoring</span>
+                <div className="flex items-center gap-2">
+                  <span className={
+                    currentSignal > 70 ? "text-green-600" :
+                    currentSignal > 40 ? "text-blue-600" :
+                    currentSignal > 20 ? "text-orange-500" : "text-red-600"
+                  }>
+                    {currentSignal > 70 ? "Locked In" :
+                     currentSignal > 40 ? "On Track" :
+                     currentSignal > 20 ? "Drifting" : "Broken Focus"}
+                  </span>
+                  
+                  {!isPaused && (
+                    <span className="text-[10px] text-gray-500 font-medium">
+                      {trend > 0 ? "↑ Improving" : trend < 0 ? "↓ Dropping" : "→ Stable"}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-[9px] text-gray-400 uppercase tracking-wider">Live Monitoring</span>
+                  <span className="text-[8px] text-gray-300">Approximate signal</span>
+                </div>
+              </div>
+              <div className="text-[9px] text-gray-400 mt-1.5">
+                Based on activity + interruptions
               </div>
             </div>
           )}

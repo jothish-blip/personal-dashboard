@@ -245,6 +245,60 @@ export default function Sidebar({ system }: any) {
                 className="flex-1 bg-white border border-blue-500 rounded px-1.5 py-0.5 outline-none text-[13px]" onClick={(e) => e.stopPropagation()}
               />
             ) : <span className={`truncate flex-1 text-[13px] select-none ${isActiveFolder ? 'font-semibold' : 'font-medium'}`}>{folder.name}</span>}
+            
+            {/* Folder Hover Actions - Updated for maximum utility */}
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+              {/* ➕ New File */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedFolders((p: any) => ({ ...p, [folder.id]: true }));
+                  setCreating({ type: "file", parentId: folder.id });
+                }}
+                className="p-1 hover:bg-blue-100 rounded text-gray-500 hover:text-blue-700 transition-colors"
+                title="New File"
+              >
+                <FilePlus size={12} />
+              </button>
+
+              {/* ➕ New Subfolder */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedFolders((p: any) => ({ ...p, [folder.id]: true }));
+                  setCreating({ type: "folder", parentId: folder.id });
+                }}
+                className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-900 transition-colors"
+                title="New Subfolder"
+              >
+                <FolderPlus size={12} />
+              </button>
+
+              {/* ✏️ Rename */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRenamingId(folder.id);
+                  setRenameValue(folder.name);
+                }}
+                className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-900 transition-colors"
+                title="Rename"
+              >
+                <Edit3 size={12} />
+              </button>
+
+              {/* 🗑 Delete */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteFolder(folder.id);
+                }}
+                className="p-1 hover:bg-red-100 rounded text-red-500 hover:text-red-700 transition-colors"
+                title="Delete"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
           </div>
 
           <div className={`transition-all duration-200 ease-out overflow-hidden ${isExpanded ? 'max-h-auto opacity-100 mt-[1px]' : 'max-h-0 opacity-0'}`}>
@@ -259,13 +313,39 @@ export default function Sidebar({ system }: any) {
                     if (e.metaKey || e.ctrlKey) toggleSelection(doc.id, true);
                     else { setActiveDocId(doc.id); setOpenTabs((p: any) => p.includes(doc.id) ? p : [...p, doc.id]); if (window.innerWidth < 1024) setIsSidebarOpen(false); }
                   }}
+                  onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, type: "file", id: doc.id }); }}
                   style={{ paddingLeft: indent + 18 }}
                   className={`group flex items-center gap-2 pr-3 py-2.5 mx-2 rounded-md cursor-pointer transition-all duration-150 ease-out border-l-2 active:scale-[0.99] ${
                     activeDocId === doc.id || selectedItems?.has(doc.id) ? "bg-blue-50 border-blue-400 text-blue-700 font-medium" : "border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/60"
                   }`}
                 >
                   {getFileIcon(doc.type)}
-                  <span className={`truncate flex-1 text-[12.5px] select-none ${activeDocId === doc.id ? 'font-medium text-blue-700' : 'font-normal'}`}>{doc.title}</span>
+                  
+                  {renamingId === doc.id ? (
+                    <input
+                      autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={() => handleRenameSubmit(doc.id, 'doc')} onKeyDown={(e) => e.key === 'Enter' && handleRenameSubmit(doc.id, 'doc')}
+                      className="flex-1 bg-white border border-blue-500 rounded px-1.5 py-0.5 outline-none text-[12.5px]" onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : <span className={`truncate flex-1 text-[12.5px] select-none ${activeDocId === doc.id ? 'font-medium text-blue-700' : 'font-normal'}`}>{doc.title}</span>}
+
+                  {/* File Hover Actions */}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setRenamingId(doc.id); setRenameValue(doc.title); }} 
+                      className="p-1 hover:bg-blue-100 rounded text-gray-500 hover:text-blue-700 transition-colors"
+                      title="Rename File"
+                    >
+                      <Edit3 size={12} />
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); deleteDocument(doc.id); }} 
+                      className="p-1 hover:bg-red-100 rounded text-red-500 hover:text-red-700 transition-colors"
+                      title="Delete File"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </div>
               ))}
               {renderTree(folder.children, depth + 1)}
@@ -309,8 +389,11 @@ export default function Sidebar({ system }: any) {
               <div className={`w-7 h-7 ${activeWorkspace?.color || 'bg-gray-800'} rounded-md flex items-center justify-center shadow-sm`}>
                 <span className="text-white text-[13px] font-bold">{activeWorkspace?.name.charAt(0).toUpperCase() || 'W'}</span>
               </div>
-              <span className="text-sm font-semibold text-gray-900 truncate tracking-tight">{activeWorkspace?.name || "Loading..."}</span>
-              <ChevronDown size={16} className="text-gray-400" />
+              <div className="flex flex-1 items-center gap-2 min-w-0">
+                <span className="text-sm font-semibold text-gray-900 truncate tracking-tight">{activeWorkspace?.name || "Loading..."}</span>
+                {activeWorkspace?.lockHash && <Lock size={14} className="text-gray-400 shrink-0" />}
+              </div>
+              <ChevronDown size={16} className="text-gray-400 shrink-0" />
             </div>
           </div>
 
@@ -346,14 +429,40 @@ export default function Sidebar({ system }: any) {
                           className="text-[13px] border border-blue-400 rounded px-1.5 py-0.5 outline-none w-full"
                         />
                       ) : (
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                          <span className="truncate">{ws.name}</span>
-                          {/* 🔥 Fixed Title Typo Error Here */}
-                          {ws.lockHash && (
-                            <span title="Protected Workspace" className="shrink-0 flex items-center">
-                              <Lock size={10} className="text-gray-400" />
-                            </span>
-                          )}
+                        <div className="flex items-center justify-between flex-1 min-w-0 pr-1">
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                            <span className="truncate">{ws.name}</span>
+                            {ws.lockHash && (
+                              <Lock size={12} className="text-gray-400 shrink-0" />
+                            )}
+                          </div>
+                          
+                          {/* Workspace Edit/Delete Actions */}
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRenamingId(ws.id);
+                                setRenameValue(ws.name);
+                              }}
+                              className="p-1 hover:bg-gray-200 rounded text-gray-500 transition-colors"
+                              title="Rename Workspace"
+                            >
+                              <Edit3 size={12} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm("Are you sure you want to delete this workspace and all its contents?")) {
+                                  deleteWorkspace(ws.id);
+                                }
+                              }}
+                              className="p-1 hover:bg-red-100 rounded text-red-600 transition-colors"
+                              title="Delete Workspace"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -511,12 +620,38 @@ export default function Sidebar({ system }: any) {
                             if (e.metaKey || e.ctrlKey) toggleSelection(doc.id, true);
                             else { setActiveDocId(doc.id); setOpenTabs((p: any) => p.includes(doc.id) ? p : [...p, doc.id]); if (window.innerWidth < 1024) setIsSidebarOpen(false); }
                           }}
+                          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, type: "file", id: doc.id }); }}
                           className={`group flex items-center gap-2 px-3 py-2.5 mx-2 rounded-md cursor-pointer transition-all duration-150 ease-out border-l-2 active:scale-[0.99] ${
                             activeDocId === doc.id || selectedItems?.has(doc.id) ? "bg-blue-50 border-blue-500 text-blue-700 font-medium shadow-[inset_1px_0_0_0_rgba(59,130,246,0.1)]" : "border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/80"
                           }`}
                         >
                           {getFileIcon(doc.type)}
-                          <span className={`truncate flex-1 text-[12.5px] select-none ${activeDocId === doc.id ? 'text-blue-700 font-medium' : 'font-normal'}`}>{doc.title}</span>
+                          
+                          {renamingId === doc.id ? (
+                            <input
+                              autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
+                              onBlur={() => handleRenameSubmit(doc.id, 'doc')} onKeyDown={(e) => e.key === 'Enter' && handleRenameSubmit(doc.id, 'doc')}
+                              className="flex-1 bg-white border border-blue-500 rounded px-1.5 py-0.5 outline-none text-[12.5px]" onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : <span className={`truncate flex-1 text-[12.5px] select-none ${activeDocId === doc.id ? 'text-blue-700 font-medium' : 'font-normal'}`}>{doc.title}</span>}
+
+                          {/* File Hover Actions */}
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setRenamingId(doc.id); setRenameValue(doc.title); }} 
+                              className="p-1 hover:bg-blue-100 rounded text-gray-500 hover:text-blue-700 transition-colors"
+                              title="Rename File"
+                            >
+                              <Edit3 size={12} />
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); deleteDocument(doc.id); }} 
+                              className="p-1 hover:bg-red-100 rounded text-red-500 hover:text-red-700 transition-colors"
+                              title="Delete File"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
                         </div>
                     ))}
                     {renderTree(roots, 0)}
@@ -565,15 +700,40 @@ export default function Sidebar({ system }: any) {
           <button onClick={(e) => { e.stopPropagation(); const id = contextMenu.id; const item = contextMenu.type === 'folder' ? folders.find((f: any) => f.id === id) : documents.find((d: any) => d.id === id); setRenamingId(id); setRenameValue(item?.name || item?.title || ""); setContextMenu(null); }} className="w-full text-left px-2.5 py-2.5 rounded-md text-[13px] hover:bg-gray-100 transition-colors flex items-center gap-2.5 text-gray-700 font-medium active:scale-[0.98]">
             <Edit3 size={14} className="text-gray-500" /> Rename
           </button>
+          
           {contextMenu.type === 'folder' && (
             <button onClick={(e) => { e.stopPropagation(); setExpandedFolders((p: any) => ({...p, [contextMenu.id]: true})); setCreating({ type: "folder", parentId: contextMenu.id }); setContextMenu(null); }} className="w-full text-left px-2.5 py-2.5 rounded-md text-[13px] hover:bg-gray-100 transition-colors flex items-center gap-2.5 text-gray-700 font-medium active:scale-[0.98]">
               <FolderPlus size={14} className="text-gray-500" /> New Subfolder
             </button>
           )}
+          
           <div className="h-[1px] bg-gray-100 my-0.5 w-full" />
-          <button onClick={(e) => { e.stopPropagation(); contextMenu.type === 'folder' ? deleteFolder(contextMenu.id) : deleteDocument(contextMenu.id); setContextMenu(null); }} className="w-full text-left px-2.5 py-2.5 rounded-md text-[13px] hover:bg-red-50 transition-colors flex items-center gap-2.5 text-red-600 font-semibold group active:scale-[0.98]">
-            <Trash2 size={14} className="text-red-400 group-hover:text-red-600 transition-colors" /> Delete
-          </button>
+          
+          {contextMenu.type === 'folder' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteFolder(contextMenu.id);
+                setContextMenu(null);
+              }}
+              className="w-full text-left px-2.5 py-2.5 rounded-md text-[13px] hover:bg-red-50 text-red-600 flex items-center gap-2.5 group transition-colors active:scale-[0.98]"
+            >
+              <Trash2 size={14} className="text-red-400 group-hover:text-red-600 transition-colors" /> Delete Folder
+            </button>
+          )}
+
+          {contextMenu.type === 'file' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteDocument(contextMenu.id);
+                setContextMenu(null);
+              }}
+              className="w-full text-left px-2.5 py-2.5 rounded-md text-[13px] hover:bg-red-50 text-red-600 flex items-center gap-2.5 group transition-colors active:scale-[0.98]"
+            >
+              <Trash2 size={14} className="text-red-400 group-hover:text-red-600 transition-colors" /> Delete File
+            </button>
+          )}
         </div>
       )}
 

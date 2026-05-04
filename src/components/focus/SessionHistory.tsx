@@ -24,6 +24,13 @@ export default function SessionHistory() {
     return `${m} min`;
   };
 
+  const formatSegmentDuration = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  };
+
   const formatStartTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString("en-IN", {
       timeZone: "Asia/Kolkata",
@@ -57,8 +64,9 @@ export default function SessionHistory() {
     return "text-red-500";
   };
 
-  const getSessionClassification = (distractionCount: number) => {
-    if (distractionCount === 0) return { label: "Deep Focus", style: "bg-green-100 text-green-700" };
+  const getSessionClassification = (distractionCount: number, pausedDuration: number, durationSeconds: number) => {
+    if (pausedDuration > durationSeconds) return { label: "Interrupted", style: "bg-gray-100 text-gray-600 border border-gray-200" };
+    if (distractionCount === 0 && pausedDuration < 30) return { label: "Deep Focus", style: "bg-green-100 text-green-700" };
     if (distractionCount < 3) return { label: "Stable", style: "bg-blue-100 text-blue-700" };
     return { label: "Distracted", style: "bg-red-100 text-red-700" };
   };
@@ -225,14 +233,24 @@ export default function SessionHistory() {
               <div className="flex flex-col">
                 {daySessions.map((session: FocusSession, index: number) => {
                   
-                  // 🔥 FIX 3: Safety check guarantees we always deal with an Array here
                   const dists = Array.isArray(session.distractions) ? session.distractions : []; 
                   const distCount = dists.length || 0;
+                  // @ts-ignore - Safely access pauseTimeline if it exists on the record
+                  const pauseTimeline = session.pauseTimeline || [];
+                  const hasPauses = pauseTimeline.length > 0;
+                  const canExpand = distCount > 0 || hasPauses;
                   
-                  const classification = getSessionClassification(distCount);
+                  // 🔥 Calculate true timeline durations
+                  const rawEndTime = session.endTime || (session.startTime + session.actualDuration * 1000);
+                  const totalDuration = Math.max(1, (rawEndTime - session.startTime) / 1000);
+                  const extraDur = session.extraDuration || 0;
+                  const pausedDuration = Math.max(0, totalDuration - (session.durationSeconds + extraDur));
+                  const efficiency = Math.min(100, Math.max(0, (session.durationSeconds / totalDuration) * 100));
+                  
+                  const classification = getSessionClassification(distCount, pausedDuration, session.durationSeconds);
                   const isExpanded = expandedId === session.id;
                   const isLast = index === daySessions.length - 1;
-                  const hasExtraFlow = (session.extraDuration || 0) > 0;
+                  const hasExtraFlow = extraDur > 30; // Meaningful extra flow
 
                   return (
                     <div key={session.id} className="flex gap-3 md:gap-4 relative group">
@@ -244,6 +262,13 @@ export default function SessionHistory() {
                         </div>
                         <span>{formatEndTime(session)}</span>
                         <span className="text-[8px] bg-gray-100 text-gray-400 px-1 py-[1px] rounded mt-1.5 font-sans font-medium tracking-wide">IST</span>
+                        
+                        {/* Pause duration text below time column */}
+                        {pausedDuration > 5 && (
+                          <span className="text-[9px] text-gray-400 mt-1 whitespace-nowrap text-center leading-tight">
+                            {formatTime(pausedDuration)} paused
+                          </span>
+                        )}
                       </div>
 
                       <div className="relative flex flex-col items-center">
@@ -268,8 +293,9 @@ export default function SessionHistory() {
 
                           <div className="flex justify-between items-start mb-1.5">
                             <div className="flex flex-col gap-1 pr-2 min-w-0">
-                              <span className="text-sm font-semibold text-gray-800 truncate" title={session.taskTitle}>
+                              <span className="text-sm font-semibold text-gray-800 truncate flex items-center gap-1.5" title={session.taskTitle}>
                                 {session.taskTitle}
+                                {pausedDuration > 5 && <span className="text-[10px] opacity-80" title="Session had pauses">⏸</span>}
                               </span>
                               <div className="flex flex-wrap gap-1">
                                 <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap ${classification.style}`}>
@@ -277,7 +303,7 @@ export default function SessionHistory() {
                                 </span>
                                 {hasExtraFlow && (
                                   <span className="text-[9px] font-bold px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded whitespace-nowrap">
-                                    🔥 +{Math.floor((session.extraDuration || 0) / 60)}m Flow
+                                    🔥 +{Math.floor(extraDur / 60)}m Flow
                                   </span>
                                 )}
                               </div>
@@ -287,72 +313,159 @@ export default function SessionHistory() {
                             </span>
                           </div>
 
+                          {/* 🔥 Visual Timeline Bar */}
+                          <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden flex mt-2.5 mb-1.5">
+                            <div
+                              className="bg-blue-500"
+                              style={{ width: `${(session.durationSeconds / totalDuration) * 100}%` }}
+                            />
+                            {pausedDuration > 0 && (
+                              <div
+                                className="bg-yellow-400"
+                                style={{ width: `${(pausedDuration / totalDuration) * 100}%` }}
+                              />
+                            )}
+                            {hasExtraFlow && (
+                              <div
+                                className="bg-purple-500"
+                                style={{ width: `${(extraDur / totalDuration) * 100}%` }}
+                              />
+                            )}
+                          </div>
+
+                          {/* Improved Breakdown Stats */}
                           <div className="flex justify-between items-end mt-2">
-                            <div className="text-[11px] font-medium text-gray-500 flex flex-col gap-1">
+                            <div className="text-[11px] font-medium text-gray-500 flex flex-col gap-1 w-full">
                               
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="font-semibold text-gray-700">
-                                  {formatTime(session.durationSeconds)} (Focus)
+                                  {formatTime(session.durationSeconds)} Focused
                                 </span>
-                                {hasExtraFlow && (
-                                  <span className="font-semibold text-purple-600">
-                                    +{formatTime(session.extraDuration || 0)} (Extra)
+                                
+                                {pausedDuration > 5 && (
+                                  <span className="text-yellow-600 font-semibold">
+                                    • {formatTime(pausedDuration)} Paused
                                   </span>
                                 )}
+
+                                {hasExtraFlow && (
+                                  <span className="font-semibold text-purple-600">
+                                    • +{formatTime(extraDur)} Extra
+                                  </span>
+                                )}
+
                                 <span className="text-gray-300">•</span>
+                                
                                 <span className={distCount > 0 ? "text-amber-600 font-semibold" : ""}>
                                   {distCount} interruption{distCount !== 1 ? 's' : ''}
                                 </span>
+                                
                                 <span className="text-gray-300">•</span>
                                 <span>{formatMode(session.mode)}</span>
+                                
+                                <span className="text-gray-300">•</span>
+                                <span className="text-[10px] text-gray-400">
+                                  {Math.round(efficiency)}% efficiency
+                                </span>
                               </div>
                               
-                              {distCount > 0 && (
+                              {/* Only show toggle if there are details to see */}
+                              {canExpand && (
                                 <button
                                   onClick={() => setExpandedId(isExpanded ? null : session.id)}
                                   className="text-[10px] text-blue-500 hover:text-blue-700 font-semibold text-left w-fit transition-colors mt-0.5"
                                 >
-                                  {isExpanded ? "Hide details ▲" : "View distractions ▼"}
+                                  {isExpanded ? "Hide details ▲" : "View details ▼"}
                                 </button>
                               )}
                             </div>
                           </div>
 
-                          {isExpanded && distCount > 0 && (
+                          {/* EXPANDED AREA */}
+                          {isExpanded && canExpand && (
                             <div className="mt-3 pt-3 border-t border-gray-100 animate-in fade-in slide-in-from-top-2 duration-200">
                               
-                              <div className="w-full h-1 bg-gray-100 rounded-full mb-3 overflow-hidden" title="Distraction density">
-                                <div 
-                                  className="h-full bg-red-400 rounded-full transition-all" 
-                                  style={{ width: `${Math.min(100, distCount * 15)}%` }} 
-                                />
-                              </div>
-
-                              <div className="flex flex-col gap-2">
-                                <div className="text-[11px] text-gray-500">
-                                  Top Issue: <span className="font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded ml-1">{getTopDistraction(dists)}</span>
-                                </div>
-
-                                <div className="flex flex-wrap gap-1.5">
-                                  {Object.entries(getDistractionBreakdown(dists)).map(([reason, count]) => (
-                                    <span
-                                      key={reason}
-                                      className="text-[10px] font-medium px-2 py-0.5 bg-gray-50 border border-gray-200 text-gray-600 rounded-md flex items-center gap-1"
-                                    >
-                                      {reason} <span className="text-gray-400">({count as React.ReactNode})</span>
-                                    </span>
-                                  ))}
-                                </div>
+                              <div className="flex flex-col gap-4">
                                 
-                                <div className="mt-1 flex flex-wrap gap-1.5">
-                                  {dists.map((d: Distraction) => (
-                                    <span key={d.id} className="text-[9px] font-mono text-gray-400 bg-gray-50 px-1 rounded border border-gray-100">
-                                      {new Date(d.timestamp).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
+                                {/* --- DISTRACTION LOG --- */}
+                                {distCount > 0 && (
+                                  <div>
+                                    <div className="w-full h-1 bg-gray-100 rounded-full mb-3 overflow-hidden" title="Distraction density">
+                                      <div 
+                                        className="h-full bg-red-400 rounded-full transition-all" 
+                                        style={{ width: `${Math.min(100, distCount * 15)}%` }} 
+                                      />
+                                    </div>
 
+                                    <div className="flex flex-col gap-2">
+                                      <div className="text-[11px] text-gray-500">
+                                        Top Issue: <span className="font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded ml-1">{getTopDistraction(dists)}</span>
+                                      </div>
+
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {Object.entries(getDistractionBreakdown(dists)).map(([reason, count]) => (
+                                          <span
+                                            key={reason}
+                                            className="text-[10px] font-medium px-2 py-0.5 bg-gray-50 border border-gray-200 text-gray-600 rounded-md flex items-center gap-1"
+                                          >
+                                            {reason} <span className="text-gray-400">({count as React.ReactNode})</span>
+                                          </span>
+                                        ))}
+                                      </div>
+                                      
+                                      <div className="mt-1 flex flex-wrap gap-1.5">
+                                        {dists.map((d: Distraction) => (
+                                          <span key={d.id} className="text-[9px] font-mono text-gray-400 bg-gray-50 px-1 rounded border border-gray-100">
+                                            {new Date(d.timestamp).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: '2-digit', minute: '2-digit' })}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* --- PAUSE TIMELINE --- */}
+                                {hasPauses && (
+                                  <div className={distCount > 0 ? "border-t border-gray-50 pt-3" : ""}>
+                                    <div className="text-[11px] font-semibold text-gray-500 mb-2 flex justify-between items-center">
+                                      <span>Pause Timeline</span>
+                                      <span className="text-[9px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-400">
+                                        Paused {pauseTimeline.length} time{pauseTimeline.length !== 1 ? 's' : ''}
+                                      </span>
+                                    </div>
+                                    
+                                    <div className="space-y-1.5 bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                      {[...pauseTimeline].sort((a: any, b: any) => a.start - b.start).map((seg: any, i: number) => {
+                                        const start = new Date(seg.start);
+                                        const end = seg.end ? new Date(seg.end) : null;
+                                        const durationSeconds = seg.end ? Math.floor((seg.end - seg.start) / 1000) : 0;
+                                        const isLong = durationSeconds > 120;
+
+                                        return (
+                                          <div key={i} className={`text-[10px] flex justify-between items-center px-1.5 py-1 rounded transition-colors ${isLong ? "text-amber-700 font-medium bg-amber-50" : "text-gray-600 hover:bg-white"}`}>
+                                            <div className="flex items-center gap-2">
+                                              <span className="opacity-70 text-[9px]">⏸</span>
+                                              <span className="font-mono">{start.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                                              
+                                              <span className="text-gray-300">→</span>
+                                              
+                                              <span className="opacity-70 text-[9px]">▶</span>
+                                              <span className="font-mono">{end ? end.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "Still paused"}</span>
+                                            </div>
+                                            
+                                            {end && (
+                                              <span className={`font-mono text-[9px] ${isLong ? "text-amber-600" : "text-gray-400"}`}>
+                                                ({formatSegmentDuration(durationSeconds)})
+                                              </span>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                              </div>
                             </div>
                           )}
 
@@ -362,7 +475,7 @@ export default function SessionHistory() {
                   );
                 })}
               </div>
-            </div>
+            </div>  
           ))
         )}
       </div>

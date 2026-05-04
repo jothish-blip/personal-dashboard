@@ -14,6 +14,14 @@ interface HeaderProps {
   actualToday: string;
 }
 
+// Helper to get bulletproof local YYYY-MM
+const getLocalMonth = () => {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  return `${yyyy}-${mm}`;
+};
+
 export default function Header({
   todayDataLength, yesterdayDataLength, tasksLength, globalWeekStats,
   meta, setMonthYear, addTask, showError, lockToday, actualToday
@@ -23,6 +31,17 @@ export default function Header({
   
   const [showHeaderHelp, setShowHeaderHelp] = useState(false);
   const isLocked = meta.lockedDates?.includes(actualToday);
+
+  const todayMonth = getLocalMonth();
+  const selectedMonth = meta.currentMonth || todayMonth;
+
+  // 🔥 FIX: Prevent old saved month from sticking on fresh loads
+  useEffect(() => {
+    if (!meta.currentMonth || meta.currentMonth !== todayMonth) {
+      setMonthYear(todayMonth);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !localStorage.getItem("header_help_seen")) {
@@ -120,10 +139,19 @@ export default function Header({
                 <CalendarDays size={16} className="text-gray-400" />
                 <input 
                   type="month" 
-                  value={meta.currentMonth} 
+                  value={selectedMonth} 
                   onChange={(e) => setMonthYear(e.target.value)} 
                   className="outline-none text-sm font-bold text-gray-700 bg-transparent cursor-pointer" 
                 />
+                {/* 🔥 UX: Quick Reset Button */}
+                {selectedMonth !== todayMonth && (
+                  <button 
+                    onClick={() => setMonthYear(todayMonth)}
+                    className="text-[10px] font-bold text-blue-500 hover:text-blue-700 tracking-wider ml-1 transition-colors"
+                  >
+                    TODAY
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -134,12 +162,24 @@ export default function Header({
       <div className="md:hidden z-[80] bg-white/95 backdrop-blur-md border-b border-gray-200 p-4 shadow-[0_4px_16px_rgba(0,0,0,0.04)] sticky top-0">
         <div className="flex justify-between items-end">
           <div className="flex flex-col">
-            <input 
-              type="month" 
-              value={meta.currentMonth} 
-              onChange={(e) => setMonthYear(e.target.value)} 
-              className="text-[10px] font-bold text-gray-500 uppercase tracking-widest bg-transparent outline-none mb-1" 
-            />
+            <div className="flex items-center gap-2 mb-1">
+              <input 
+                type="month" 
+                value={selectedMonth} 
+                onChange={(e) => setMonthYear(e.target.value)} 
+                className="text-[10px] font-bold text-gray-500 uppercase tracking-widest bg-transparent outline-none" 
+              />
+              {/* 🔥 UX: Quick Reset Button */}
+              {selectedMonth !== todayMonth && (
+                <button 
+                  onClick={() => setMonthYear(todayMonth)}
+                  className="text-[10px] font-bold text-blue-500 hover:text-blue-700 tracking-wider transition-colors"
+                >
+                  TODAY
+                </button>
+              )}
+            </div>
+            
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-gray-800 leading-none">Today's Output</h1>
               <button onClick={() => setShowHeaderHelp(true)} className="text-gray-300 hover:text-gray-500 transition-colors p-1 rounded hover:bg-gray-50">
