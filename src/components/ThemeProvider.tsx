@@ -3,11 +3,14 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 type Theme = "light" | "dark";
+type ThemeMode = "light" | "dark" | "system";
 
 interface ThemeContextValue {
   theme: Theme;
+  themeMode: ThemeMode;
   isDarkMode: boolean;
   toggleTheme: () => void;
+  setThemeMode: (mode: ThemeMode) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
@@ -22,19 +25,22 @@ function applyThemeToDOM(theme: Theme) {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("light");
+  const [themeMode, setThemeModeState] = useState<ThemeMode>("system");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     // 1. Initial Load Logic
-    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
+    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY) as ThemeMode | null;
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     
     if (storedTheme === "light" || storedTheme === "dark") {
+      setThemeModeState(storedTheme);
       setTheme(storedTheme);
       applyThemeToDOM(storedTheme);
     } else {
+      setThemeModeState("system");
       const systemTheme = mediaQuery.matches ? "dark" : "light";
       setTheme(systemTheme);
       applyThemeToDOM(systemTheme);
@@ -43,7 +49,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // 2. Listen for System Theme Changes
     const handleChange = (e: MediaQueryListEvent) => {
       const currentStored = window.localStorage.getItem(THEME_STORAGE_KEY);
-      // ONLY update if the user hasn't manually overridden it
+      // ONLY update if the user hasn't manually overridden it (i.e., they are in system mode)
       if (!currentStored) {
         const newSystemTheme = e.matches ? "dark" : "light";
         setTheme(newSystemTheme);
@@ -57,21 +63,40 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
+  const setThemeMode = (mode: ThemeMode) => {
+    document.documentElement.classList.add("theme-transition");
+    setThemeModeState(mode);
+
+    if (mode === "system") {
+      window.localStorage.removeItem(THEME_STORAGE_KEY);
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      setTheme(systemTheme);
+      applyThemeToDOM(systemTheme);
+    } else {
+      window.localStorage.setItem(THEME_STORAGE_KEY, mode);
+      setTheme(mode);
+      applyThemeToDOM(mode);
+    }
+
+    setTimeout(() => {
+      document.documentElement.classList.remove("theme-transition");
+    }, 350);
+  };
+
   const toggleTheme = () => {
-    // Add smooth transition class just before changing the theme
     document.documentElement.classList.add("theme-transition");
 
     setTheme((prev) => {
       const newTheme = prev === "dark" ? "light" : "dark";
       
-      // ONLY save to localStorage when the user actively clicks the toggle
+      // Update both the mode and actual theme
+      setThemeModeState(newTheme);
       window.localStorage.setItem(THEME_STORAGE_KEY, newTheme);
       applyThemeToDOM(newTheme);
       
       return newTheme;
     });
 
-    // Remove the class right after the transition duration ends
     setTimeout(() => {
       document.documentElement.classList.remove("theme-transition");
     }, 350);
@@ -80,10 +105,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(
     () => ({
       theme,
+      themeMode,
       isDarkMode: theme === "dark",
       toggleTheme,
+      setThemeMode,
     }),
-    [theme]
+    [theme, themeMode]
   );
 
   // Prevent hydration mismatch on initial render

@@ -21,13 +21,13 @@ export default function ProfilePage() {
 
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [uploading, setUploading] = useState(false); // 🔥 New: Avatar specifically
+  const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
 
-  // ✅ Load Profile
+  // ✅ Load Profile with Auto-Create Fallback
   useEffect(() => {
     const load = async () => {
       const {
@@ -40,31 +40,53 @@ export default function ProfilePage() {
       setUserId(user.id);
       setUserEmail(user.email ?? null);
 
-      const { data, error } = await supabase
+      // Use maybeSingle() to prevent 406 error if row doesn't exist
+      let { data, error } = await supabase
         .from("profiles")
         .select(`id, full_name, username, bio, age, gender, location, avatar_url, updated_at`)
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        console.error(error);
-      } else {
-        setProfile(data as Profile);
+        console.error("Failed to fetch user profile:", JSON.stringify(error, null, 2));
       }
 
+      // Auto-create profile if it doesn't exist yet
+      if (!data && !error) {
+        console.log("No profile found. Auto-creating...");
+        const { data: newProfile, error: insertError } = await supabase
+          .from("profiles")
+          .insert({
+            id: user.id,
+            full_name: user.user_metadata?.full_name || null,
+            avatar_url: user.user_metadata?.avatar_url || null,
+          })
+          .select(`id, full_name, username, bio, age, gender, location, avatar_url, updated_at`)
+          .single();
+
+        if (insertError) {
+          console.error("Failed to auto-create profile:", JSON.stringify(insertError, null, 2));
+        } else {
+          data = newProfile;
+        }
+      }
+
+      if (data) {
+        setProfile(data as Profile);
+      }
+      
       setLoading(false);
     };
 
     load();
   }, [supabase]);
 
-  // ✅ Avatar Upload (Corrected Logic)
+  // ✅ Avatar Upload (Optimized for Permanence)
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const file = e.target.files?.[0];
       if (!file || !userId || !profile) return;
 
-      // 1. Validate File Type
       if (!file.type.startsWith("image/")) {
         setMessage({ type: "error", text: "Please upload an image file." });
         return;
@@ -74,14 +96,14 @@ export default function ProfilePage() {
       setMessage(null);
 
       const fileExt = file.name.split(".").pop();
-      // 🚀 FIX 1: Use timestamp in filename to break CDN/Browser cache
-      const filePath = `${userId}/avatar_${Date.now()}.${fileExt}`;
+      // Constant filename so it overwrites instead of filling up storage
+      const filePath = `${userId}/profile_avatar.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(filePath, file, { 
-            cacheControl: '3600',
-            upsert: false // Set to false since name is now unique
+            cacheControl: '31536000',
+            upsert: true // Force Supabase to overwrite the old image
         });
 
       if (uploadError) throw uploadError;
@@ -92,7 +114,6 @@ export default function ProfilePage() {
 
       const avatarUrl = data.publicUrl;
 
-      // Update Database
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ 
@@ -103,12 +124,11 @@ export default function ProfilePage() {
 
       if (updateError) throw updateError;
 
-      // Update Local State
-      setProfile({ ...profile, avatar_url: avatarUrl });
-      setMessage({ type: "success", text: "Photo updated." });
+      setProfile({ ...profile, avatar_url: avatarUrl, updated_at: new Date().toISOString() });
+      setMessage({ type: "success", text: "Photo updated permanently." });
 
     } catch (error) {
-      console.error("Upload error:", error);
+      console.error("Upload error:", JSON.stringify(error, null, 2));
       setMessage({ type: "error", text: "Failed to upload photo." });
     } finally {
       setUploading(false);
@@ -145,6 +165,7 @@ export default function ProfilePage() {
       .eq("id", userId);
 
     if (error) {
+      console.error("Update failed:", JSON.stringify(error, null, 2));
       setMessage({ type: "error", text: "Update failed." });
     } else {
       setMessage({ type: "success", text: "Profile updated." });
@@ -185,7 +206,6 @@ export default function ProfilePage() {
             {uploading ? (
               <Loader2 className="animate-spin text-gray-400 w-6 h-6" />
             ) : profile.avatar_url ? (
-              // 🚀 FIX 2: Append timestamp to the src to force a re-render from cache
               <img 
                 src={`${profile.avatar_url}?t=${new Date(profile.updated_at || "").getTime()}`} 
                 alt="Profile" 

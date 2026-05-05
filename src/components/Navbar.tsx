@@ -3,7 +3,6 @@
 import React, { useRef, useMemo, useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Meta } from "../types";
-
 import DesktopNav from "./navbar/DesktopNav";
 import MobileNav from "./navbar/MobileNav";
 
@@ -49,17 +48,17 @@ export default function Navbar({
         return;
       }
 
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", currentUser.id)
-          .single();
+      // Changed .single() to .maybeSingle()
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .maybeSingle();
 
-        if (error) throw error;
-        if (data && isMounted) setUserProfile(data);
-      } catch (err) {
-        console.error("Failed to fetch user profile:", err);
+      if (error) {
+        console.error("Failed to fetch user profile in Navbar:", JSON.stringify(error, null, 2));
+      } else if (data && isMounted) {
+        setUserProfile(data);
       }
     };
 
@@ -92,7 +91,6 @@ export default function Navbar({
     [pathname]
   );
 
-  // 🔥 1. Removed y, m, years, and setMonthYear from navProps
   const navProps = {
     activePaths,
     handleNav,
@@ -127,7 +125,6 @@ export default function Navbar({
 
   return (
     <>
-      {/* 🔥 3.1 & 3.5 Premium Glass UI and Smoother Transitions */}
       <nav
         className={`fixed top-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-[0_4px_20px_rgba(0,0,0,0.05)] transition-transform duration-300 ease-in-out ${
           showNavbar ? "translate-y-0" : "-translate-y-full"
@@ -138,6 +135,8 @@ export default function Navbar({
       </nav>
 
       <div className="h-[120px] md:h-[64px]" />
+      
     </>
+    
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useMemo } from 'react';
 import { Files, Search, Activity, X } from 'lucide-react';
+import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
 
 export default function HistoryView(props: any) {
   const documents = props.documents || props.system?.documents || [];
@@ -8,11 +9,13 @@ export default function HistoryView(props: any) {
   const setView = props.setView || props.system?.setView;
   const setActiveDocId = props.setActiveDocId || props.system?.setActiveDocId;
 
+  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
+
   const [filterType, setFilterType] = useState<'all' | 'month' | 'year'>('all');
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<'name' | 'created' | 'updated' | 'words'>('updated');
   const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
-  const [selectedLogDoc, setSelectedLogDoc] = useState<any>(null); // 🔥 For Log Panel
+  const [selectedLogDoc, setSelectedLogDoc] = useState<any>(null); // For Log Panel
 
   // 1. Core Filtering
   const filteredDocs = useMemo(() => {
@@ -90,7 +93,7 @@ export default function HistoryView(props: any) {
     });
   };
 
-  // 🔥 Format Log Function
+  // Format Log Function
   const formatLog = (log: any) => {
     switch (log.type) {
       case "created": return "📄 Created document";
@@ -107,28 +110,42 @@ export default function HistoryView(props: any) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="bg-white border border-gray-200 rounded-2xl p-4 md:p-6 shadow-sm">
+    <div className={`max-w-7xl mx-auto px-4 py-8 min-h-screen transition-colors duration-300 ${
+      isDarkMode ? "bg-[#050505]" : "bg-gray-50"
+    }`}>
+      <div className={`border rounded-[2rem] p-4 md:p-6 shadow-sm transition-colors ${
+        isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"
+      }`}>
         
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <Files size={24} className="text-gray-900" />
-          <h2 className="text-xl md:text-2xl font-bold text-gray-900">File History Overview</h2>
+          <Files size={24} className={isDarkMode ? "text-gray-300" : "text-gray-900"} />
+          <h2 className={`text-xl md:text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+            File History Overview
+          </h2>
         </div>
 
         {/* Top Controls */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} size={16} />
               <input
                 placeholder="Search files..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="border border-gray-200 pl-9 pr-3 py-2 rounded-xl text-sm w-full outline-none focus:border-green-500 bg-gray-50"
+                className={`border pl-9 pr-3 py-2 rounded-xl text-sm w-full outline-none focus:border-green-500 transition-colors ${
+                  isDarkMode ? "bg-[#1a1a1a] border-gray-800 text-gray-200 placeholder-gray-600" : "bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400"
+                }`}
               />
             </div>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="border border-gray-200 px-3 py-2 rounded-xl text-sm outline-none focus:border-green-500 bg-gray-50 text-gray-700 cursor-pointer">
+            <select 
+              value={sortBy} 
+              onChange={(e) => setSortBy(e.target.value as any)} 
+              className={`border px-3 py-2 rounded-xl text-sm outline-none focus:border-green-500 cursor-pointer transition-colors ${
+                isDarkMode ? "bg-[#1a1a1a] border-gray-800 text-gray-300 [&>option]:bg-[#1a1a1a]" : "bg-gray-50 border-gray-200 text-gray-700 [&>option]:bg-white"
+              }`}
+            >
               <option value="updated">Sort by Updated</option>
               <option value="created">Sort by Created</option>
               <option value="name">Sort by Name</option>
@@ -138,24 +155,57 @@ export default function HistoryView(props: any) {
 
           <div className="flex flex-wrap items-center gap-3 justify-between">
             <div className="flex gap-2">
-              <button onClick={() => setFilterType('all')} className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${filterType === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>All</button>
-              <button onClick={() => setFilterType('month')} className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${filterType === 'month' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>This Month</button>
-              <button onClick={() => setFilterType('year')} className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${filterType === 'year' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>This Year</button>
+              <button 
+                onClick={() => setFilterType('all')} 
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                  filterType === 'all' 
+                    ? (isDarkMode ? 'bg-gray-200 text-gray-900' : 'bg-gray-800 text-white') 
+                    : (isDarkMode ? 'bg-gray-800 text-gray-400 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')
+                }`}
+              >All</button>
+              <button 
+                onClick={() => setFilterType('month')} 
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                  filterType === 'month' 
+                    ? (isDarkMode ? 'bg-gray-200 text-gray-900' : 'bg-gray-800 text-white') 
+                    : (isDarkMode ? 'bg-gray-800 text-gray-400 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')
+                }`}
+              >This Month</button>
+              <button 
+                onClick={() => setFilterType('year')} 
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                  filterType === 'year' 
+                    ? (isDarkMode ? 'bg-gray-200 text-gray-900' : 'bg-gray-800 text-white') 
+                    : (isDarkMode ? 'bg-gray-800 text-gray-400 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')
+                }`}
+              >This Year</button>
             </div>
 
             {selectedDocs.length > 0 && (
               <div className="flex gap-2 animate-in fade-in duration-200">
-                <button onClick={bulkDelete} className="text-xs font-bold bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-100">Delete ({selectedDocs.length})</button>
-                <button onClick={bulkRestore} className="text-xs font-bold bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100">Restore ({selectedDocs.length})</button>
+                <button 
+                  onClick={bulkDelete} 
+                  className={`text-xs font-bold border px-3 py-1.5 rounded-lg transition-colors ${
+                    isDarkMode ? "bg-red-950/30 text-red-400 border-red-900/50 hover:bg-red-900/50" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                  }`}
+                >Delete ({selectedDocs.length})</button>
+                <button 
+                  onClick={bulkRestore} 
+                  className={`text-xs font-bold border px-3 py-1.5 rounded-lg transition-colors ${
+                    isDarkMode ? "bg-green-950/30 text-green-400 border-green-900/50 hover:bg-green-900/50" : "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                  }`}
+                >Restore ({selectedDocs.length})</button>
               </div>
             )}
           </div>
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto border border-gray-100 rounded-xl">
+        <div className={`overflow-x-auto border rounded-xl transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
           <table className="w-full text-sm min-w-[900px]">
-            <thead className="bg-gray-50 text-gray-500 border-b border-gray-200 text-xs uppercase tracking-wider font-semibold">
+            <thead className={`border-b text-xs uppercase tracking-wider font-semibold ${
+              isDarkMode ? "bg-gray-900 text-gray-400 border-gray-800" : "bg-gray-50 text-gray-500 border-gray-200"
+            }`}>
               <tr>
                 <th className="py-3 px-4 w-12 text-center">
                   <input type="checkbox" checked={sortedDocs.length > 0 && selectedDocs.length === sortedDocs.length} onChange={toggleSelectAll} className="cursor-pointer rounded border-gray-300 text-green-600 focus:ring-green-500"/>
@@ -168,7 +218,7 @@ export default function HistoryView(props: any) {
                 <th className="text-left py-3 px-4">Activity</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className={`divide-y transition-colors ${isDarkMode ? "divide-gray-800" : "divide-gray-100"}`}>
               {sortedDocs.length > 0 ? (
                 sortedDocs.map((doc: any) => {
                   const wordCount = doc.content ? doc.content.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length : 0;
@@ -176,26 +226,42 @@ export default function HistoryView(props: any) {
                   const isViewingLogs = selectedLogDoc?.id === doc.id;
 
                   return (
-                    <tr key={doc.id} className={`transition-colors group ${isViewingLogs ? 'bg-blue-50/50' : isSelected ? 'bg-green-50/50' : 'hover:bg-gray-50'}`}>
+                    <tr key={doc.id} className={`transition-colors group ${
+                      isViewingLogs 
+                        ? (isDarkMode ? 'bg-blue-900/20' : 'bg-blue-50/50') 
+                        : isSelected 
+                          ? (isDarkMode ? 'bg-green-900/20' : 'bg-green-50/50') 
+                          : (isDarkMode ? 'hover:bg-gray-800/50' : 'hover:bg-gray-50')
+                    }`}>
                       <td className="py-3 px-4 text-center">
                         <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(doc.id)} className="cursor-pointer rounded border-gray-300 text-green-600 focus:ring-green-500"/>
                       </td>
-                      <td className="py-3 px-4 font-semibold text-gray-800 truncate max-w-[200px]" title={doc.title || "Untitled"}>{doc.title || "Untitled"}</td>
+                      <td className={`py-3 px-4 font-semibold truncate max-w-[200px] ${isDarkMode ? "text-gray-200" : "text-gray-800"}`} title={doc.title || "Untitled"}>
+                        {doc.title || "Untitled"}
+                      </td>
                       <td className="py-3 px-4">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${doc.deletedAt ? "bg-red-50 text-red-600 border border-red-100" : "bg-green-50 text-green-700 border border-green-100"}`}>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border ${
+                          doc.deletedAt 
+                            ? (isDarkMode ? "bg-red-950/30 text-red-400 border-red-900/50" : "bg-red-50 text-red-600 border-red-100") 
+                            : (isDarkMode ? "bg-green-950/30 text-green-400 border-green-900/50" : "bg-green-50 text-green-700 border-green-100")
+                        }`}>
                           {doc.deletedAt ? "Deleted" : "Active"}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-gray-500 text-xs">{formatDate(doc.updatedAt)}</td>
-                      <td className="py-3 px-4 text-gray-600 font-medium">{wordCount}</td>
+                      <td className={`py-3 px-4 text-xs ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>{formatDate(doc.updatedAt)}</td>
+                      <td className={`py-3 px-4 font-medium ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{wordCount}</td>
                       <td className="py-3 px-4">
-                        <button onClick={() => { if (setActiveDocId && setView) { setActiveDocId(doc.id); setView("editor"); } }} className="text-xs font-bold text-green-600 hover:underline">
+                        <button onClick={() => { if (setActiveDocId && setView) { setActiveDocId(doc.id); setView("editor"); } }} className={`text-xs font-bold hover:underline ${
+                          isDarkMode ? "text-green-400" : "text-green-600"
+                        }`}>
                           Open
                         </button>
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex flex-col items-start gap-1">
-                          <button onClick={() => setSelectedLogDoc(doc)} className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded-md hover:bg-blue-100 transition-colors flex items-center gap-1.5">
+                          <button onClick={() => setSelectedLogDoc(doc)} className={`text-xs font-bold px-2 py-1 rounded-md transition-colors flex items-center gap-1.5 ${
+                            isDarkMode ? "text-blue-400 bg-blue-950/30 hover:bg-blue-900/50 hover:text-blue-300" : "text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100"
+                          }`}>
                             <Activity size={12} /> View Logs
                           </button>
                           <span className="text-[10px] text-gray-400 font-medium ml-1">{doc.logs?.length || 0} entries</span>
@@ -206,8 +272,8 @@ export default function HistoryView(props: any) {
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-gray-400 bg-gray-50/50">
-                    <p className="font-medium text-gray-500 mb-1">No documents found</p>
+                  <td colSpan={7} className={`py-16 text-center ${isDarkMode ? "bg-[#111111] text-gray-500" : "bg-gray-50/50 text-gray-400"}`}>
+                    <p className={`font-medium mb-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>No documents found</p>
                     <p className="text-xs">Adjust your search or filters.</p>
                   </td>
                 </tr>
@@ -218,11 +284,15 @@ export default function HistoryView(props: any) {
 
         {/* 🔥 Log View Panel */}
         {selectedLogDoc && (
-          <div className="mt-8 border border-gray-200 rounded-2xl p-6 bg-gray-50 shadow-inner animate-in fade-in slide-in-from-bottom-4 relative">
-            <button onClick={() => setSelectedLogDoc(null)} className="absolute top-4 right-4 p-1.5 bg-white border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
+          <div className={`mt-8 border rounded-2xl p-6 shadow-inner animate-in fade-in slide-in-from-bottom-4 relative transition-colors ${
+            isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-gray-50 border-gray-200"
+          }`}>
+            <button onClick={() => setSelectedLogDoc(null)} className={`absolute top-4 right-4 p-1.5 border rounded-lg transition-colors ${
+              isDarkMode ? "bg-[#111111] border-gray-800 text-gray-400 hover:bg-gray-800" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-100"
+            }`}>
               <X size={16} />
             </button>
-            <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <h3 className={`text-sm font-bold mb-4 flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
               <Activity size={16} className="text-blue-500" />
               Activity Logs — <span className="text-gray-500 font-medium truncate max-w-[200px] md:max-w-md">{selectedLogDoc.title || "Untitled"}</span>
             </h3>
@@ -230,13 +300,15 @@ export default function HistoryView(props: any) {
             <div className="space-y-2 max-h-60 overflow-y-auto pr-2 no-scrollbar">
               {selectedLogDoc.logs && selectedLogDoc.logs.length > 0 ? (
                 selectedLogDoc.logs.slice().reverse().map((log: any, i: number) => (
-                  <div key={i} className="text-xs flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:border-blue-100 transition-colors">
-                    <span className="font-semibold text-gray-700">{formatLog(log)}</span>
-                    <span className="text-gray-400 font-medium">{formatDate(log.timestamp)}</span>
+                  <div key={i} className={`text-xs flex justify-between items-center p-3 rounded-xl border shadow-sm transition-colors ${
+                    isDarkMode ? "bg-[#111111] border-gray-800 hover:border-blue-900/50" : "bg-white border-gray-100 hover:border-blue-100"
+                  }`}>
+                    <span className={`font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>{formatLog(log)}</span>
+                    <span className={`font-medium ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>{formatDate(log.timestamp)}</span>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8 text-gray-400 text-xs font-medium">
+                <div className={`text-center py-8 text-xs font-medium ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
                   No activity recorded for this document yet.
                 </div>
               )}

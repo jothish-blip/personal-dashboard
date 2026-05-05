@@ -4,8 +4,11 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer
 } from 'recharts';
+import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
 
 export default function Analytics({ documents = [] }: any) {
+  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
+
   // 1. Total Words
   const totalWords = useMemo(() => {
     return documents.reduce((acc: number, doc: any) => {
@@ -124,39 +127,45 @@ export default function Analytics({ documents = [] }: any) {
   }, [documents]);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 md:px-6 md:py-10 space-y-8 bg-white min-h-screen">
+    <div className={`max-w-4xl mx-auto px-4 py-6 md:px-6 md:py-10 space-y-8 min-h-screen transition-colors duration-300 ${
+      isDarkMode ? "bg-[#050505]" : "bg-white"
+    }`}>
       
       {/* 1. Header & Summary Strip */}
       <div>
-        <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
+        <h2 className={`text-2xl md:text-3xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
           Your Writing Activity
         </h2>
-        <p className="text-sm text-gray-500 mt-1 mb-6">
+        <p className={`text-sm mt-1 mb-6 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
           Track how you write, not just what you write
         </p>
 
-        <div className="flex gap-6 flex-wrap bg-gray-50 border border-gray-100 rounded-xl p-4">
+        <div className={`flex gap-6 flex-wrap rounded-xl p-4 border transition-colors ${
+          isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-100"
+        }`}>
           <div className="flex items-center gap-2">
-            📄 <span className="text-sm text-gray-600"><b className="text-gray-900">{documents.length}</b> docs</span>
+            📄 <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}><b className={isDarkMode ? "text-white" : "text-gray-900"}>{documents.length}</b> docs</span>
           </div>
           <div className="flex items-center gap-2">
-            ✍️ <span className="text-sm text-gray-600"><b className="text-gray-900">{totalWords.toLocaleString()}</b> words</span>
+            ✍️ <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}><b className={isDarkMode ? "text-white" : "text-gray-900"}>{totalWords.toLocaleString()}</b> words</span>
           </div>
           <div className="flex items-center gap-2">
-            🔥 <span className="text-sm text-gray-600"><b className="text-gray-900">{writingStreak}</b> day streak</span>
+            🔥 <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}><b className={isDarkMode ? "text-white" : "text-gray-900"}>{writingStreak}</b> day streak</span>
           </div>
           <div className="flex items-center gap-2">
-            📅 <span className="text-sm text-gray-600"><b className="text-gray-900">{thisWeekDocs}</b> this week</span>
+            📅 <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}><b className={isDarkMode ? "text-white" : "text-gray-900"}>{thisWeekDocs}</b> this week</span>
           </div>
         </div>
       </div>
 
-      <div className="border-t border-gray-100" />
+      <div className={`border-t ${isDarkMode ? "border-gray-800" : "border-gray-100"}`} />
 
       {/* 2. Main Activity Chart */}
       {chartData.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-4 md:p-6 h-64 md:h-72 shadow-sm hover:shadow-lg transition-all duration-200">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900">
+        <div className={`border rounded-2xl p-4 md:p-6 h-64 md:h-72 shadow-sm hover:shadow-lg transition-all duration-200 ${
+          isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"
+        }`}>
+          <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
             Documents Created Over Time
           </h3>
           <ResponsiveContainer width="100%" height="100%">
@@ -167,27 +176,27 @@ export default function Analytics({ documents = [] }: any) {
                   <stop offset="100%" stopColor="#4f46e5" />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="2 2" vertical={false} stroke="#f1f5f9" />
+              <CartesianGrid strokeDasharray="2 2" vertical={false} stroke={isDarkMode ? "#1f2937" : "#f1f5f9"} />
               <XAxis 
                 dataKey="date" 
-                tick={{ fontSize: 12, fill: '#94a3b8' }}
+                tick={{ fontSize: 12, fill: isDarkMode ? '#6b7280' : '#94a3b8' }}
                 axisLine={false}
                 tickLine={false}
                 dy={10}
               />
               <YAxis 
-                tick={{ fontSize: 12, fill: '#94a3b8' }}
+                tick={{ fontSize: 12, fill: isDarkMode ? '#6b7280' : '#94a3b8' }}
                 axisLine={false}
                 tickLine={false}
                 allowDecimals={false}
               />
               <Tooltip 
                 contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  border: '1px solid #e2e8f0', 
+                  backgroundColor: isDarkMode ? '#0a0a0a' : '#fff', 
+                  border: `1px solid ${isDarkMode ? '#374151' : '#e2e8f0'}`, 
                   borderRadius: '12px',
                   boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                  color: '#0f172a',
+                  color: isDarkMode ? '#f3f4f6' : '#0f172a',
                   fontSize: '14px',
                   fontWeight: 600
                 }}
@@ -200,7 +209,7 @@ export default function Analytics({ documents = [] }: any) {
                 stroke="url(#chartGradient)" 
                 strokeWidth={3} 
                 dot={false}
-                activeDot={{ r: 6, fill: '#4f46e5', stroke: '#fff', strokeWidth: 2 }}
+                activeDot={{ r: 6, fill: '#4f46e5', stroke: isDarkMode ? '#111111' : '#fff', strokeWidth: 2 }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -208,12 +217,14 @@ export default function Analytics({ documents = [] }: any) {
       )}
 
       {/* 3. Heatmap (Compact GitHub Style) */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-4 md:p-6 shadow-sm hover:shadow-lg transition-all duration-200">
-        <h3 className="text-sm font-semibold mb-3 text-gray-700">
+      <div className={`border rounded-2xl p-4 md:p-6 shadow-sm hover:shadow-lg transition-all duration-200 ${
+        isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"
+      }`}>
+        <h3 className={`text-sm font-semibold mb-3 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
           Daily Activity
         </h3>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-400">Less</span>
+          <span className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Less</span>
           <div className="grid grid-cols-7 gap-1">
             {heatmapDays.map(({ date, count }) => (
               <div
@@ -223,63 +234,81 @@ export default function Analytics({ documents = [] }: any) {
                   count > 4 ? "bg-green-600" :
                   count > 2 ? "bg-green-400" :
                   count > 0 ? "bg-green-200" :
-                  "bg-gray-100"
+                  (isDarkMode ? "bg-gray-800" : "bg-gray-100")
                 }`}
               />
             ))}
           </div>
-          <span className="text-xs text-gray-400">More</span>
+          <span className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>More</span>
         </div>
       </div>
 
-      <div className="border-t border-gray-100" />
+      <div className={`border-t ${isDarkMode ? "border-gray-800" : "border-gray-100"}`} />
 
       {/* 4. Deep Insights (Semantic Color Cards with Micro-Interactions) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-100 via-white to-white border border-blue-100 hover:scale-[1.03] hover:shadow-lg transition-all duration-200">
-          <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider mb-1">Writing Time</p>
-          <p className="text-2xl md:text-3xl font-bold text-gray-900">
-            {Math.floor(totalWritingTime / 60000)} <span className="text-base text-gray-500 font-medium">min</span>
+        <div className={`p-5 rounded-2xl border hover:scale-[1.03] hover:shadow-lg transition-all duration-200 ${
+          isDarkMode 
+            ? "bg-gradient-to-br from-blue-900/20 via-[#1a1a1a] to-[#111111] border-blue-900/50" 
+            : "bg-gradient-to-br from-blue-100 via-white to-white border-blue-100"
+        }`}>
+          <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>Writing Time</p>
+          <p className={`text-2xl md:text-3xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+            {Math.floor(totalWritingTime / 60000)} <span className={`text-base font-medium ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>min</span>
           </p>
         </div>
 
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-orange-100 via-white to-white border border-orange-100 hover:scale-[1.03] hover:shadow-lg transition-all duration-200">
-          <p className="text-xs text-orange-600 font-semibold uppercase tracking-wider mb-1">Current Streak</p>
-          <p className="text-2xl md:text-3xl font-bold text-gray-900">
-            {writingStreak} <span className="text-base text-gray-500 font-medium">days</span>
+        <div className={`p-5 rounded-2xl border hover:scale-[1.03] hover:shadow-lg transition-all duration-200 ${
+          isDarkMode 
+            ? "bg-gradient-to-br from-orange-900/20 via-[#1a1a1a] to-[#111111] border-orange-900/50" 
+            : "bg-gradient-to-br from-orange-100 via-white to-white border-orange-100"
+        }`}>
+          <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}>Current Streak</p>
+          <p className={`text-2xl md:text-3xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+            {writingStreak} <span className={`text-base font-medium ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>days</span>
           </p>
         </div>
 
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-100 via-white to-white border border-purple-100 hover:scale-[1.03] hover:shadow-lg transition-all duration-200">
-          <p className="text-xs text-purple-600 font-semibold uppercase tracking-wider mb-1">Most Active Day</p>
-          <p className="text-xl md:text-2xl font-bold text-gray-900 truncate">
+        <div className={`p-5 rounded-2xl border hover:scale-[1.03] hover:shadow-lg transition-all duration-200 ${
+          isDarkMode 
+            ? "bg-gradient-to-br from-purple-900/20 via-[#1a1a1a] to-[#111111] border-purple-900/50" 
+            : "bg-gradient-to-br from-purple-100 via-white to-white border-purple-100"
+        }`}>
+          <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${isDarkMode ? "text-purple-400" : "text-purple-600"}`}>Most Active Day</p>
+          <p className={`text-xl md:text-2xl font-bold truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}>
             {mostActiveDay?.[0] || "—"}
           </p>
           {mostActiveDay && (
-            <p className="text-sm text-gray-500 mt-0.5">{mostActiveDay[1]} total edits</p>
+            <p className={`text-sm mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>{mostActiveDay[1]} total edits</p>
           )}
         </div>
 
       </div>
 
-      <div className="border-t border-gray-100" />
+      <div className={`border-t ${isDarkMode ? "border-gray-800" : "border-gray-100"}`} />
 
       {/* 5. Tags Section */}
       <div className="pb-6">
-        <h3 className="text-sm font-semibold mb-3 text-gray-900">Top Tags</h3>
+        <h3 className={`text-sm font-semibold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Top Tags</h3>
         <div className="flex flex-wrap gap-2">
           {topTags.length > 0 ? (
             topTags.map(([tag, count]) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-1.5 bg-gray-50 text-gray-700 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-default"
+                className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors cursor-default ${
+                  isDarkMode 
+                    ? "bg-[#111111] text-gray-300 border-gray-800 hover:bg-gray-800" 
+                    : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+                }`}
               >
-                #{tag} <span className="text-gray-400">{count}</span>
+                #{tag} <span className={isDarkMode ? "text-gray-500" : "text-gray-400"}>{count}</span>
               </span>
             ))
           ) : (
-            <button className="text-sm text-green-600 font-medium hover:text-green-700 transition-colors">
+            <button className={`text-sm font-medium transition-colors ${
+              isDarkMode ? "text-green-400 hover:text-green-300" : "text-green-600 hover:text-green-700"
+            }`}>
               + Add tags to organize your workspace
             </button>
           )}

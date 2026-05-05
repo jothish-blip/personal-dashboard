@@ -4,9 +4,10 @@ import React, { useRef, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Bell, Trash2, X, Info, Calendar, Brain, 
-  Book, ListTodo, Search, LayoutGrid, AlertCircle, FileText
+  Book, ListTodo, Search, LayoutGrid, FileText
 } from 'lucide-react';
 import { NexNotification, NexModule } from './types';
+import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
 
 interface NotificationCenterProps {
   notifications: NexNotification[];
@@ -45,6 +46,7 @@ export default function NotificationCenter({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
 
   const [filter, setFilter] = useState<NexModule | 'all' | 'mini' | 'system'>('all');
   const [searchQuery, setSearchQuery] = useState("");
@@ -73,27 +75,30 @@ export default function NotificationCenter({
   };
 
   return (
-    <div className="absolute top-full right-0 mt-2 w-[360px] md:w-[420px] bg-white rounded-xl border border-gray-100 z-[100] overflow-hidden flex flex-col max-h-[560px]">
+    <div className={`absolute top-full right-0 mt-2 w-[360px] md:w-[420px] rounded-xl border z-[100] overflow-hidden flex flex-col max-h-[560px] shadow-2xl transition-colors duration-300 ${
+      isDarkMode ? "bg-[#111111] border-gray-800 shadow-black/50" : "bg-white border-gray-100 shadow-slate-200/50"
+    }`}>
 
       {/* Header */}
-      <div className="px-4 py-4 border-b border-gray-100 space-y-4">
+      <div className={`px-4 py-4 border-b space-y-4 transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
 
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">
+          <h3 className={`text-sm font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
             Notifications
           </h3>
 
           <div className="flex gap-1">
             <button 
               onClick={(e) => { e.stopPropagation(); clearAll(); }} 
-              className="p-2 hover:bg-gray-100 rounded-md text-gray-400"
+              className={`p-2 rounded-md transition-colors ${isDarkMode ? "hover:bg-gray-800 text-gray-500 hover:text-gray-300" : "hover:bg-gray-100 text-gray-400 hover:text-gray-600"}`}
+              title="Clear all"
             >
               <Trash2 size={16} />
             </button>
 
             <button 
               onClick={onClose} 
-              className="p-2 hover:bg-gray-100 rounded-md text-gray-400"
+              className={`p-2 rounded-md transition-colors ${isDarkMode ? "hover:bg-gray-800 text-gray-500 hover:text-gray-300" : "hover:bg-gray-100 text-gray-400 hover:text-gray-600"}`}
             >
               <X size={16} />
             </button>
@@ -102,26 +107,28 @@ export default function NotificationCenter({
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`} size={14} />
           <input 
             type="text"
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-2 text-sm bg-transparent border-b border-gray-200 focus:outline-none focus:border-black"
+            className={`w-full pl-8 pr-3 py-2 text-sm bg-transparent border-b outline-none transition-colors ${
+              isDarkMode ? "border-gray-800 text-white focus:border-gray-500 placeholder-gray-600" : "border-gray-200 text-gray-900 focus:border-black placeholder-gray-400"
+            }`}
           />
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-4 text-xs">
+        <div className="flex gap-4 text-xs overflow-x-auto scrollbar-hide pb-1">
           {['all', 'task', 'planner', 'focus', 'diary', 'mini', 'system'].map((m) => (
             <button
               key={m}
               onClick={() => setFilter(m as any)}
-              className={`capitalize ${
+              className={`capitalize transition-colors whitespace-nowrap ${
                 filter === m
-                  ? "text-black font-medium"
-                  : "text-gray-400"
+                  ? (isDarkMode ? "text-white font-semibold" : "text-black font-semibold")
+                  : (isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600")
               }`}
             >
               {m === 'mini' ? 'notes' : m}
@@ -131,10 +138,10 @@ export default function NotificationCenter({
       </div>
 
       {/* List */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-2 py-2 space-y-1 scrollbar-hide">
 
         {filteredNotifications.length === 0 ? (
-          <div className="py-16 flex flex-col items-center text-center text-gray-400">
+          <div className={`py-16 flex flex-col items-center text-center ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
             <LayoutGrid size={20} className="mb-2" />
             <p className="text-sm">No notifications</p>
           </div>
@@ -143,32 +150,36 @@ export default function NotificationCenter({
             <div
               key={n.id}
               onClick={() => handleNotificationClick(n)}
-              className="flex gap-3 px-3 py-3 rounded-md hover:bg-gray-50 cursor-pointer transition"
+              className={`flex gap-3 px-3 py-3 rounded-md cursor-pointer transition-all ${
+                isDarkMode ? "hover:bg-[#1a1a1a]" : "hover:bg-gray-50"
+              }`}
             >
-              <div className="mt-0.5">
+              <div className="mt-0.5 shrink-0">
                 <ModuleIcon module={n.module} />
               </div>
 
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start">
-                  <p className={`text-sm ${
-                    n.read ? "text-gray-600" : "text-gray-900 font-medium"
+                  <p className={`text-sm truncate pr-2 ${
+                    n.read 
+                      ? (isDarkMode ? "text-gray-500" : "text-gray-600") 
+                      : (isDarkMode ? "text-white font-medium" : "text-gray-900 font-medium")
                   }`}>
                     {n.title}
                   </p>
 
-                  <span className="text-xs text-gray-400">
+                  <span className={`text-xs shrink-0 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
                     {formatTimeAgo(n.timestamp)}
                   </span>
                 </div>
 
-                <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                <p className={`text-sm mt-1 line-clamp-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                   {n.body}
                 </p>
               </div>
 
               {!n.read && (
-                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
+                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 shrink-0" />
               )}
             </div>
           ))
@@ -177,16 +188,16 @@ export default function NotificationCenter({
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+      <div className={`px-4 py-3 border-t flex items-center justify-between transition-colors ${isDarkMode ? "border-gray-800 bg-[#0a0a0a]" : "border-gray-100 bg-gray-50/50"}`}>
 
-        <span className="text-xs text-gray-400">
+        <span className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
           {unreadCount} unread
         </span>
 
-        <div className="flex gap-2">
+        <div className="flex gap-4">
           <button 
             onClick={onClose}
-            className="text-xs text-gray-500 hover:text-black"
+            className={`text-xs transition-colors ${isDarkMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-black"}`}
           >
             Close
           </button>
@@ -196,7 +207,7 @@ export default function NotificationCenter({
               router.push('/notifications');
               onClose();
             }}
-            className="text-xs font-medium text-black"
+            className={`text-xs font-bold transition-colors ${isDarkMode ? "text-white hover:text-gray-300" : "text-black hover:text-gray-600"}`}
           >
             View all
           </button>

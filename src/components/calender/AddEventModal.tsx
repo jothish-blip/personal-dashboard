@@ -1,6 +1,9 @@
+"use client";
+
 import React, { useRef, useEffect, useState } from "react";
 import { X, Clock, Mic, Sparkles, HelpCircle } from "lucide-react";
 import { TaskType, Priority, PlannerEvent } from "./types";
+import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
 
 interface AddEventModalProps {
   isOpen: boolean;
@@ -26,6 +29,7 @@ export default function AddEventModal({
   setFormData,
   handleSave
 }: AddEventModalProps) {
+  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
   const titleInputRef = useRef<HTMLInputElement>(null);
   
   // States for new features
@@ -181,31 +185,41 @@ export default function AddEventModal({
   return (
     <div 
       onClick={onClose}
-      className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-end md:items-center justify-center p-0 md:p-6 transition-opacity"
+      className={`fixed inset-0 z-[200] flex items-end md:items-center justify-center p-0 md:p-6 transition-opacity backdrop-blur-sm ${
+        isDarkMode ? "bg-black/60" : "bg-slate-900/40"
+      }`}
     >
       <div 
         onClick={(e) => e.stopPropagation()} 
-        className="bg-white w-full md:max-w-lg rounded-t-[2rem] md:rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.15)] p-5 md:p-10 space-y-5 animate-in slide-in-from-bottom-8 md:zoom-in-95 max-h-[90vh] overflow-y-auto scrollbar-hide"
+        className={`w-full md:max-w-lg rounded-t-[2rem] md:rounded-[2rem] p-5 md:p-10 space-y-5 animate-in slide-in-from-bottom-8 md:zoom-in-95 max-h-[90vh] overflow-y-auto scrollbar-hide border ${
+          isDarkMode ? "bg-[#111111] shadow-[0_20px_60px_rgba(0,0,0,0.5)] border-gray-800" : "bg-white shadow-[0_20px_60px_rgba(0,0,0,0.15)] border-transparent"
+        }`}
       >
-        <div className="w-10 h-1.5 bg-slate-200 rounded-full mx-auto mb-2 md:hidden" />
+        <div className={`w-10 h-1.5 rounded-full mx-auto mb-2 md:hidden ${isDarkMode ? "bg-gray-800" : "bg-slate-200"}`} />
 
-        {/* HEADER & 2. HELP ICON */}
+        {/* HEADER & HELP ICON */}
         <div className="flex flex-col gap-3">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <h3 className="text-xl font-bold text-slate-900 tracking-tight">
+              <h3 className={`text-xl font-bold tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>
                 {isEdit ? "Edit Task" : "Add Task"}
               </h3>
               <button 
                 onClick={() => setShowHelp(!showHelp)}
-                className={`p-1.5 rounded-full transition-colors ${showHelp ? 'bg-orange-100 text-orange-600' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
+                className={`p-1.5 rounded-full transition-colors ${
+                  showHelp 
+                    ? (isDarkMode ? 'bg-orange-900/30 text-orange-400' : 'bg-orange-100 text-orange-600') 
+                    : (isDarkMode ? 'text-gray-500 hover:text-gray-300 hover:bg-gray-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100')
+                }`}
               >
                 <HelpCircle size={16} />
               </button>
             </div>
             <button 
               onClick={onClose} 
-              className="p-2 bg-slate-50 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors"
+              className={`p-2 rounded-full transition-colors ${
+                isDarkMode ? "bg-gray-900 text-gray-500 hover:text-white hover:bg-gray-800" : "bg-slate-50 text-slate-400 hover:text-slate-900 hover:bg-slate-100"
+              }`}
             >
               <X size={20} />
             </button>
@@ -213,7 +227,9 @@ export default function AddEventModal({
 
           {/* Help Tooltip */}
           {showHelp && (
-            <div className="text-xs text-orange-800 bg-orange-50 border border-orange-100 p-3 rounded-xl animate-in fade-in zoom-in-95">
+            <div className={`text-xs p-3 rounded-xl animate-in fade-in zoom-in-95 border ${
+              isDarkMode ? "bg-orange-950/30 border-orange-900/50 text-orange-400" : "text-orange-800 bg-orange-50 border-orange-100"
+            }`}>
               Plan only present or future tasks. This system is designed for active execution, not past tracking.
             </div>
           )}
@@ -221,9 +237,9 @@ export default function AddEventModal({
 
         <div className="space-y-5">
           
-          {/* TITLE INPUT & 3. VOICE INPUT */}
+          {/* TITLE INPUT & VOICE INPUT */}
           <div>
-            <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Task Name</label>
+            <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Task Name</label>
             <div className="relative mt-2">
               <input
                 ref={titleInputRef}
@@ -232,14 +248,18 @@ export default function AddEventModal({
                 onChange={handleTitleChange}
                 onKeyDown={handleKeyDown}
                 placeholder="Type task... (e.g., Finish report at 5pm)"
-                className="w-full p-3.5 pr-12 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none font-bold text-base transition-all placeholder:font-medium placeholder:text-slate-300"
+                className={`w-full p-3.5 pr-12 border rounded-2xl outline-none font-bold text-base transition-all placeholder:font-medium ${
+                  isDarkMode 
+                    ? "bg-[#0a0a0a] border-gray-800 text-white placeholder-gray-600 focus:bg-[#111111] focus:border-orange-500 focus:ring-4 focus:ring-orange-900/20" 
+                    : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-300 focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10"
+                }`}
               />
               <button
                 onClick={startVoiceInput}
                 className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-all ${
                   isListening 
-                    ? "text-orange-500 bg-orange-100 animate-pulse" 
-                    : "text-slate-400 hover:text-orange-500 hover:bg-orange-50"
+                    ? (isDarkMode ? "text-orange-400 bg-orange-900/30 animate-pulse" : "text-orange-500 bg-orange-100 animate-pulse")
+                    : (isDarkMode ? "text-gray-500 hover:text-orange-400 hover:bg-orange-900/20" : "text-slate-400 hover:text-orange-500 hover:bg-orange-50")
                 }`}
                 title="Use voice input"
               >
@@ -248,9 +268,11 @@ export default function AddEventModal({
             </div>
           </div>
 
-          {/* 5. FOCUS TASK SUGGESTION */}
+          {/* FOCUS TASK SUGGESTION */}
           {!isEdit && (
-            <div className="bg-gradient-to-r from-orange-50 to-amber-50 p-3 rounded-xl text-xs text-orange-700 font-semibold flex items-start gap-2 border border-orange-100/50">
+            <div className={`p-3 rounded-xl text-xs font-semibold flex items-start gap-2 border ${
+              isDarkMode ? "bg-orange-950/20 text-orange-400 border-orange-900/30" : "bg-gradient-to-r from-orange-50 to-amber-50 text-orange-700 border-orange-100/50"
+            }`}>
               <Sparkles size={14} className="text-orange-500 shrink-0 mt-0.5" />
               <span>Suggested Focus: Start with your highest priority pending task to build momentum.</span>
             </div>
@@ -260,7 +282,7 @@ export default function AddEventModal({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <div className="flex justify-between items-center h-[18px]">
-                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Date</label>
+                <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Date</label>
                 <button 
                   onClick={() => setFormData({ ...formData, date: getNowLocal().date })}
                   className="text-xs text-orange-500 font-semibold hover:text-orange-600 transition-colors"
@@ -270,17 +292,19 @@ export default function AddEventModal({
               </div>
               <input
                 type="date"
-                min={getNowLocal().date} // 1. Prevent past dates in UI
+                min={getNowLocal().date} // Prevent past dates in UI
                 value={formData.date || ""}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm focus:border-orange-500 transition-colors"
+                className={`w-full p-3.5 border rounded-2xl outline-none font-bold text-sm focus:border-orange-500 transition-colors ${
+                  isDarkMode ? "bg-[#0a0a0a] border-gray-800 text-white color-scheme-dark" : "bg-slate-50 border-slate-200 text-slate-900"
+                }`}
               />
             </div>
 
             <div className="space-y-2">
               <div className="flex justify-between items-center h-[18px]">
-                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Time</label>
-                {/* 4. AI AUTO-SCHEDULING */}
+                <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Time</label>
+                {/* AI AUTO-SCHEDULING */}
                 <button 
                   onClick={suggestTime}
                   className="text-[10px] uppercase tracking-wider text-blue-500 font-bold hover:text-blue-600 transition-colors flex items-center gap-1"
@@ -292,33 +316,55 @@ export default function AddEventModal({
                 type="time"
                 value={formData.time || ""}
                 onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm focus:border-orange-500 transition-colors"
+                className={`w-full p-3.5 border rounded-2xl outline-none font-bold text-sm focus:border-orange-500 transition-colors ${
+                  isDarkMode ? "bg-[#0a0a0a] border-gray-800 text-white color-scheme-dark" : "bg-slate-50 border-slate-200 text-slate-900"
+                }`}
               />
             </div>
           </div>
 
           {/* QUICK TIME BUTTONS */}
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-             <Clock size={14} className="text-slate-300 shrink-0" />
-             <button onClick={() => setQuickTime(0)} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${checkQuickTimeMatch(0) ? "bg-orange-500 text-white shadow-sm" : "bg-orange-50 hover:bg-orange-100 text-orange-600"}`}>Now</button>
-             <button onClick={() => setQuickTime(15)} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${checkQuickTimeMatch(15) ? "bg-slate-800 text-white shadow-sm" : "bg-slate-50 hover:bg-slate-100 text-slate-700"}`}>+15 Min</button>
-             <button onClick={() => setQuickTime(30)} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${checkQuickTimeMatch(30) ? "bg-slate-800 text-white shadow-sm" : "bg-slate-50 hover:bg-slate-100 text-slate-700"}`}>+30 Min</button>
-             <button onClick={() => setQuickTime(60)} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${checkQuickTimeMatch(60) ? "bg-slate-800 text-white shadow-sm" : "bg-slate-50 hover:bg-slate-100 text-slate-700"}`}>+1 Hour</button>
+             <Clock size={14} className={`shrink-0 ${isDarkMode ? "text-gray-600" : "text-slate-300"}`} />
+             
+             <button onClick={() => setQuickTime(0)} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+               checkQuickTimeMatch(0) 
+                 ? "bg-orange-500 text-white border-orange-500 shadow-sm" 
+                 : (isDarkMode ? "bg-orange-950/20 hover:bg-orange-900/30 text-orange-500 border-orange-900/50" : "bg-orange-50 hover:bg-orange-100 text-orange-600 border-transparent")
+             }`}>Now</button>
+             
+             <button onClick={() => setQuickTime(15)} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+               checkQuickTimeMatch(15) 
+                 ? (isDarkMode ? "bg-gray-700 text-white border-gray-600 shadow-sm" : "bg-slate-800 text-white border-slate-800 shadow-sm") 
+                 : (isDarkMode ? "bg-[#0a0a0a] hover:bg-gray-800 text-gray-300 border-gray-800" : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-transparent")
+             }`}>+15 Min</button>
+             
+             <button onClick={() => setQuickTime(30)} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+               checkQuickTimeMatch(30) 
+                 ? (isDarkMode ? "bg-gray-700 text-white border-gray-600 shadow-sm" : "bg-slate-800 text-white border-slate-800 shadow-sm") 
+                 : (isDarkMode ? "bg-[#0a0a0a] hover:bg-gray-800 text-gray-300 border-gray-800" : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-transparent")
+             }`}>+30 Min</button>
+             
+             <button onClick={() => setQuickTime(60)} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+               checkQuickTimeMatch(60) 
+                 ? (isDarkMode ? "bg-gray-700 text-white border-gray-600 shadow-sm" : "bg-slate-800 text-white border-slate-800 shadow-sm") 
+                 : (isDarkMode ? "bg-[#0a0a0a] hover:bg-gray-800 text-gray-300 border-gray-800" : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-transparent")
+             }`}>+1 Hour</button>
           </div>
 
           <div className="pt-2 space-y-4">
             {/* CATEGORY */}
             <div>
-              <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Category</label>
+              <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Category</label>
               <div className="grid grid-cols-4 gap-2 mt-2">
                 {["Work", "Study", "Health", "Finance", "Personal", "Deep Work", "Learning", "Meeting"].map((t) => (
                   <button
                     key={t}
                     onClick={() => setFormData({ ...formData, type: t as TaskType })}
-                    className={`p-2 rounded-lg text-[11px] font-semibold transition-all ${
+                    className={`p-2 rounded-lg text-[11px] font-semibold transition-all border ${
                       formData.type === t
-                        ? "bg-orange-100 text-orange-600 shadow-sm border border-orange-200"
-                        : "bg-slate-50 text-slate-500 hover:bg-slate-100 border border-transparent"
+                        ? (isDarkMode ? "bg-orange-900/30 text-orange-400 border-orange-800/50 shadow-sm" : "bg-orange-100 text-orange-600 border-orange-200 shadow-sm")
+                        : (isDarkMode ? "bg-[#0a0a0a] text-gray-400 hover:bg-[#1a1a1a] border-gray-800" : "bg-slate-50 text-slate-500 hover:bg-slate-100 border-transparent")
                     }`}
                   >
                     {t}
@@ -329,7 +375,7 @@ export default function AddEventModal({
 
             {/* PRIORITY */}
             <div className="pt-1">
-              <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Priority</label>
+              <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Priority</label>
               <div className="flex gap-2 mt-2">
                 {["low", "medium", "high"].map((p) => (
                   <button
@@ -338,11 +384,11 @@ export default function AddEventModal({
                     className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all border ${
                       formData.priority === p
                         ? p === "high"
-                          ? "bg-red-50 text-red-600 border-red-200 shadow-sm"
+                          ? (isDarkMode ? "bg-red-900/30 text-red-400 border-red-800/50 shadow-sm" : "bg-red-50 text-red-600 border-red-200 shadow-sm")
                           : p === "medium"
-                          ? "bg-orange-50 text-orange-600 border-orange-200 shadow-sm"
-                          : "bg-slate-800 text-white border-slate-800 shadow-sm"
-                        : "bg-slate-50 text-slate-400 border-transparent hover:bg-slate-100"
+                          ? (isDarkMode ? "bg-orange-900/30 text-orange-400 border-orange-800/50 shadow-sm" : "bg-orange-50 text-orange-600 border-orange-200 shadow-sm")
+                          : (isDarkMode ? "bg-gray-700 text-white border-gray-600 shadow-sm" : "bg-slate-800 text-white border-slate-800 shadow-sm")
+                        : (isDarkMode ? "bg-[#0a0a0a] text-gray-500 hover:bg-[#1a1a1a] border-gray-800" : "bg-slate-50 text-slate-400 border-transparent hover:bg-slate-100")
                     }`}
                   >
                     {p}
@@ -357,9 +403,13 @@ export default function AddEventModal({
             <button
               onClick={handleValidatedSave}
               disabled={!formData.title?.trim() || !formData.time}
-              className="w-full py-4 bg-orange-500 hover:bg-orange-600 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none text-white rounded-2xl text-sm font-semibold shadow-[0_8px_30px_rgba(249,115,22,0.3)] transition-all active:scale-[0.98]"
+              className={`w-full py-4 text-white rounded-2xl text-sm font-semibold transition-all active:scale-[0.98] ${
+                !formData.title?.trim() || !formData.time 
+                  ? (isDarkMode ? "bg-gray-900 text-gray-600 shadow-none" : "bg-slate-100 text-slate-400 shadow-none") 
+                  : "bg-orange-500 hover:bg-orange-600 shadow-[0_8px_30px_rgba(249,115,22,0.3)]"
+              }`}
             >
-              {/* 6. Prevent Empty / Bad Input Contextual Text */}
+              {/* Prevent Empty / Bad Input Contextual Text */}
               {!formData.title?.trim()
                 ? "Enter task name"
                 : !formData.time

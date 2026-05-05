@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Smile, Meh, Frown, 
@@ -8,9 +10,11 @@ import {
   HelpCircle, Undo, Sparkles, Lock
 } from 'lucide-react';
 import { PREDEFINED_TAGS, PREDEFINED_FRICTIONS } from './types';
+import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
 
 // --- Mobile-Friendly Click-to-Toggle Help Tooltip ---
 const HelpTip = ({ text }: { text: string }) => {
+  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
   const [open, setOpen] = useState(false);
   const tipRef = useRef<HTMLDivElement>(null);
 
@@ -29,15 +33,19 @@ const HelpTip = ({ text }: { text: string }) => {
       <button
         type="button"
         onClick={(e) => { e.preventDefault(); setOpen(!open); }}
-        className={`transition-colors focus:outline-none ${open ? 'text-orange-500' : 'text-gray-300 hover:text-orange-400'}`}
+        className={`transition-colors focus:outline-none ${open ? 'text-orange-500' : (isDarkMode ? 'text-gray-600 hover:text-orange-400' : 'text-gray-300 hover:text-orange-400')}`}
       >
         <HelpCircle size={13} />
       </button>
 
       {open && (
-        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 max-w-[85vw] p-3 rounded-xl bg-white border border-gray-200 text-gray-700 text-xs font-medium shadow-xl text-center leading-relaxed animate-in fade-in zoom-in-95 duration-150">
+        <div className={`absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 max-w-[85vw] p-3 rounded-xl border text-xs font-medium shadow-xl text-center leading-relaxed animate-in fade-in zoom-in-95 duration-150 ${
+          isDarkMode ? "bg-[#1a1a1a] border-gray-800 text-gray-300" : "bg-white border-gray-200 text-gray-700"
+        }`}>
           {text}
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-b border-r border-gray-200 rotate-45" />
+          <div className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 border-b border-r ${
+            isDarkMode ? "bg-[#1a1a1a] border-gray-800" : "bg-white border-gray-200"
+          }`} />
         </div>
       )}
     </div>
@@ -56,6 +64,8 @@ export default function BehaviorPanel({ system }: any) {
     newRelatedDate, setNewRelatedDate, addRelatedDate, removeRelatedDate 
   } = system;
   
+  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
+
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [customTag, setCustomTag] = useState('');
   const [customFriction, setCustomFriction] = useState('');
@@ -166,14 +176,74 @@ export default function BehaviorPanel({ system }: any) {
     return insights;
   }, [currentEntry.energy, currentEntry.frictions, currentEntry.distractionLevel, currentEntry.sleep]);
 
+  // --- Dark Mode State Generators ---
+  const getMoodClass = (mood: string, current: string) => {
+    if (current !== mood) {
+      return isDarkMode ? "bg-[#111111] border-gray-800 text-gray-500 hover:bg-[#1a1a1a]" : "bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200";
+    }
+    if (mood === 'good') return isDarkMode ? "bg-green-950/30 border-green-800 text-green-400 ring-2 ring-green-900/50 ring-offset-1 ring-offset-[#0a0a0a]" : "bg-green-50 border-green-300 text-green-700 ring-2 ring-green-100 ring-offset-1";
+    if (mood === 'neutral') return isDarkMode ? "bg-gray-800 border-gray-600 text-gray-200 ring-2 ring-gray-700 ring-offset-1 ring-offset-[#0a0a0a]" : "bg-gray-100 border-gray-400 text-gray-800 ring-2 ring-gray-100 ring-offset-1";
+    return isDarkMode ? "bg-red-950/30 border-red-800 text-red-400 ring-2 ring-red-900/50 ring-offset-1 ring-offset-[#0a0a0a]" : "bg-red-50 border-red-300 text-red-700 ring-2 ring-red-100 ring-offset-1";
+  };
+
+  const getEnergyClass = (energy: string, current: string) => {
+    if (current !== energy) {
+      return isDarkMode ? "bg-[#111111] border-gray-800 text-gray-500 hover:bg-[#1a1a1a]" : "bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200";
+    }
+    if (energy === 'high') return isDarkMode ? "bg-emerald-950/30 border-emerald-800 text-emerald-400 ring-2 ring-emerald-900/50 ring-offset-1 ring-offset-[#0a0a0a]" : "bg-emerald-50 border-emerald-300 text-emerald-700 ring-2 ring-emerald-100 ring-offset-1";
+    if (energy === 'medium') return isDarkMode ? "bg-orange-950/30 border-orange-800 text-orange-400 ring-2 ring-orange-900/50 ring-offset-1 ring-offset-[#0a0a0a]" : "bg-orange-50 border-orange-300 text-orange-700 ring-2 ring-orange-100 ring-offset-1";
+    return isDarkMode ? "bg-red-950/30 border-red-800 text-red-400 ring-2 ring-red-900/50 ring-offset-1 ring-offset-[#0a0a0a]" : "bg-red-50 border-red-300 text-red-700 ring-2 ring-red-100 ring-offset-1";
+  };
+
+  const getSleepClass = (sleep: string, current: string) => {
+    if (current !== sleep) {
+      return isDarkMode ? "bg-[#111111] border-gray-800 text-gray-500 hover:bg-[#1a1a1a]" : "bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200";
+    }
+    if (sleep === 'good') return isDarkMode ? "bg-indigo-950/30 border-indigo-800 text-indigo-400 ring-2 ring-indigo-900/50 ring-offset-1 ring-offset-[#0a0a0a]" : "bg-indigo-50 border-indigo-300 text-indigo-700 ring-2 ring-indigo-100 ring-offset-1";
+    if (sleep === 'average') return isDarkMode ? "bg-gray-800 border-gray-600 text-gray-200 ring-2 ring-gray-700 ring-offset-1 ring-offset-[#0a0a0a]" : "bg-gray-100 border-gray-400 text-gray-800 ring-2 ring-gray-100 ring-offset-1";
+    return isDarkMode ? "bg-red-950/30 border-red-800 text-red-400 ring-2 ring-red-900/50 ring-offset-1 ring-offset-[#0a0a0a]" : "bg-red-50 border-red-300 text-red-700 ring-2 ring-red-100 ring-offset-1";
+  };
+
+  const baseInputClass = `w-full border rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-orange-400 transition-colors ${
+    isDarkMode 
+      ? "bg-[#111111] border-gray-800 text-gray-200 focus:bg-[#1a1a1a] placeholder-gray-600 [&>option]:bg-[#111111]" 
+      : "bg-gray-50 border-gray-200 text-gray-800 focus:bg-white placeholder-gray-400"
+  }`;
+
+  const baseInputSmallClass = `flex-1 px-4 py-2 text-sm border rounded-xl outline-none focus:border-orange-400 transition-colors shadow-sm ${
+    isDarkMode ? "bg-[#111111] border-gray-800 text-gray-200 placeholder-gray-600" : "bg-white border-gray-200 text-gray-700 placeholder-gray-400"
+  }`;
+
+  const baseButtonClass = `px-4 py-2 text-xs font-bold border rounded-xl transition-colors shadow-sm ${
+    isDarkMode ? "bg-[#111111] border-gray-800 text-gray-300 hover:bg-[#1a1a1a]" : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+  }`;
+
+  const unselectedPillClass = `px-2.5 py-1 rounded-md text-[11px] font-bold border transition-all shadow-sm ${
+    isDarkMode ? "bg-[#111111] text-gray-400 border-gray-800 hover:bg-[#1a1a1a]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+  }`;
+
+  const plusOptionClass = `text-[10px] px-2 py-1 rounded-md font-medium transition-colors ${
+    isDarkMode ? "bg-gray-800 text-gray-400 hover:bg-gray-700" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+  }`;
+
+  const dividerClass = `my-4 border-t ${isDarkMode ? "border-gray-800" : "border-gray-100"}`;
+
   return (
-    <div className="bg-white border border-gray-200 rounded-[24px] p-5 sm:p-6 shadow-sm mt-6">
+    <div className={`border rounded-[24px] p-5 sm:p-6 shadow-sm mt-6 transition-colors ${
+      isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-200"
+    }`}>
       
       {/* Visual State & Top Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-6 pb-4 border-b border-gray-100">
+      <div className={`flex flex-wrap items-center justify-between gap-2 mb-6 pb-4 border-b ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mr-1">Day Score:</span>
-          <span className={`text-[12px] font-bold px-2.5 py-1 rounded-md ${dayQualityScore >= 70 ? 'bg-emerald-50 text-emerald-700' : dayQualityScore < 40 ? 'bg-red-50 text-red-700' : 'bg-orange-50 text-orange-700'}`}>
+          <span className={`text-[12px] font-bold px-2.5 py-1 rounded-md border ${
+            dayQualityScore >= 70 
+              ? (isDarkMode ? 'bg-emerald-950/30 text-emerald-400 border-emerald-900/50' : 'bg-emerald-50 text-emerald-700 border-transparent') 
+              : dayQualityScore < 40 
+                ? (isDarkMode ? 'bg-red-950/30 text-red-400 border-red-900/50' : 'bg-red-50 text-red-700 border-transparent') 
+                : (isDarkMode ? 'bg-orange-950/30 text-orange-400 border-orange-900/50' : 'bg-orange-50 text-orange-700 border-transparent')
+          }`}>
             {dayQualityScore}/100
           </span>
         </div>
@@ -200,13 +270,13 @@ export default function BehaviorPanel({ system }: any) {
             <HelpTip text="How you emotionally felt today. Helps detect emotional patterns over time." />
           </div>
           <div className="flex gap-2">
-            <button onClick={() => handleAction({ mood: 'good' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${currentEntry.mood === 'good' ? 'bg-green-50 border-green-300 text-green-700 shadow-sm ring-2 ring-green-100 ring-offset-1' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200'}`}>
+            <button onClick={() => handleAction({ mood: 'good' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getMoodClass('good', currentEntry.mood)}`}>
               <Smile size={20} /> <span className="text-[10px] font-bold uppercase">Good</span>
             </button>
-            <button onClick={() => handleAction({ mood: 'neutral' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${currentEntry.mood === 'neutral' ? 'bg-gray-100 border-gray-400 text-gray-800 shadow-sm ring-2 ring-gray-100 ring-offset-1' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200'}`}>
+            <button onClick={() => handleAction({ mood: 'neutral' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getMoodClass('neutral', currentEntry.mood)}`}>
               <Meh size={20} /> <span className="text-[10px] font-bold uppercase">Neutral</span>
             </button>
-            <button onClick={() => handleAction({ mood: 'bad' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${currentEntry.mood === 'bad' ? 'bg-red-50 border-red-300 text-red-700 shadow-sm ring-2 ring-red-100 ring-offset-1' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200'}`}>
+            <button onClick={() => handleAction({ mood: 'bad' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getMoodClass('bad', currentEntry.mood)}`}>
               <Frown size={20} /> <span className="text-[10px] font-bold uppercase">Low</span>
             </button>
           </div>
@@ -219,13 +289,13 @@ export default function BehaviorPanel({ system }: any) {
             <HelpTip text="Your physical & mental energy level. Strongly impacts productivity patterns." />
           </div>
           <div className="flex gap-2">
-            <button onClick={() => handleAction({ energy: 'high' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${currentEntry.energy === 'high' ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm ring-2 ring-emerald-100 ring-offset-1' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200'}`}>
+            <button onClick={() => handleAction({ energy: 'high' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getEnergyClass('high', currentEntry.energy)}`}>
               <BatteryFull size={20} /> <span className="text-[10px] font-bold uppercase">High</span>
             </button>
-            <button onClick={() => handleAction({ energy: 'medium' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${currentEntry.energy === 'medium' ? 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm ring-2 ring-orange-100 ring-offset-1' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200'}`}>
+            <button onClick={() => handleAction({ energy: 'medium' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getEnergyClass('medium', currentEntry.energy)}`}>
               <BatteryMedium size={20} /> <span className="text-[10px] font-bold uppercase">Med</span>
             </button>
-            <button onClick={() => handleAction({ energy: 'low' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${currentEntry.energy === 'low' ? 'bg-red-50 border-red-300 text-red-700 shadow-sm ring-2 ring-red-100 ring-offset-1' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200'}`}>
+            <button onClick={() => handleAction({ energy: 'low' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getEnergyClass('low', currentEntry.energy)}`}>
               <Battery size={20} /> <span className="text-[10px] font-bold uppercase">Low</span>
             </button>
           </div>
@@ -238,13 +308,13 @@ export default function BehaviorPanel({ system }: any) {
             <HelpTip text="The foundation of performance. Correlates directly with focus and willpower." />
           </div>
           <div className="flex gap-2">
-            <button onClick={() => handleAction({ sleep: 'good' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${currentEntry.sleep === 'good' ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-sm ring-2 ring-indigo-100 ring-offset-1' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200'}`}>
+            <button onClick={() => handleAction({ sleep: 'good' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getSleepClass('good', currentEntry.sleep)}`}>
               <Moon size={20} /> <span className="text-[10px] font-bold uppercase">Good</span>
             </button>
-            <button onClick={() => handleAction({ sleep: 'average' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${currentEntry.sleep === 'average' ? 'bg-gray-100 border-gray-400 text-gray-800 shadow-sm ring-2 ring-gray-100 ring-offset-1' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200'}`}>
+            <button onClick={() => handleAction({ sleep: 'average' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getSleepClass('average', currentEntry.sleep)}`}>
               <Cloud size={20} /> <span className="text-[10px] font-bold uppercase">Avg</span>
             </button>
-            <button onClick={() => handleAction({ sleep: 'poor' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${currentEntry.sleep === 'poor' ? 'bg-red-50 border-red-300 text-red-700 shadow-sm ring-2 ring-red-100 ring-offset-1' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200'}`}>
+            <button onClick={() => handleAction({ sleep: 'poor' })} className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getSleepClass('poor', currentEntry.sleep)}`}>
               <CloudRain size={20} /> <span className="text-[10px] font-bold uppercase">Poor</span>
             </button>
           </div>
@@ -252,22 +322,26 @@ export default function BehaviorPanel({ system }: any) {
       </div>
 
       {/* Auto-Generated Summary */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 mb-6 text-center shadow-sm">
-        <p className="text-sm font-medium text-gray-700 italic">
+      <div className={`border rounded-xl py-3 px-4 mb-6 text-center shadow-sm ${
+        isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-200"
+      }`}>
+        <p className={`text-sm font-medium italic ${isDarkMode ? "text-gray-400" : "text-gray-700"}`}>
           "{dailySummary}"
         </p>
       </div>
 
       {/* Consolidated Insights Card */}
       {activeInsights.length > 0 && (
-        <div className="mb-6 bg-white border border-gray-200 p-4 rounded-xl shadow-sm animate-in fade-in slide-in-from-bottom-2">
-          <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
+        <div className={`mb-6 border p-4 rounded-xl shadow-sm animate-in fade-in slide-in-from-bottom-2 ${
+          isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"
+        }`}>
+          <div className={`flex items-center gap-2 mb-3 border-b pb-2 ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
             <Sparkles size={14} className="text-orange-500" />
             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">System Intelligence</span>
           </div>
           <div className="space-y-3">
             {activeInsights.map((insight, idx) => (
-              <div key={idx} className="flex items-start gap-3 text-sm font-medium text-gray-700">
+              <div key={idx} className={`flex items-start gap-3 text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
                 <div className="mt-0.5 text-orange-500 shrink-0">{insight.icon}</div>
                 <p>{insight.text}</p>
               </div>
@@ -280,7 +354,9 @@ export default function BehaviorPanel({ system }: any) {
       <button 
         onClick={() => setShowAdvanced(!showAdvanced)} 
         className={`flex items-center justify-between w-full px-5 py-3.5 rounded-xl border transition-all ${
-          showAdvanced ? 'bg-gray-50 border-gray-300 text-gray-800 shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+          showAdvanced 
+            ? (isDarkMode ? 'bg-[#1a1a1a] border-gray-800 text-gray-200' : 'bg-gray-50 border-gray-300 text-gray-800 shadow-sm') 
+            : (isDarkMode ? 'bg-[#111111] border-gray-800 text-gray-400 hover:bg-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50')
         }`}
       >
         <span className="text-xs font-bold uppercase tracking-widest">
@@ -303,7 +379,7 @@ export default function BehaviorPanel({ system }: any) {
               <select 
                 value={currentEntry.environment || 'home'} 
                 onChange={(e) => handleAction({ environment: e.target.value })} 
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-bold text-gray-700 outline-none focus:border-orange-400 focus:bg-white transition-colors cursor-pointer"
+                className={baseInputClass}
               >
                 <option value="home">🏡 Home Base</option>
                 <option value="office">🏢 Office / Work</option>
@@ -320,7 +396,7 @@ export default function BehaviorPanel({ system }: any) {
               <select 
                 value={currentEntry.focusArea || 'None'} 
                 onChange={(e) => handleAction({ focusArea: e.target.value })} 
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-bold text-gray-700 outline-none focus:border-orange-400 focus:bg-white transition-colors cursor-pointer"
+                className={baseInputClass}
               >
                 <option value="None">No focus selected</option>
                 <option value="Work">💼 Work</option>
@@ -340,7 +416,7 @@ export default function BehaviorPanel({ system }: any) {
                    {currentEntry.distractionLevel || 0}%
                  </span>
               </div>
-              <div className="flex items-center gap-3 bg-gray-50 px-4 py-3 mt-2 rounded-xl border border-gray-100 mb-2">
+              <div className={`flex items-center gap-3 px-4 py-3 mt-2 rounded-xl border mb-2 ${isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-100"}`}>
                 <input 
                   type="range" min="0" max="100" 
                   value={currentEntry.distractionLevel || 0} 
@@ -360,7 +436,7 @@ export default function BehaviorPanel({ system }: any) {
                    {currentEntry.goalAlignment || 50}%
                  </span>
               </div>
-              <div className="flex items-center gap-3 bg-gray-50 px-4 py-3 mt-2 rounded-xl border border-gray-100 mb-2">
+              <div className={`flex items-center gap-3 px-4 py-3 mt-2 rounded-xl border mb-2 ${isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-100"}`}>
                 <input 
                   type="range" min="0" max="100" 
                   value={currentEntry.goalAlignment || 50} 
@@ -371,7 +447,7 @@ export default function BehaviorPanel({ system }: any) {
             </div>
           </div>
 
-          <hr className="border-gray-100 my-4" />
+          <hr className={dividerClass} />
 
           {/* SECTION 3: ADVANCED DYNAMICS */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 lg:gap-6">
@@ -379,7 +455,7 @@ export default function BehaviorPanel({ system }: any) {
               <div className="flex items-center mb-3">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Time Structure</span>
               </div>
-              <select value={currentEntry.dayStructure || 'semi-structured'} onChange={(e) => handleAction({ dayStructure: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:border-orange-400 focus:bg-white transition-colors">
+              <select value={currentEntry.dayStructure || 'semi-structured'} onChange={(e) => handleAction({ dayStructure: e.target.value })} className={baseInputClass}>
                 <option value="structured">📐 Structured</option>
                 <option value="semi-structured">📏 Semi-Structured</option>
                 <option value="chaotic">🌪️ Chaotic</option>
@@ -389,7 +465,7 @@ export default function BehaviorPanel({ system }: any) {
               <div className="flex items-center mb-3">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Execution Depth</span>
               </div>
-              <select value={currentEntry.executionQuality || 'shallow'} onChange={(e) => handleAction({ executionQuality: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:border-orange-400 focus:bg-white transition-colors">
+              <select value={currentEntry.executionQuality || 'shallow'} onChange={(e) => handleAction({ executionQuality: e.target.value })} className={baseInputClass}>
                 <option value="deep">🌊 Deep</option>
                 <option value="shallow">💧 Shallow</option>
                 <option value="fragmented">🧩 Fragmented</option>
@@ -399,7 +475,7 @@ export default function BehaviorPanel({ system }: any) {
               <div className="flex items-center mb-3">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Cognitive Load</span>
               </div>
-              <select value={currentEntry.cognitiveLoad || 'medium'} onChange={(e) => handleAction({ cognitiveLoad: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:border-orange-400 focus:bg-white transition-colors">
+              <select value={currentEntry.cognitiveLoad || 'medium'} onChange={(e) => handleAction({ cognitiveLoad: e.target.value })} className={baseInputClass}>
                 <option value="low">🟢 Low</option>
                 <option value="medium">🟡 Medium</option>
                 <option value="high">🔴 High</option>
@@ -409,7 +485,7 @@ export default function BehaviorPanel({ system }: any) {
               <div className="flex items-center mb-3">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Social Exposure</span>
               </div>
-              <select value={currentEntry.socialLoad || 'balanced'} onChange={(e) => handleAction({ socialLoad: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:border-orange-400 focus:bg-white transition-colors">
+              <select value={currentEntry.socialLoad || 'balanced'} onChange={(e) => handleAction({ socialLoad: e.target.value })} className={baseInputClass}>
                 <option value="isolated">🏝️ Isolated</option>
                 <option value="balanced">⚖️ Balanced</option>
                 <option value="overloaded">🎭 Overloaded</option>
@@ -419,7 +495,7 @@ export default function BehaviorPanel({ system }: any) {
               <div className="flex items-center mb-3">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Momentum State</span>
               </div>
-              <select value={currentEntry.momentum || 'stable'} onChange={(e) => handleAction({ momentum: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:border-orange-400 focus:bg-white transition-colors">
+              <select value={currentEntry.momentum || 'stable'} onChange={(e) => handleAction({ momentum: e.target.value })} className={baseInputClass}>
                 <option value="building">📈 Building</option>
                 <option value="stable">➖ Stable</option>
                 <option value="declining">📉 Declining</option>
@@ -427,7 +503,7 @@ export default function BehaviorPanel({ system }: any) {
             </div>
           </div>
 
-          <hr className="border-gray-100 my-4" />
+          <hr className={dividerClass} />
 
           {/* SECTION 4: PSYCHOLOGICAL REFLECTION */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -444,11 +520,11 @@ export default function BehaviorPanel({ system }: any) {
                   onChange={(e) => handleAction({ trigger: e.target.value })} 
                   placeholder="What caused this day?..." 
                   maxLength={60}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-gray-800 outline-none focus:border-orange-400 focus:bg-white transition-colors" 
+                  className={baseInputClass} 
                 />
                 <div className="flex flex-wrap gap-2 mt-2">
                   {['Bad sleep', 'Distractions', 'Heavy workload'].map(s => (
-                    <button key={s} onClick={() => handleAction({ trigger: s })} className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded-md hover:bg-gray-200 font-medium transition-colors">+{s}</button>
+                    <button key={s} onClick={() => handleAction({ trigger: s })} className={plusOptionClass}>+{s}</button>
                   ))}
                 </div>
               </div>
@@ -462,7 +538,7 @@ export default function BehaviorPanel({ system }: any) {
                   onChange={(e) => handleAction({ identity: e.target.value })} 
                   placeholder="Who were you today?..." 
                   maxLength={60}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-gray-800 outline-none focus:border-orange-400 focus:bg-white transition-colors" 
+                  className={baseInputClass} 
                 />
               </div>
             </div>
@@ -479,11 +555,11 @@ export default function BehaviorPanel({ system }: any) {
                   onChange={(e) => handleAction({ win: e.target.value })} 
                   placeholder="One win from today..." 
                   maxLength={100}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-gray-800 outline-none focus:border-orange-400 focus:bg-white transition-colors" 
+                  className={baseInputClass} 
                 />
                 <div className="flex flex-wrap gap-2 mt-2">
                   {['Deep work block', 'Cleared inbox', 'Good workout'].map(s => (
-                    <button key={s} onClick={() => handleAction({ win: s })} className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded-md hover:bg-gray-200 font-medium transition-colors">+{s}</button>
+                    <button key={s} onClick={() => handleAction({ win: s })} className={plusOptionClass}>+{s}</button>
                   ))}
                 </div>
               </div>
@@ -497,11 +573,11 @@ export default function BehaviorPanel({ system }: any) {
                   onChange={(e) => handleAction({ improvement: e.target.value })} 
                   placeholder="How will you improve tomorrow?..." 
                   maxLength={100}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-gray-800 outline-none focus:border-orange-400 focus:bg-white transition-colors" 
+                  className={baseInputClass} 
                 />
                 <div className="flex flex-wrap gap-2 mt-2">
                   {['Sleep earlier', 'Phone in other room', 'Plan night before'].map(s => (
-                    <button key={s} onClick={() => handleAction({ improvement: s })} className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded-md hover:bg-gray-200 font-medium transition-colors">+{s}</button>
+                    <button key={s} onClick={() => handleAction({ improvement: s })} className={plusOptionClass}>+{s}</button>
                   ))}
                 </div>
               </div>
@@ -509,7 +585,7 @@ export default function BehaviorPanel({ system }: any) {
 
           </div>
 
-          <hr className="border-gray-100 my-4" />
+          <hr className={dividerClass} />
 
           {/* SECTION 5: TAGS & FRICTIONS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -525,7 +601,9 @@ export default function BehaviorPanel({ system }: any) {
               {(currentEntry.tags || []).length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-4">
                   {(currentEntry.tags || []).map((tag: string) => (
-                    <button key={tag} onClick={() => handleTagToggleAction(tag)} className="px-3 py-1 bg-orange-50 text-orange-700 hover:bg-red-50 hover:text-red-700 border border-orange-200 rounded-lg text-xs font-bold shadow-sm transition-colors group flex items-center gap-1">
+                    <button key={tag} onClick={() => handleTagToggleAction(tag)} className={`px-3 py-1 border rounded-lg text-xs font-bold shadow-sm transition-colors group flex items-center gap-1 ${
+                      isDarkMode ? "bg-orange-950/30 text-orange-400 border-orange-900/50 hover:bg-red-950/30 hover:text-red-400 hover:border-red-900/50" : "bg-orange-50 text-orange-700 hover:bg-red-50 hover:text-red-700 border-orange-200"
+                    }`}>
                       #{tag} <span className="opacity-60 group-hover:opacity-100">×</span>
                     </button>
                   ))}
@@ -540,7 +618,7 @@ export default function BehaviorPanel({ system }: any) {
                       {tags.map(tag => {
                         if (currentEntry.tags?.includes(tag)) return null;
                         return (
-                          <button key={tag} onClick={() => handleTagToggleAction(tag)} className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 transition-all shadow-sm">
+                          <button key={tag} onClick={() => handleTagToggleAction(tag)} className={unselectedPillClass}>
                             + {tag}
                           </button>
                         )
@@ -551,8 +629,8 @@ export default function BehaviorPanel({ system }: any) {
               </div>
 
               <div className="flex gap-2">
-                <input value={customTag} onChange={(e) => setCustomTag(e.target.value)} onKeyDown={handleTagKeyDown} placeholder="Add custom tag (Press Enter)..." className="flex-1 px-4 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none focus:border-orange-400 transition-colors shadow-sm" />
-                <button onClick={() => { if (!customTag.trim()) return; handleTagToggleAction(customTag.trim()); setCustomTag(''); }} className="px-4 py-2 text-xs font-bold bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+                <input value={customTag} onChange={(e) => setCustomTag(e.target.value)} onKeyDown={handleTagKeyDown} placeholder="Add custom tag (Press Enter)..." className={baseInputSmallClass} />
+                <button onClick={() => { if (!customTag.trim()) return; handleTagToggleAction(customTag.trim()); setCustomTag(''); }} className={baseButtonClass}>
                   Add
                 </button>
               </div>
@@ -569,7 +647,11 @@ export default function BehaviorPanel({ system }: any) {
               {(currentEntry.frictions || []).length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-4">
                   {(currentEntry.frictions || []).map((friction: string, idx: number) => (
-                    <button key={friction} onClick={() => handleFrictionToggleAction(friction)} className={`px-3 py-1 text-red-700 border rounded-lg text-xs font-bold shadow-sm transition-colors group flex items-center gap-1 ${idx === 0 ? 'bg-red-100 border-red-300 hover:bg-red-50' : 'bg-red-50 border-red-200 hover:bg-red-100'}`} title={idx === 0 ? "Top Blocker Today" : ""}>
+                    <button key={friction} onClick={() => handleFrictionToggleAction(friction)} className={`px-3 py-1 border rounded-lg text-xs font-bold shadow-sm transition-colors group flex items-center gap-1 ${
+                      idx === 0 
+                        ? (isDarkMode ? "bg-red-900/40 border-red-800/60 hover:bg-red-950/30 text-red-400" : "bg-red-100 border-red-300 hover:bg-red-50 text-red-700") 
+                        : (isDarkMode ? "bg-red-950/20 border-red-900/30 hover:bg-red-900/40 text-red-400" : "bg-red-50 border-red-200 hover:bg-red-100 text-red-700")
+                    }`} title={idx === 0 ? "Top Blocker Today" : ""}>
                       {idx === 0 && <span className="mr-1 opacity-80">⚠️</span>}
                       {friction} <span className="opacity-60 group-hover:opacity-100">×</span>
                     </button>
@@ -583,18 +665,18 @@ export default function BehaviorPanel({ system }: any) {
                   {PREDEFINED_FRICTIONS.map(friction => {
                     if (currentEntry.frictions?.includes(friction)) return null;
                     return (
-                      <button key={friction} onClick={() => handleFrictionToggleAction(friction)} className="shrink-0 snap-start px-3 py-1.5 rounded-md text-[11px] font-bold bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 transition-all shadow-sm">
+                      <button key={friction} onClick={() => handleFrictionToggleAction(friction)} className={`shrink-0 snap-start ${unselectedPillClass}`}>
                         + {friction}
                       </button>
                     )
                   })}
                 </div>
-                <div className="absolute right-0 bottom-2 top-6 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none" />
+                <div className={`absolute right-0 bottom-2 top-6 w-8 bg-gradient-to-l pointer-events-none ${isDarkMode ? 'from-[#0a0a0a] to-transparent' : 'from-white to-transparent'}`} />
               </div>
 
               <div className="flex gap-2">
-                <input value={customFriction} onChange={(e) => setCustomFriction(e.target.value)} onKeyDown={handleFrictionKeyDown} placeholder="Add custom friction (Press Enter)..." className="flex-1 px-4 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none focus:border-orange-400 transition-colors shadow-sm" />
-                <button onClick={() => { if (!customFriction.trim()) return; handleFrictionToggleAction(customFriction.trim()); setCustomFriction(''); }} className="px-4 py-2 text-xs font-bold bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+                <input value={customFriction} onChange={(e) => setCustomFriction(e.target.value)} onKeyDown={handleFrictionKeyDown} placeholder="Add custom friction (Press Enter)..." className={baseInputSmallClass} />
+                <button onClick={() => { if (!customFriction.trim()) return; handleFrictionToggleAction(customFriction.trim()); setCustomFriction(''); }} className={baseButtonClass}>
                   Add
                 </button>
               </div>
@@ -602,10 +684,10 @@ export default function BehaviorPanel({ system }: any) {
 
           </div>
 
-          <hr className="border-gray-100 my-4" />
+          <hr className={dividerClass} />
 
           {/* SECTION 6: CHAPTER & LINKS (STRICT SINGLE LINE) */}
-          <div className="grid grid-cols-2 gap-4 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             
             {/* Chapter */}
             <div className="w-full">
@@ -616,7 +698,7 @@ export default function BehaviorPanel({ system }: any) {
                 value={currentEntry.chapter || ''} 
                 onChange={(e) => handleAction({ chapter: e.target.value })} 
                 placeholder="e.g. Startup Phase" 
-                className="w-full bg-white border border-gray-200 shadow-sm rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-orange-400 transition-colors" 
+                className={baseInputClass} 
               />
             </div>
 
@@ -631,7 +713,9 @@ export default function BehaviorPanel({ system }: any) {
               {(currentEntry.relatedDates || []).length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
                   {(currentEntry.relatedDates || []).map((date: string) => (
-                    <div key={date} className="flex items-center gap-1 bg-gray-50 text-gray-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
+                    <div key={date} className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg border shadow-sm ${
+                      isDarkMode ? "bg-[#111111] text-gray-300 border-gray-800" : "bg-gray-50 text-gray-700 border-gray-200"
+                    }`}>
                       {date}
                       <button onClick={() => removeRelatedDate(date)} className="text-gray-400 hover:text-red-500 ml-1 transition-colors">×</button>
                     </div>
@@ -647,11 +731,13 @@ export default function BehaviorPanel({ system }: any) {
                   value={newRelatedDate} 
                   onChange={(e) => setNewRelatedDate(e.target.value)} 
                   placeholder="YYYY-MM-DD" 
-                  className="flex-1 min-w-0 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium outline-none focus:border-orange-400 transition-colors shadow-sm" 
+                  className={baseInputSmallClass} 
                 />
                 <button 
                   onClick={() => { addRelatedDate(); handleAction({}); }} 
-                  className="px-4 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-bold rounded-xl transition-all active:scale-95 shadow-sm whitespace-nowrap"
+                  className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all active:scale-95 shadow-sm whitespace-nowrap border ${
+                    isDarkMode ? "bg-[#111111] border-gray-800 text-gray-300 hover:bg-[#1a1a1a]" : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                  }`}
                 >
                   Link
                 </button>
@@ -665,7 +751,11 @@ export default function BehaviorPanel({ system }: any) {
              <button 
                onClick={() => updateEntry({ isLocked: true })}
                disabled={completionScore < 5}
-               className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-sm ${completionScore >= 5 ? 'bg-orange-500 text-white hover:bg-orange-600 active:scale-95' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+               className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-sm ${
+                 completionScore >= 5 
+                  ? 'bg-orange-500 text-white hover:bg-orange-600 active:scale-95' 
+                  : (isDarkMode ? 'bg-gray-900 text-gray-600 cursor-not-allowed' : 'bg-gray-100 text-gray-400 cursor-not-allowed')
+                }`}
              >
                <Lock size={16} />
                {completionScore >= 5 ? "Finalize & Lock Day" : `Complete ${5 - completionScore} more fields to Lock`}

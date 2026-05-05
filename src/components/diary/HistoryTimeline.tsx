@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   History, 
@@ -6,12 +7,15 @@ import {
   CalendarDays,
   XCircle
 } from 'lucide-react';
+import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
 
 export default function HistoryTimeline({ system }: any) {
   const { 
     weeklySummary, energyFilter, setEnergyFilter, 
     searchQuery, setSearchQuery, historyDates, filteredHistory, allEntries 
   } = system;
+
+  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
 
   // --- NEW: DATE FILTER STATES ---
   const [dateFilter, setDateFilter] = useState<'today' | 'yesterday' | 'tomorrow' | 'custom' | null>(null);
@@ -127,12 +131,12 @@ export default function HistoryTimeline({ system }: any) {
         <div className="flex flex-col gap-4">
           
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-gray-100 rounded-lg text-gray-500">
+            <div className={`p-2 rounded-lg ${isDarkMode ? "bg-[#111111] text-gray-400 border border-gray-800" : "bg-gray-100 text-gray-500 border border-transparent"}`}>
               <History size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900 tracking-tight">Timeline</h3>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+              <h3 className={`text-lg font-bold tracking-tight ${isDarkMode ? "text-white" : "text-gray-900"}`}>Timeline</h3>
+              <p className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
                 {weeklySummary?.dominantMood || 'Neutral'} mood • {weeklySummary?.topTag || 'Logs'}
               </p>
             </div>
@@ -143,19 +147,23 @@ export default function HistoryTimeline({ system }: any) {
             <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
               <button
                 onClick={() => { setDateFilter(null); setCustomDate(''); }}
-                className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${
-                  !dateFilter ? 'bg-gray-100 text-gray-900 border-gray-200' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-600'
+                className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-full border transition-colors shrink-0 ${
+                  !dateFilter 
+                    ? (isDarkMode ? 'bg-gray-200 text-gray-900 border-gray-200' : 'bg-gray-100 text-gray-900 border-gray-200') 
+                    : (isDarkMode ? 'bg-[#111111] border-gray-800 text-gray-400 hover:bg-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-600')
                 }`}
               >
                 All
               </button>
               
-              <div className="h-4 w-[1px] bg-gray-200 mx-1 shrink-0" />
+              <div className={`h-4 w-[1px] mx-1 shrink-0 ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`} />
 
               <button
                 onClick={() => setDateFilter('yesterday')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${
-                  dateFilter === 'yesterday' ? 'bg-gray-900 text-white' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-colors shrink-0 ${
+                  dateFilter === 'yesterday' 
+                    ? (isDarkMode ? 'bg-gray-200 text-gray-900 border-gray-200' : 'bg-gray-900 text-white border-gray-900') 
+                    : (isDarkMode ? 'bg-[#111111] border-gray-800 text-gray-400 hover:bg-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50')
                 }`}
               >
                 Yesterday
@@ -163,8 +171,10 @@ export default function HistoryTimeline({ system }: any) {
 
               <button
                 onClick={() => setDateFilter('today')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${
-                  dateFilter === 'today' ? 'bg-gray-900 text-white' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-colors shrink-0 ${
+                  dateFilter === 'today' 
+                    ? (isDarkMode ? 'bg-gray-200 text-gray-900 border-gray-200' : 'bg-gray-900 text-white border-gray-900') 
+                    : (isDarkMode ? 'bg-[#111111] border-gray-800 text-gray-400 hover:bg-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50')
                 }`}
               >
                 Today
@@ -172,8 +182,10 @@ export default function HistoryTimeline({ system }: any) {
 
               <button
                 onClick={() => setDateFilter('tomorrow')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${
-                  dateFilter === 'tomorrow' ? 'bg-gray-900 text-white' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-colors shrink-0 ${
+                  dateFilter === 'tomorrow' 
+                    ? (isDarkMode ? 'bg-gray-200 text-gray-900 border-gray-200' : 'bg-gray-900 text-white border-gray-900') 
+                    : (isDarkMode ? 'bg-[#111111] border-gray-800 text-gray-400 hover:bg-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50')
                 }`}
               >
                 Tomorrow
@@ -181,8 +193,10 @@ export default function HistoryTimeline({ system }: any) {
 
               <button
                 onClick={() => setDateFilter('custom')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${
-                  dateFilter === 'custom' ? 'bg-gray-900 text-white' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                className={`px-3 py-1.5 text-xs font-bold rounded-full border transition-colors shrink-0 ${
+                  dateFilter === 'custom' 
+                    ? (isDarkMode ? 'bg-gray-200 text-gray-900 border-gray-200' : 'bg-gray-900 text-white border-gray-900') 
+                    : (isDarkMode ? 'bg-[#111111] border-gray-800 text-gray-400 hover:bg-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50')
                 }`}
               >
                 Custom
@@ -199,7 +213,9 @@ export default function HistoryTimeline({ system }: any) {
                     setMomentumFilter(null);
                     setEnergyFilter(null);
                   }}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-red-500 bg-red-50 rounded-full border border-red-100 hover:bg-red-100 transition-colors ml-auto shrink-0"
+                  className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ml-auto shrink-0 ${
+                    isDarkMode ? "text-red-400 bg-red-950/30 border-red-900/50 hover:bg-red-900/50" : "text-red-500 bg-red-50 border-red-100 hover:bg-red-100"
+                  }`}
                 >
                   <XCircle size={12} /> Clear
                 </button>
@@ -212,25 +228,31 @@ export default function HistoryTimeline({ system }: any) {
                 type="date"
                 value={customDate}
                 onChange={(e) => setCustomDate(e.target.value)}
-                className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium outline-none focus:border-gray-400 focus:ring-4 focus:ring-gray-500/5 transition-all shadow-sm"
+                className={`w-full mt-1 border rounded-xl px-4 py-2.5 text-sm font-medium outline-none transition-all shadow-sm ${
+                  isDarkMode ? "bg-[#111111] border-gray-800 text-white color-scheme-dark focus:border-gray-600 focus:ring-4 focus:ring-white/5" : "bg-white border-gray-200 text-gray-900 focus:border-gray-400 focus:ring-4 focus:ring-gray-500/5"
+                }`}
               />
             )}
           </div>
 
           {/* Search Bar */}
           <div className="relative w-full mt-2">
-            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Search size={16} className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
             <input 
               type="text" 
               placeholder="Search text, tags, frictions, mood, energy..." 
               value={searchQuery || ''} 
               onChange={(e) => setSearchQuery(e.target.value)} 
-              className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-10 py-3 text-sm font-medium outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-500/5 transition-all shadow-sm" 
+              className={`w-full border rounded-xl pl-10 pr-10 py-3 text-sm font-medium outline-none transition-all shadow-sm ${
+                isDarkMode 
+                  ? "bg-[#111111] border-gray-800 text-white placeholder-gray-600 focus:border-orange-500 focus:ring-4 focus:ring-orange-900/20" 
+                  : "bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-500/5"
+              }`} 
             />
             {searchQuery && (
               <button 
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 ${isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}
                 aria-label="Clear search"
               >
                 ×
@@ -240,14 +262,16 @@ export default function HistoryTimeline({ system }: any) {
 
           {/* Horizontal Scroll Filters with Visual Priority */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            <div className="flex items-center gap-2 pr-4 border-r border-gray-100 shrink-0">
-              <Filter size={12} className="text-gray-400" />
-              <span className="text-[10px] font-bold text-gray-400 uppercase">Behaviors</span>
+            <div className={`flex items-center gap-2 pr-4 border-r shrink-0 ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+              <Filter size={12} className={isDarkMode ? "text-gray-500" : "text-gray-400"} />
+              <span className={`text-[10px] font-bold uppercase ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Behaviors</span>
             </div>
             <button 
               onClick={() => setExecutionFilter(executionFilter === 'high' ? null : 'high')} 
               className={`whitespace-nowrap px-4 py-1.5 text-xs font-bold rounded-full border transition-all ${
-                executionFilter === 'high' ? 'bg-green-500 border-green-600 text-white scale-105 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                executionFilter === 'high' 
+                  ? (isDarkMode ? 'bg-green-900/50 border-green-800 text-green-400 scale-105 shadow-sm' : 'bg-green-500 border-green-600 text-white scale-105 shadow-sm') 
+                  : (isDarkMode ? 'bg-[#111111] border-gray-800 text-gray-400 hover:bg-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50')
               }`}
             >
               High Execution
@@ -255,7 +279,9 @@ export default function HistoryTimeline({ system }: any) {
             <button 
               onClick={() => setExecutionFilter(executionFilter === 'low' ? null : 'low')} 
               className={`whitespace-nowrap px-4 py-1.5 text-xs font-bold rounded-full border transition-all ${
-                executionFilter === 'low' ? 'bg-red-500 border-red-600 text-white scale-105 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                executionFilter === 'low' 
+                  ? (isDarkMode ? 'bg-red-900/50 border-red-800 text-red-400 scale-105 shadow-sm' : 'bg-red-500 border-red-600 text-white scale-105 shadow-sm') 
+                  : (isDarkMode ? 'bg-[#111111] border-gray-800 text-gray-400 hover:bg-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50')
               }`}
             >
               Low Execution
@@ -263,7 +289,9 @@ export default function HistoryTimeline({ system }: any) {
             <button 
               onClick={() => setEnergyFilter(energyFilter === 'low' ? null : 'low')} 
               className={`whitespace-nowrap px-4 py-1.5 text-xs font-bold rounded-full border transition-all ${
-                energyFilter === 'low' ? 'bg-orange-500 border-orange-600 text-white scale-105 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                energyFilter === 'low' 
+                  ? (isDarkMode ? 'bg-orange-900/50 border-orange-800 text-orange-400 scale-105 shadow-sm' : 'bg-orange-500 border-orange-600 text-white scale-105 shadow-sm') 
+                  : (isDarkMode ? 'bg-[#111111] border-gray-800 text-gray-400 hover:bg-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50')
               }`}
             >
               Low Energy
@@ -271,7 +299,9 @@ export default function HistoryTimeline({ system }: any) {
             <button 
               onClick={() => setMomentumFilter(momentumFilter === 'high' ? null : 'high')} 
               className={`whitespace-nowrap px-4 py-1.5 text-xs font-bold rounded-full border transition-all ${
-                momentumFilter === 'high' ? 'bg-purple-500 border-purple-600 text-white scale-105 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                momentumFilter === 'high' 
+                  ? (isDarkMode ? 'bg-purple-900/50 border-purple-800 text-purple-400 scale-105 shadow-sm' : 'bg-purple-500 border-purple-600 text-white scale-105 shadow-sm') 
+                  : (isDarkMode ? 'bg-[#111111] border-gray-800 text-gray-400 hover:bg-[#1a1a1a]' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50')
               }`}
             >
               High Momentum
@@ -282,13 +312,15 @@ export default function HistoryTimeline({ system }: any) {
         {/* 2️⃣ TIMELINE CARDS LIST */}
         <div ref={listRef} className="flex flex-col gap-3 scroll-mt-6">
           {displayDates.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-              <CalendarDays size={24} className="mx-auto text-gray-300 mb-2" />
+            <div className={`text-center py-12 rounded-2xl border border-dashed ${
+              isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-200"
+            }`}>
+              <CalendarDays size={24} className={`mx-auto mb-2 ${isDarkMode ? "text-gray-700" : "text-gray-300"}`} />
               {/* Clear Empty State UX */}
               {dateFilter ? (
-                <p className="text-sm font-bold text-gray-500">No entry logged for this date.</p>
+                <p className={`text-sm font-bold ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>No entry logged for this date.</p>
               ) : (
-                <p className="text-sm font-bold text-gray-400">No entries match your criteria.</p>
+                <p className={`text-sm font-bold ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>No entries match your criteria.</p>
               )}
             </div>
           ) : (
@@ -308,6 +340,7 @@ export default function HistoryTimeline({ system }: any) {
  * Clean, Expandable Card Component (Behavior Driven)
  */
 function HistoryCard({ date, entry, system }: any) {
+  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
   const isSelected = system.selectedDate === date;
   const [expanded, setExpanded] = useState(false);
   
@@ -319,7 +352,7 @@ function HistoryCard({ date, entry, system }: any) {
     day: 'numeric' 
   });
   
-  // Auto-expand during replay animation (if logic still exists elsewhere)
+  // Auto-expand during replay animation
   useEffect(() => {
     if (system.isReplaying && isSelected) {
       setExpanded(true);
@@ -330,9 +363,11 @@ function HistoryCard({ date, entry, system }: any) {
 
   if (!entry || entry.isMissed) {
     return (
-      <div className="flex flex-col gap-1 p-4 sm:p-5 bg-gray-50 border border-gray-200 rounded-2xl opacity-60 text-left">
-        <span className="text-xs font-black text-gray-400 uppercase tracking-tighter">{displayDate}</span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">No entry logged</span>
+      <div className={`flex flex-col gap-1 p-4 sm:p-5 border rounded-2xl opacity-60 text-left ${
+        isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-gray-50 border-gray-200"
+      }`}>
+        <span className={`text-xs font-black uppercase tracking-tighter ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>{displayDate}</span>
+        <span className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>No entry logged</span>
       </div>
     );
   }
@@ -351,8 +386,8 @@ function HistoryCard({ date, entry, system }: any) {
       tabIndex={0}
       className={`flex flex-col gap-3 p-4 sm:p-5 border rounded-[22px] text-left transition-all cursor-pointer active:scale-[0.97] select-none ${
         isSelected 
-          ? 'border-orange-500 bg-orange-50 shadow-md' 
-          : 'bg-white border-gray-100 hover:border-orange-200 shadow-sm'
+          ? (isDarkMode ? 'border-orange-500 bg-orange-950/20' : 'border-orange-500 bg-orange-50 shadow-md') 
+          : (isDarkMode ? 'bg-[#111111] border-gray-800 hover:border-gray-600' : 'bg-white border-gray-100 hover:border-orange-200 shadow-sm')
       }`}
     >
       {/* Card Header */}
@@ -363,25 +398,33 @@ function HistoryCard({ date, entry, system }: any) {
               e.stopPropagation();
               system.setSelectedDate(date);
             }}
-            className={`text-sm font-black text-left transition-colors hover:underline focus:outline-none focus:underline ${isSelected ? 'text-orange-700' : 'text-gray-900'}`}
+            className={`text-sm font-black text-left transition-colors hover:underline focus:outline-none focus:underline ${
+              isSelected 
+                ? (isDarkMode ? 'text-orange-400' : 'text-orange-700') 
+                : (isDarkMode ? 'text-white' : 'text-gray-900')
+            }`}
           >
             {displayDate}
           </button>
-          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
             {dayType}
           </span>
         </div>
         
         <div className="flex items-center gap-2">
-           <span className="text-[9px] font-bold text-gray-400 uppercase bg-white px-2 py-0.5 rounded border border-gray-100 shadow-sm">
+           <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border shadow-sm ${
+             isDarkMode ? "bg-gray-800 text-gray-300 border-gray-700" : "bg-white text-gray-400 border-gray-100"
+           }`}>
             {entry.mood || 'N/A'}
           </span>
           {entry.chapter && (
-            <span className="text-[9px] font-bold bg-purple-50 text-purple-600 px-2 py-0.5 rounded border border-purple-100 uppercase">
+            <span className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase ${
+              isDarkMode ? "bg-purple-950/30 text-purple-400 border-purple-900/50" : "bg-purple-50 text-purple-600 border-purple-100"
+            }`}>
               {entry.chapter}
             </span>
           )}
-          <span className="text-xs text-gray-400 font-bold ml-1">
+          <span className={`text-xs font-bold ml-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
             {expanded ? '−' : '+'}
           </span>
         </div>
@@ -390,27 +433,37 @@ function HistoryCard({ date, entry, system }: any) {
       {/* --- BEHAVIOR STRIP --- */}
       <div className="flex flex-wrap gap-2 mt-1">
         {entry.energy && (
-          <span className="text-[10px] font-semibold px-2 py-1 rounded bg-yellow-50 text-yellow-600 uppercase tracking-wide">
+          <span className={`text-[10px] font-semibold px-2 py-1 rounded uppercase tracking-wide ${
+            isDarkMode ? "bg-yellow-950/30 text-yellow-500" : "bg-yellow-50 text-yellow-600"
+          }`}>
             ⚡ {entry.energy}
           </span>
         )}
         {entry.sleep && (
-          <span className="text-[10px] font-semibold px-2 py-1 rounded bg-blue-50 text-blue-600 uppercase tracking-wide">
+          <span className={`text-[10px] font-semibold px-2 py-1 rounded uppercase tracking-wide ${
+            isDarkMode ? "bg-blue-950/30 text-blue-400" : "bg-blue-50 text-blue-600"
+          }`}>
             💤 {entry.sleep}
           </span>
         )}
         {entry.executionQuality && (
-          <span className="text-[10px] font-semibold px-2 py-1 rounded bg-green-50 text-green-600 uppercase tracking-wide">
+          <span className={`text-[10px] font-semibold px-2 py-1 rounded uppercase tracking-wide ${
+            isDarkMode ? "bg-emerald-950/30 text-emerald-400" : "bg-green-50 text-green-600"
+          }`}>
             🎯 {entry.executionQuality}
           </span>
         )}
         {entry.momentum && (
-          <span className="text-[10px] font-semibold px-2 py-1 rounded bg-purple-50 text-purple-600 uppercase tracking-wide">
+          <span className={`text-[10px] font-semibold px-2 py-1 rounded uppercase tracking-wide ${
+            isDarkMode ? "bg-purple-950/30 text-purple-400" : "bg-purple-50 text-purple-600"
+          }`}>
             🔄 {entry.momentum}
           </span>
         )}
         {entry.dayStructure && (
-          <span className="text-[10px] font-semibold px-2 py-1 rounded bg-gray-100 text-gray-600 uppercase tracking-wide">
+          <span className={`text-[10px] font-semibold px-2 py-1 rounded uppercase tracking-wide ${
+            isDarkMode ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-600"
+          }`}>
             📊 {entry.dayStructure}
           </span>
         )}
@@ -418,58 +471,58 @@ function HistoryCard({ date, entry, system }: any) {
 
       {/* Card Body - Content */}
       <div className="flex flex-col gap-1 mt-1">
-        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+        <p className={`text-[10px] uppercase font-bold tracking-wider ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
           Summary
         </p>
-        <p className={`text-sm text-gray-800 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+        <p className={`text-sm leading-relaxed ${expanded ? '' : 'line-clamp-2'} ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>
           {entry.learning || entry.morning || "Entry contains no text analysis."}
         </p>
 
         {/* Highlight Main Issue (Friction) */}
         {!expanded && entry.frictions && entry.frictions.length > 0 && (
-          <p className="text-[11px] text-red-500 font-medium mt-1">
+          <p className={`text-[11px] font-medium mt-1 ${isDarkMode ? "text-red-400" : "text-red-500"}`}>
             Issue: {entry.frictions[0]}
           </p>
         )}
 
         {/* Highlight Win */}
         {!expanded && entry.win && (
-          <p className="text-[11px] text-green-600 font-medium">
+          <p className={`text-[11px] font-medium ${isDarkMode ? "text-emerald-400" : "text-green-600"}`}>
             ✔ {entry.win}
           </p>
         )}
         
         {/* EXPANDED CONTENT (FULL DAY) */}
         {expanded && (
-          <div className="mt-4 pt-4 border-t border-gray-100 space-y-4 animate-in fade-in duration-300">
+          <div className={`mt-4 pt-4 border-t space-y-4 animate-in fade-in duration-300 ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
             
             {/* Behavior Overview Grid */}
-            <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100">
-              <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">
+            <div className={`p-3.5 rounded-xl border ${isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-gray-50 border-gray-100"}`}>
+              <p className={`text-[10px] font-bold uppercase mb-2 tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
                 Behavior
               </p>
-              <div className="grid grid-cols-2 gap-y-2 gap-x-2 text-xs font-medium text-gray-700">
-                <span className="flex gap-2"><span className="text-gray-400 w-14">Energy:</span> {entry.energy || '-'}</span>
-                <span className="flex gap-2"><span className="text-gray-400 w-14">Sleep:</span> {entry.sleep || '-'}</span>
-                <span className="flex gap-2"><span className="text-gray-400 w-14">Focus:</span> {entry.focusArea || '-'}</span>
-                <span className="flex gap-2"><span className="text-gray-400 w-14">Execute:</span> {entry.executionQuality || '-'}</span>
-                <span className="flex gap-2"><span className="text-gray-400 w-14">Momentum:</span> {entry.momentum || '-'}</span>
-                <span className="flex gap-2"><span className="text-gray-400 w-14">Structure:</span> {entry.dayStructure || '-'}</span>
+              <div className={`grid grid-cols-2 gap-y-2 gap-x-2 text-xs font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+                <span className="flex gap-2"><span className={`w-14 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Energy:</span> {entry.energy || '-'}</span>
+                <span className="flex gap-2"><span className={`w-14 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Sleep:</span> {entry.sleep || '-'}</span>
+                <span className="flex gap-2"><span className={`w-14 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Focus:</span> {entry.focusArea || '-'}</span>
+                <span className="flex gap-2"><span className={`w-14 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Execute:</span> {entry.executionQuality || '-'}</span>
+                <span className="flex gap-2"><span className={`w-14 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Momentum:</span> {entry.momentum || '-'}</span>
+                <span className="flex gap-2"><span className={`w-14 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Structure:</span> {entry.dayStructure || '-'}</span>
               </div>
 
               {/* Full Lists inside Behavior context */}
               {((entry.frictions && entry.frictions.length > 0) || entry.win) && (
-                <div className="mt-3 pt-3 border-t border-gray-200 flex flex-col gap-2">
+                <div className={`mt-3 pt-3 border-t flex flex-col gap-2 ${isDarkMode ? "border-gray-800" : "border-gray-200"}`}>
                   {entry.frictions && entry.frictions.length > 0 && (
                     <div className="text-[11px]">
-                      <span className="text-red-500 font-bold uppercase tracking-wider block mb-1">Issues Faced</span>
-                      <ul className="list-disc pl-4 text-gray-600 space-y-0.5">
+                      <span className={`font-bold uppercase tracking-wider block mb-1 ${isDarkMode ? "text-red-400" : "text-red-500"}`}>Issues Faced</span>
+                      <ul className={`list-disc pl-4 space-y-0.5 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                         {entry.frictions.map((f: string, i: number) => <li key={i}>{f}</li>)}
                       </ul>
                     </div>
                   )}
                   {entry.win && (
-                    <p className="text-[11px] text-green-600 font-bold mt-1">
+                    <p className={`text-[11px] font-bold mt-1 ${isDarkMode ? "text-emerald-400" : "text-green-600"}`}>
                       <span className="uppercase tracking-wider block mb-0.5">Key Win</span>
                       ✔ {entry.win}
                     </p>
@@ -481,26 +534,26 @@ function HistoryCard({ date, entry, system }: any) {
             {/* Structured Text Sections */}
             {entry.morning && (
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Planning</span>
-                <p className="text-sm text-gray-800 leading-relaxed">{entry.morning}</p>
+                <span className={`text-[10px] font-bold uppercase tracking-widest block mb-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Planning</span>
+                <p className={`text-sm leading-relaxed ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>{entry.morning}</p>
               </div>
             )}
             {entry.afternoon && (
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Execution</span>
-                <p className="text-sm text-gray-800 leading-relaxed">{entry.afternoon}</p>
+                <span className={`text-[10px] font-bold uppercase tracking-widest block mb-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Execution</span>
+                <p className={`text-sm leading-relaxed ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>{entry.afternoon}</p>
               </div>
             )}
             {entry.evening && (
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Reflection</span>
-                <p className="text-sm text-gray-800 leading-relaxed">{entry.evening}</p>
+                <span className={`text-[10px] font-bold uppercase tracking-widest block mb-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Reflection</span>
+                <p className={`text-sm leading-relaxed ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>{entry.evening}</p>
               </div>
             )}
             {entry.tomorrow && (
-              <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 mt-2">
-                <span className="text-[10px] font-bold text-gray-900 uppercase tracking-widest block mb-1">Next Focus</span>
-                <p className="font-bold text-gray-900">{entry.tomorrow}</p>
+              <div className={`p-3 rounded-xl border mt-2 ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+                <span className={`text-[10px] font-bold uppercase tracking-widest block mb-1 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Next Focus</span>
+                <p className={`font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>{entry.tomorrow}</p>
               </div>
             )}
           </div>
@@ -511,12 +564,16 @@ function HistoryCard({ date, entry, system }: any) {
       {entry.tags && entry.tags.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 pt-1">
           {entry.tags.slice(0, 1).map((t: string) => (
-            <span key={t} className="text-[9px] font-bold text-gray-600 bg-gray-100 px-2 py-1 rounded-md uppercase tracking-tight">
+            <span key={t} className={`text-[9px] font-bold px-2 py-1 rounded-md uppercase tracking-tight ${
+              isDarkMode ? "text-gray-300 bg-gray-800" : "text-gray-600 bg-gray-100"
+            }`}>
               #{t}
             </span>
           ))}
           {entry.tags.length > 1 && (
-            <span className="text-[9px] font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded-md">
+            <span className={`text-[9px] font-bold px-2 py-1 rounded-md ${
+              isDarkMode ? "text-gray-400 bg-[#111111]" : "text-gray-500 bg-gray-50"
+            }`}>
               +{entry.tags.length - 1} more
             </span>
           )}

@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { Clock, AlertTriangle } from 'lucide-react';
 import { Task, Meta } from '../types';
 import { FilterType, getLocalDate, getISODay, FilteredData } from './analytics/utils';
+import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
 
 import FilterBar from './analytics/FilterBar';
 import SummaryCards from './analytics/SummaryCards';
@@ -23,6 +24,7 @@ type ExtendedFilteredData = Omit<FilteredData, 'stats'> & {
 };
 
 export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Meta }) {
+  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
   const actualToday = getLocalDate(new Date());
   
   const [filterType, setFilterType] = useState<FilterType>('month');
@@ -263,18 +265,22 @@ export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Me
                     filteredData.stats.avgPerDay > tasks.length * 0.4 ? "Moderate" : "Low";
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-[#F9FAFB]">
+    <div className={`flex-1 overflow-y-auto p-4 md:p-8 transition-colors duration-300 ${
+      isDarkMode ? "bg-[#050505] text-white" : "bg-[#F9FAFB] text-gray-900"
+    }`}>
       <div className="max-w-[1200px] mx-auto w-full flex flex-col gap-6 pb-24">
         
         {/* 1. SYSTEM STATUS BAR */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 flex justify-between items-center shadow-sm">
+        <div className={`border rounded-xl p-4 flex justify-between items-center shadow-sm transition-colors ${
+          isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"
+        }`}>
           <div className="flex items-center gap-3">
             <div className={`w-3 h-3 rounded-full shadow-inner ${
-              systemStatus === "Improving" ? "bg-green-500" :
+              systemStatus === "Improving" ? "bg-emerald-500" :
               systemStatus === "Degrading" ? "bg-red-500" :
               "bg-gray-400"
             }`} />
-            <span className="text-sm font-bold text-gray-800">
+            <span className={`text-sm font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
               {systemStatus === "Improving" && "System Improving"}
               {systemStatus === "Degrading" && "System Dropping"}
               {systemStatus === "Stable" && "System Stable"}
@@ -284,28 +290,33 @@ export default function AnalyticsView({ tasks, meta }: { tasks: Task[], meta: Me
           <div className="flex items-center gap-4">
             {/* NET PERFORMANCE BADGE */}
             <div className={`text-[11px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border ${
-              filteredData.netPerformance > 0 ? "bg-green-50 text-green-600 border-green-200" :
-              filteredData.netPerformance < 0 ? "bg-red-50 text-red-600 border-red-200" :
-              "bg-gray-50 text-gray-500 border-gray-200"
+              filteredData.netPerformance > 0 
+                ? (isDarkMode ? "bg-emerald-950/30 text-emerald-400 border-emerald-900/50" : "bg-green-50 text-green-600 border-green-200") 
+                : filteredData.netPerformance < 0 
+                  ? (isDarkMode ? "bg-red-950/30 text-red-400 border-red-900/50" : "bg-red-50 text-red-600 border-red-200") 
+                  : (isDarkMode ? "bg-[#1a1a1a] text-gray-400 border-gray-800" : "bg-gray-50 text-gray-500 border-gray-200")
             }`}>
               Net: {filteredData.netPerformance > 0 ? `+${filteredData.netPerformance}` : filteredData.netPerformance}
             </div>
 
             <div className="flex items-center gap-2">
-              <Clock size={12} className="text-gray-400" />
-              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Updated just now</span>
+              <Clock size={12} className={isDarkMode ? "text-gray-500" : "text-gray-400"} />
+              <span className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Updated just now</span>
             </div>
           </div>
         </div>
 
         {/* 2. ANOMALY DETECTION */}
         {anomaly && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 text-sm font-bold text-red-600 shadow-sm">
+          <div className={`border rounded-xl p-4 flex items-center gap-3 text-sm font-bold shadow-sm transition-colors ${
+            isDarkMode ? "bg-red-950/30 border-red-900/50 text-red-400" : "bg-red-50 border-red-200 text-red-600"
+          }`}>
             <AlertTriangle size={18} /> {anomaly}
           </div>
         )}
 
         {/* 3. SMART FILTER BAR */}
+        {/* Child handles its own dark mode using the hook if built consistently */}
         <FilterBar 
           filterType={filterType} setFilterType={setFilterType}
           selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth}

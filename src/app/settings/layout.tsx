@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
+import { useTheme } from "@/components/ThemeProvider";
 
 import {
   ArrowLeft,
@@ -11,6 +12,7 @@ import {
   Bell,
   MessageSquare,
   Settings,
+  Monitor // 🔥 Imported for Appearance tab
 } from "lucide-react";
 
 export default function SettingsLayout({
@@ -21,6 +23,7 @@ export default function SettingsLayout({
   const router = useRouter();
   const pathname = usePathname();
   const supabase = getSupabaseClient();
+  const { isDarkMode } = useTheme(); 
 
   const [loading, setLoading] = useState(true);
 
@@ -41,11 +44,17 @@ export default function SettingsLayout({
     load();
   }, [router, supabase]);
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? "bg-[#050505]" : "bg-[#FAFAFA]"}`} />
+    );
+  }
 
+  // 🔥 Added Appearance path
   const navItems = [
     { name: "Profile", path: "/settings/profile", icon: User },
     { name: "Account", path: "/settings/account-management", icon: Settings },
+    { name: "Appearance", path: "/settings/appearance", icon: Monitor }, 
     { name: "Security", path: "/settings/security", icon: Shield },
     { name: "Notifications", path: "/settings/notifications", icon: Bell },
     { name: "Feedback", path: "/settings/feedback", icon: MessageSquare },
@@ -53,29 +62,37 @@ export default function SettingsLayout({
   ];
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-gray-900 font-sans">
+    <div className={`min-h-screen font-sans transition-colors duration-300 ${
+      isDarkMode ? "bg-[#050505] text-white" : "bg-[#FAFAFA] text-[#111827]"
+    }`}>
 
       {/* 🔝 Header */}
-      <div className="bg-white px-4 md:px-6 py-4 sticky top-0 z-30">
+      <div className={`px-4 md:px-6 py-4 sticky top-0 z-30 transition-colors duration-300 border-b ${
+        isDarkMode ? "bg-[#050505]/95 border-gray-800 backdrop-blur-sm" : "bg-white border-transparent"
+      }`}>
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <button
             onClick={() => router.push("/")}
-            className="flex items-center gap-2 text-sm text-gray-500 hover:text-black"
+            className={`flex items-center gap-2 text-sm transition-colors ${
+              isDarkMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-black"
+            }`}
           >
             <ArrowLeft size={16} />
             Back
           </button>
 
-          <div className="font-semibold text-gray-800">
+          <div className={`font-semibold ${isDarkMode ? "text-white" : "text-gray-800"}`}>
             Settings
           </div>
 
-          <div className="w-10" /> {/* spacer */}
+          <div className="w-10" />
         </div>
       </div>
 
       {/* 📱 MOBILE NAV (Tabs) */}
-      <div className="md:hidden sticky top-[60px] z-20 bg-[#FAFAFA] border-b border-gray-100">
+      <div className={`md:hidden sticky top-[56px] z-20 border-b transition-colors duration-300 ${
+        isDarkMode ? "bg-[#050505] border-gray-800" : "bg-[#FAFAFA] border-gray-100"
+      }`}>
         <div className="flex overflow-x-auto no-scrollbar px-2">
           {navItems.map((item) => {
             const isActive = pathname.startsWith(item.path);
@@ -84,10 +101,14 @@ export default function SettingsLayout({
               <button
                 key={item.path}
                 onClick={() => router.push(item.path)}
-                className={`flex-shrink-0 px-4 py-3 text-sm font-medium transition ${
+                className={`flex-shrink-0 px-4 py-3 text-sm font-medium transition-all ${
                   isActive
-                    ? "text-black border-b-2 border-black"
-                    : "text-gray-400"
+                    ? isDarkMode 
+                      ? "text-white border-b-2 border-white" 
+                      : "text-black border-b-2 border-black"
+                    : isDarkMode
+                      ? "text-gray-500 hover:text-gray-300"
+                      : "text-gray-400 hover:text-gray-600"
                 }`}
               >
                 {item.name}
@@ -102,9 +123,11 @@ export default function SettingsLayout({
 
         {/* Sidebar (Desktop Only) */}
         <div className="hidden md:block w-60 shrink-0">
-          <div className="space-y-1">
+          <div className="space-y-1 sticky top-[100px]">
 
-            <p className="text-xs font-semibold text-gray-400 uppercase mb-4">
+            <p className={`text-xs font-semibold uppercase mb-4 tracking-wider ${
+              isDarkMode ? "text-gray-500" : "text-gray-400"
+            }`}>
               Settings
             </p>
 
@@ -116,10 +139,14 @@ export default function SettingsLayout({
                 <button
                   key={item.path}
                   onClick={() => router.push(item.path)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-md transition ${
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all border ${
                     isActive
-                      ? "bg-gray-100 text-black"
-                      : "text-gray-500 hover:text-black hover:bg-gray-50"
+                      ? isDarkMode 
+                        ? "bg-[#111111] text-white border-gray-800 shadow-sm" 
+                        : "bg-gray-100 text-black border-transparent"
+                      : isDarkMode
+                        ? "text-gray-400 border-transparent hover:text-white hover:bg-[#111111]"
+                        : "text-gray-500 border-transparent hover:text-black hover:bg-gray-50"
                   }`}
                 >
                   <Icon size={16} />

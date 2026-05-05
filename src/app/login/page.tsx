@@ -4,7 +4,10 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
 import { FaGithub, FaDiscord } from "react-icons/fa";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Loader2, ShieldCheck, Sun, Moon } from "lucide-react";
+
+// 🔥 UPDATE THIS PATH to match your ThemeProvider location
+import { useTheme } from "@/components/ThemeProvider"; 
 
 // Official Google SVG Icon
 const GoogleIcon = () => (
@@ -21,10 +24,19 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const supabase = getSupabaseClient();
   
+  // Consuming your local app theme state to perfectly sync light/dark mode
+  const { isDarkMode, toggleTheme } = useTheme(); 
+  
   const [checkingSession, setCheckingSession] = useState(true);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Check for Registration Success Banner
   useEffect(() => {
@@ -76,54 +88,77 @@ function LoginContent() {
     }
   };
 
-  // Prevent silent crashes if environment variables are missing
   if (!supabase) return null;
 
-  // Block UI rendering until session is checked to prevent flicker
-  if (checkingSession) {
+  if (checkingSession || !mounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
-        <Loader2 className="w-8 h-8 text-gray-900 animate-spin" />
+      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${isDarkMode ? "bg-[#050505]" : "bg-[#FAFAFA]"}`}>
+        <Loader2 className={`w-8 h-8 animate-spin ${isDarkMode ? "text-white" : "text-gray-900"}`} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex bg-[#FAFAFA] text-gray-900 relative overflow-hidden selection:bg-indigo-100">
+    <div className={`min-h-screen flex relative overflow-hidden transition-colors duration-300 ${
+      isDarkMode 
+        ? "bg-[#050505] text-white selection:bg-indigo-900" 
+        : "bg-[#FAFAFA] text-[#111827] selection:bg-indigo-100"
+    }`}>
       
+      {/* 🌓 THEME TOGGLE BUTTON */}
+      <button
+        onClick={toggleTheme}
+        className={`absolute top-6 right-6 z-50 p-3 rounded-full border shadow-sm hover:shadow-md transition-all active:scale-95 flex items-center justify-center group ${
+          isDarkMode 
+            ? "bg-[#111111] border-gray-800 text-gray-300" 
+            : "bg-white border-gray-200 text-gray-600"
+        }`}
+        aria-label="Toggle theme"
+      >
+        {isDarkMode ? (
+          <Sun size={20} className="group-hover:text-orange-400 transition-colors" />
+        ) : (
+          <Moon size={20} className="group-hover:text-indigo-500 transition-colors" />
+        )}
+      </button>
+
       {/* 🌌 DEPTH LAYERS: Ambient Light Background Orbs */}
-      <div className="absolute top-[-10%] left-[-5%] w-[40vw] h-[40vw] rounded-full bg-indigo-200/40 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-5%] w-[30vw] h-[30vw] rounded-full bg-blue-200/40 blur-[100px] pointer-events-none" />
-      <div className="absolute top-[40%] left-[60%] w-[20vw] h-[20vw] rounded-full bg-orange-100/50 blur-[80px] pointer-events-none" />
+      <div className={`absolute top-[-10%] left-[-5%] w-[40vw] h-[40vw] rounded-full blur-[120px] pointer-events-none transition-colors duration-500 ${isDarkMode ? "bg-indigo-900/20" : "bg-indigo-200/40"}`} />
+      <div className={`absolute bottom-[-10%] right-[-5%] w-[30vw] h-[30vw] rounded-full blur-[100px] pointer-events-none transition-colors duration-500 ${isDarkMode ? "bg-blue-900/20" : "bg-blue-200/40"}`} />
+      <div className={`absolute top-[40%] left-[60%] w-[20vw] h-[20vw] rounded-full blur-[80px] pointer-events-none transition-colors duration-500 ${isDarkMode ? "bg-orange-900/20" : "bg-orange-100/50"}`} />
 
       {/* 🖥️ LEFT SIDE: Brand & Emotion (Hidden on Mobile) */}
       <div className="hidden lg:flex w-1/2 flex-col justify-between p-16 relative z-10">
         
         {/* Brand Header */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-white shadow-sm border border-gray-200 rounded-xl flex items-center justify-center">
-            <span className="font-bold text-lg text-gray-900">Nx</span>
+          <div className={`w-10 h-10 shadow-sm border rounded-xl flex items-center justify-center ${
+            isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"
+          }`}>
+            <span className={`font-bold text-lg ${isDarkMode ? "text-white" : "text-gray-900"}`}>Nx</span>
           </div>
-          <span className="font-semibold tracking-wide text-xl text-gray-900">
+          <span className={`font-semibold tracking-wide text-xl ${isDarkMode ? "text-white" : "text-gray-900"}`}>
             NexTask <span className="text-orange-500 font-black text-sm">OS</span>
           </span>
         </div>
 
         {/* Emotional Copy */}
         <div className="max-w-xl">
-          <h1 className="text-5xl xl:text-6xl font-black tracking-tight leading-[1.1] mb-6 text-gray-900">
+          <h1 className={`text-5xl xl:text-6xl font-black tracking-tight leading-[1.1] mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
             Build your system.<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-gray-400 to-gray-600">
+            <span className={`text-transparent bg-clip-text bg-gradient-to-r ${
+              isDarkMode ? "from-gray-500 to-gray-300" : "from-gray-400 to-gray-600"
+            }`}>
               Not just your tasks.
             </span>
           </h1>
-          <p className="text-lg text-gray-500 leading-relaxed font-light">
+          <p className={`text-lg leading-relaxed font-light ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
             Your personal execution engine designed for deep work, relentless focus, and compounding daily growth. 
           </p>
         </div>
 
         {/* Trust Footer */}
-        <div className="flex items-center gap-3 text-sm text-gray-500 font-medium">
+        <div className={`flex items-center gap-3 text-sm font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
           <ShieldCheck size={18} className="text-emerald-500" />
           Enterprise-grade encryption by Supabase
         </div>
@@ -132,30 +167,42 @@ function LoginContent() {
       {/* 📱 RIGHT SIDE / MOBILE: Auth Actions */}
       <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 sm:p-12 relative z-10">
         
-        {/* Mobile Header (Only visible on small screens) */}
+        {/* Mobile Header */}
         <div className="lg:hidden flex flex-col items-center text-center mb-10 mt-8">
-          <div className="w-12 h-12 bg-white shadow-sm border border-gray-200 rounded-2xl flex items-center justify-center mb-6">
-            <span className="font-bold text-xl text-gray-900">Nx</span>
+          <div className={`w-12 h-12 shadow-sm border rounded-2xl flex items-center justify-center mb-6 ${
+            isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"
+          }`}>
+            <span className={`font-bold text-xl ${isDarkMode ? "text-white" : "text-gray-900"}`}>Nx</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight leading-[1.1] mb-3 text-gray-900">
+          <h1 className={`text-3xl sm:text-4xl font-black tracking-tight leading-[1.1] mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
             Build your system.
           </h1>
-          <p className="text-sm text-gray-500 px-4">
+          <p className={`text-sm px-4 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
             Your execution engine for focus and growth.
           </p>
         </div>
 
         {/* ✨ PREMIUM LIGHT GLASS CARD */}
-        <div className="w-full max-w-[420px] bg-white/70 backdrop-blur-2xl border border-white rounded-3xl p-8 sm:p-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        <div className={`w-full max-w-[420px] backdrop-blur-2xl rounded-3xl p-8 sm:p-10 transition-all duration-300 border ${
+          isDarkMode 
+            ? "bg-[#111111]/80 border-gray-800 shadow-[0_8px_30px_rgb(0,0,0,0.3)]" 
+            : "bg-white/80 border-gray-100 shadow-xl"
+        }`}>
           
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold tracking-tight text-gray-900 mb-2">Welcome Back</h2>
-            <p className="text-sm text-gray-500">Sign in to initialize your workspace.</p>
+            <h2 className={`text-2xl font-bold tracking-tight mb-2 ${isDarkMode ? "text-white" : "text-[#111827]"}`}>
+              Welcome Back
+            </h2>
+            <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              Sign in to initialize your workspace.
+            </p>
           </div>
 
           {/* Success Banner */}
           {successMsg && (
-            <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-medium flex items-center gap-3">
+            <div className={`mb-6 p-4 rounded-xl text-sm font-medium flex items-center gap-3 border ${
+              isDarkMode ? "bg-emerald-900/20 border-emerald-800/50 text-emerald-400" : "bg-emerald-50 border-emerald-100 text-emerald-700"
+            }`}>
               <span>✨</span> {successMsg}
             </div>
           )}
@@ -163,14 +210,18 @@ function LoginContent() {
           {/* Provider Grid */}
           <div className="flex flex-col gap-4">
             
-            {/* Google - Clean White */}
+            {/* Google */}
             <button
               onClick={() => handleSocialLogin('google')}
               disabled={!!loadingProvider}
-              className="group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
+              className={`group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm transition-all duration-200 border ${
+                isDarkMode 
+                  ? "bg-[#0a0a0a] border-gray-700 text-[#E5E7EB] hover:bg-[#1f1f1f]" 
+                  : "bg-white border-gray-200 text-[#374151] hover:bg-[#F9FAFB]"
+              }`}
             >
               {loadingProvider === 'google' ? (
-                <Loader2 size={18} className="animate-spin text-gray-500" />
+                <Loader2 size={18} className={`animate-spin ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} />
               ) : (
                 <>
                   <GoogleIcon />
@@ -179,11 +230,15 @@ function LoginContent() {
               )}
             </button>
 
-            {/* GitHub - Solid Dark */}
+            {/* GitHub - BULLETPROOF CONDITIONAL INVERSION */}
             <button
               onClick={() => handleSocialLogin('github')}
               disabled={!!loadingProvider}
-              className="group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl bg-gray-900 border border-gray-900 text-white hover:bg-black hover:shadow-[0_4px_14px_rgba(0,0,0,0.2)] transition-all duration-200 font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
+              className={`group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm transition-all duration-200 border ${
+                isDarkMode 
+                  ? "bg-[#ffffff] border-[#ffffff] text-[#111827] hover:bg-[#f3f4f6]" 
+                  : "bg-[#24292f] border-[#24292f] text-[#ffffff] hover:bg-[#1b1f23]"
+              }`}
             >
               {loadingProvider === 'github' ? (
                 <Loader2 size={18} className="animate-spin" />
@@ -195,11 +250,11 @@ function LoginContent() {
               )}
             </button>
 
-            {/* Discord - Brand Color */}
+            {/* Discord */}
             <button
               onClick={() => handleSocialLogin("discord")}
               disabled={!!loadingProvider}
-              className="group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl bg-[#5865F2] border border-[#5865F2] text-white hover:bg-[#4752C4] hover:shadow-[0_4px_14px_rgba(88,101,242,0.3)] transition-all duration-200 font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
+              className="group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl bg-[#5865F2] border border-[#5865F2] text-[#ffffff] hover:bg-[#4752C4] hover:shadow-[0_4px_14px_rgba(88,101,242,0.3)] transition-all duration-200 font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
             >
               {loadingProvider === "discord" ? (
                 <Loader2 size={18} className="animate-spin" />
@@ -215,24 +270,32 @@ function LoginContent() {
 
           {/* Error UI */}
           {error && (
-            <div className="mt-6 p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm font-medium flex items-center gap-3 animate-in fade-in">
+            <div className={`mt-6 p-4 rounded-xl text-sm font-medium flex items-center gap-3 animate-in fade-in border ${
+              isDarkMode 
+                ? "bg-red-900/20 border-red-800/50 text-red-400" 
+                : "bg-red-50 border-red-100 text-red-600"
+            }`}>
               <span>⚠️</span> {error}
             </div>
           )}
 
           {/* Mobile Trust Signals */}
-          <div className="lg:hidden mt-8 flex justify-center items-center gap-2 text-[11px] text-gray-500 font-medium">
+          <div className={`lg:hidden mt-8 flex justify-center items-center gap-2 text-[11px] font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
             <ShieldCheck size={14} className="text-emerald-500" />
             Secured by Supabase Auth
           </div>
         </div>
 
-        {/* Registration Link */}
-        <p className="mt-8 text-sm text-gray-500 font-medium">
+        {/* Register Link */}
+        <p className={`mt-8 text-sm font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
           Ready to build your system?{" "}
           <button
             onClick={() => router.push("/register")}
-            className="text-gray-900 font-bold hover:text-orange-500 transition-colors underline decoration-gray-300 underline-offset-4 hover:decoration-orange-500"
+            className={`font-bold transition-colors underline underline-offset-4 ${
+              isDarkMode 
+                ? "text-white decoration-gray-700 hover:text-orange-400 hover:decoration-orange-400" 
+                : "text-[#111827] decoration-gray-300 hover:text-orange-500 hover:decoration-orange-500"
+            }`}
           >
             Create account
           </button>

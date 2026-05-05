@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Log, Meta } from '../types';
 import { parseDate } from './audit/utils';
+import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
 
 import SystemStatus from './audit/SystemStatus';
 import AuditMetrics from './audit/AuditMetrics';
@@ -19,6 +20,8 @@ interface AuditProps {
 }
 
 export default function AuditView({ logs, meta, clearLogs, deleteLog }: AuditProps) {
+  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
+
   const [filterType, setFilterType] = useState<'all' | 'month' | 'year' | 'custom'>('all');
   const [actionFilter, setActionFilter] = useState<string>('ALL');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -205,12 +208,16 @@ export default function AuditView({ logs, meta, clearLogs, deleteLog }: AuditPro
       : null;
 
   return (
-    <div className="w-full min-h-screen flex flex-col p-4 md:p-8 bg-[#F9FAFB] text-gray-900 font-sans pb-24">
+    <div className={`w-full min-h-screen flex flex-col p-4 md:p-8 font-sans pb-24 transition-colors duration-300 ${
+      isDarkMode ? "bg-[#050505] text-gray-200" : "bg-[#F9FAFB] text-gray-900"
+    }`}>
       <div className="max-w-[1500px] mx-auto w-full flex flex-col gap-6">
 
         {/* AUDIT ALERT */}
         {auditAlert && (
-          <div className="bg-red-50 border border-red-200 text-red-600 text-sm font-bold p-4 rounded-xl shadow-sm animate-in fade-in">
+          <div className={`text-sm font-bold p-4 rounded-xl shadow-sm animate-in fade-in border transition-colors ${
+            isDarkMode ? "bg-red-950/30 border-red-900/50 text-red-400" : "bg-red-50 border-red-200 text-red-600"
+          }`}>
             ⚠️ {auditAlert}
           </div>
         )}
@@ -263,8 +270,8 @@ export default function AuditView({ logs, meta, clearLogs, deleteLog }: AuditPro
       <style dangerouslySetInnerHTML={{__html: `
         .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: ${isDarkMode ? '#374151' : '#e5e7eb'}; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: ${isDarkMode ? '#4b5563' : '#d1d5db'}; }
       `}} />
     </div>
   );
