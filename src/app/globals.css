@@ -4,61 +4,156 @@
 :root {
   --background: #f9fafb;
   --foreground: #111827;
+  --surface: #ffffff;
+  --surface-alt: #f8fafc;
+  --border: #e5e7eb;
+  --muted: #6b7280;
   --primary-orange: #f97316;
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+  --selection-bg: #ffedd5;
+  --selection-text: #9a3412;
+}
+
+.dark {
+  --background: #000000;
+  --foreground: #ffffff;
+
+  /* ALL surfaces → pure black (Premium UI with subtle alt depth) */
+  --surface: #000000;
+  --surface-alt: #050505; 
+
+  /* Keep borders slightly visible */
+  --border: #1f2937;
+
+  /* Text hierarchy */
+  --muted: #9ca3af;
+
+  --primary-orange: #f97316;
+
+  --scrollbar-track: #000000;
+  --scrollbar-thumb: #1f2937;
+
+  --selection-bg: #f97316;
+  --selection-text: #ffffff;
+}
+
+/* GPU Smoothness & Scrolling */
+html {
+  will-change: background-color, color;
+  scroll-behavior: smooth;
 }
 
 html, body {
   background-color: var(--background);
   color: var(--foreground);
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
 }
 
 body {
-  @apply transition-colors duration-200 min-h-screen flex flex-col;
-  /* Smooth scrolling for the whole page */
-  scroll-behavior: smooth;
+  @apply min-h-screen flex flex-col;
+  transform: translateZ(0); /* GPU acceleration to prevent flicker */
 }
 
-/* 2. Modern Scrollbar Styling (Chrome, Safari, Edge) */
+/* GLOBAL SMOOTH THEME TRANSITION */
+*,
+*::before,
+*::after {
+  transition-property: 
+    background-color,
+    color,
+    border-color,
+    fill,
+    stroke,
+    opacity,
+    box-shadow,
+    transform,
+    backdrop-filter;
+    
+  transition-duration: 300ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Special class for iOS-level smooth fade triggered via JS */
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition-duration: 350ms !important;
+}
+
+/* 2. Global Dark Mode Overrides 
+   (Removed !important so the global transition engine can smoothly animate these) */
+
+.dark [class*="bg-gray-"],
+.dark [class*="bg-white"] {
+  background-color: #000000;
+}
+
+.dark [class*="border-gray-"],
+.dark [class*="border-white"] {
+  border-color: #1f2937;
+}
+
+.dark [class*="text-gray-900"],
+.dark [class*="text-gray-800"],
+.dark [class*="text-gray-700"] {
+  color: #ffffff;
+}
+
+.dark [class*="text-gray-600"],
+.dark [class*="text-gray-500"] {
+  color: #9ca3af;
+}
+
+.dark [class*="text-gray-400"] {
+  color: #6b7280;
+}
+
+/* 3. Modern Scrollbar Styling (Chrome, Safari, Edge) */
 ::-webkit-scrollbar {
   width: 8px; /* Slimmer for a modern look */
   height: 8px; /* For horizontal scrollbars */
 }
 
-/* The Background of the scrollbar */
 ::-webkit-scrollbar-track {
-  background: #f1f5f9; /* slate-100 */
+  background: var(--scrollbar-track);
 }
 
-/* The actual draggable bar */
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1; /* slate-300 (Subtle when inactive) */
+  background: var(--scrollbar-thumb);
   border-radius: 10px;
-  border: 2px solid #f1f5f9; /* Creates a padding effect */
+  border: 2px solid var(--scrollbar-track); /* Creates a padding effect */
 }
 
-/* Handle on hover - Transitions to your theme orange */
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary-orange);
   cursor: pointer;
 }
 
-/* 3. Firefox Scrollbar Support */
+.dark ::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #1f2937;
+}
+
+/* 4. Firefox Scrollbar Support */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 #f1f5f9;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
-/* 4. Text Selection Color */
+/* 5. Text Selection Color */
 ::selection {
-  background-color: #ffedd5; /* orange-100 */
-  color: #9a3412; /* orange-900 */
+  background-color: var(--selection-bg);
+  color: var(--selection-text);
 }
 
-/* Ensure prose doesn't look cramped */
 .prose {
   max-width: 100% !important;
 }
-
 
 /* Custom Scrollbar for sleek dropdowns */
 .custom-scrollbar::-webkit-scrollbar {
@@ -68,11 +163,14 @@ body {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #e5e7eb;
+  background-color: var(--scrollbar-thumb);
   border-radius: 10px;
 }
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
   background-color: #d1d5db;
+}
+.dark .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: #374151; /* Dark mode hover fallback */
 }
 
 /* Premium Bell Swing Animation */
@@ -89,10 +187,4 @@ body {
 .animate-swing {
   transform-origin: top center;
   animation: swing 2s ease-in-out infinite;
-}
-
-
-html, body {
-  overscroll-behavior-y: contain;
-  touch-action: pan-y;
 }

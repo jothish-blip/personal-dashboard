@@ -4,6 +4,8 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Flame, Zap, Star, ChevronDown, ChevronRight, Check, Trash2, ArrowRightLeft } from 'lucide-react';
 import { Task } from '../../types';
 import { parseLocalDate, calculateCurrentStreak, getLocalDate } from './utils';
+// 🔥 IMPORT ThemeProvider (Update path if needed, matching TaskSelector)
+import { useTheme } from "@/components/ThemeProvider"; 
 
 interface GridProps {
   tasks: Task[];
@@ -26,6 +28,9 @@ const Grid = ({
   todayRef, handleToggleSafe, deleteTask, activeWeekIndex, showScrollHint, dismissScrollHint
 }: GridProps) => {
   
+  // 🔥 Get current theme state
+  const { isDarkMode } = useTheme();
+
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [hasSwiped, setHasSwiped] = useState(false);
@@ -138,7 +143,6 @@ const Grid = ({
             const streakStyle = getStreakStyle(currentStreak);
             const isAtRisk = !historyMap[task.id]?.[actualToday] && currentStreak > 0;
             
-            // 🟢 FIXED: Safe string comparison
             const validPastDays = visibleDays.filter(d => d && `${meta.currentMonth}-${d}` <= actualToday);
             const donePastDays = validPastDays.filter(d => historyMap[task.id]?.[`${meta.currentMonth}-${d}`]);
             const isPerfectWeek = validPastDays.length > 0 && donePastDays.length === validPastDays.length;
@@ -187,7 +191,6 @@ const Grid = ({
                   const dateStr = `${meta.currentMonth}-${day}`;
                   const isDone = !!historyMap[task.id]?.[dateStr];
                   
-                  // 🟢 THE FIX: Compare STRINGS natively. Bulletproof.
                   const isFuture = dateStr > actualToday;
                   const isPast = dateStr < actualToday;
                   const isLocked = meta.lockedDates?.includes(dateStr) && dateStr !== actualToday;
@@ -282,7 +285,6 @@ const Grid = ({
                           const dateStr = `${meta.currentMonth}-${day}`;
                           const isDone = !!historyMap[task.id]?.[dateStr];
                           
-                          // 🟢 FIXED: Mobile safe string comparison
                           const isFuture = dateStr > actualToday;
                           const isLocked = meta.lockedDates?.includes(dateStr) && dateStr !== actualToday;
                           const isDisabled = isFuture || isLocked;
@@ -324,7 +326,14 @@ const Grid = ({
   return (
     <>
       <div className="bg-white rounded-[24px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-gray-200 overflow-hidden relative z-10 min-h-[400px] hidden md:flex flex-col">
-        <div className="absolute top-0 right-0 bottom-0 w-12 bg-gradient-to-l from-white via-white/80 to-transparent pointer-events-none z-30"></div>
+        
+        {/* 🔥 FIX: Dynamically swap the edge scroll-gradient based on light/dark mode */}
+        <div className={`absolute top-0 right-0 bottom-0 w-12 pointer-events-none z-30 ${
+          isDarkMode 
+            ? "bg-gradient-to-l from-black via-black/80 to-transparent" 
+            : "bg-gradient-to-l from-white via-white/80 to-transparent"
+        }`}></div>
+
         {showScrollHint && (
           <div className="absolute top-1/2 right-4 -translate-y-1/2 bg-gray-900 text-white px-3 py-2 rounded-xl text-xs font-bold z-40 animate-pulse flex items-center gap-1 pointer-events-none shadow-xl transition-opacity">
             Swipe days <ChevronRight size={14}/>
