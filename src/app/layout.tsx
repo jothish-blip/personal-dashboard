@@ -7,8 +7,9 @@ import OfflineView from "@/app/not-found/OfflineView";
 import PWARegistration from "@/components/PWARegistration";
 import ClientWrapper from "@/components/ClientWrapper";
 import ScrollRestoration from "@/app/refresh/ScrollRestoration";
-// 🔥 FIX: Correctly imported FocusProvider instead of useFocusSystem
-import { FocusProvider } from "../components/focus/useFocusSystem";
+
+// Make sure this path is pointing to your actual components folder!
+import { FocusProvider } from "@/components/focus/useFocusSystem";
 
 import "./globals.css";
 
@@ -49,9 +50,28 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
     >
-      <body className="bg-[#FAFAFA] text-slate-900 overflow-x-hidden">
+      <body className="overflow-x-hidden">
+        {/* Proper Theme Resolution Script */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function () {
+                try {
+                  var stored = localStorage.getItem('nextask_theme');
+                  var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  
+                  var finalTheme = stored ? stored : (systemDark ? 'dark' : 'light');
+                  
+                  document.documentElement.classList.toggle('dark', finalTheme === 'dark');
+                  document.documentElement.style.colorScheme = finalTheme;
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
 
         {/* SYSTEM LAYER */}
         <PWARegistration />
@@ -66,7 +86,7 @@ export default function RootLayout({
             </main>
           </ClientWrapper>
         </FocusProvider>
-          <ScrollRestoration />
+        <ScrollRestoration />
       </body>
     </html>
   );

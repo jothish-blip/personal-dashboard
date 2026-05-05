@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut
 } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 import NotificationCenter from "@/notifications/NotificationCenter";
 import { NexNotification } from "@/notifications/types";
@@ -110,6 +111,8 @@ export default function DesktopNav({
 
       {/* RIGHT */}
       <div className="flex items-center gap-4">
+
+        <ThemeToggle />
 
         {/* 🔔 NOTIFICATIONS */}
         <div className="relative flex items-center">

@@ -35,7 +35,7 @@ export default function MatrixView({
   
   const [isMobile, setIsMobile] = useState(false);
   const [showScrollHint, setShowScrollHint] = useState(false);
-  const [showMobileAdd, setShowMobileAdd] = useState(false); // Mobile Floating Button State
+  const [showMobileAdd, setShowMobileAdd] = useState(false);
 
   useEffect(() => {
     const checkScreen = () => {
@@ -334,24 +334,24 @@ export default function MatrixView({
   const scrollToToday = () => todayRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 
   return (
-    // 1. Changed Root Background to #F8FAFC and Text to gray-900
-    <div className={`flex-1 flex flex-col min-h-screen bg-[#F8FAFC] text-gray-900 pb-24 relative pt-0 overscroll-y-contain transition-colors duration-500`}>
+    // Fixed Background and Text bindings
+    <div className={`flex-1 flex flex-col min-h-screen bg-[var(--background)] text-[var(--foreground)] pb-24 relative pt-0 overscroll-y-contain transition-colors duration-500`}>
       
       {showHelp && (
-        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-in fade-in" onClick={() => setShowHelp(false)}>
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full space-y-6 shadow-2xl animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-in fade-in" onClick={() => setShowHelp(false)}>
+          <div className="bg-[var(--surface)] rounded-2xl p-8 max-w-md w-full space-y-6 shadow-2xl animate-in zoom-in-95 duration-200 border border-[var(--border)]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 text-indigo-500 mb-2">
-              <div className="p-2 bg-indigo-50 rounded-xl"><Target size={24} /></div>
-              <h2 className="font-bold text-2xl text-gray-900">System Basics</h2>
+              <div className="p-2 bg-indigo-500/10 rounded-xl"><Target size={24} /></div>
+              <h2 className="font-bold text-2xl text-[var(--foreground)]">System Basics</h2>
             </div>
-            <ul className="text-sm text-gray-500 space-y-4">
+            <ul className="text-sm text-[var(--muted)] space-y-4">
               <li className="flex gap-3"><Check size={18} className="text-green-500 shrink-0"/> <span><strong>Row = Objective:</strong> Track what matters.</span></li>
               <li className="flex gap-3"><Check size={18} className="text-green-500 shrink-0"/> <span><strong>Column = Day:</strong> Click a cell to log completion.</span></li>
               <li className="flex gap-3"><Check size={18} className="text-green-500 shrink-0"/> <span><strong>Flames = Streaks:</strong> Build unbroken chains. Green (4+ days), Orange (7+ days).</span></li>
               <li className="flex gap-3"><Check size={18} className="text-green-500 shrink-0"/> <span><strong>Locks = Accountability:</strong> Past days lock automatically unless you use a rollback token.</span></li>
               <li className="flex gap-3"><Plus size={18} className="text-indigo-500 shrink-0"/> <span><strong>Quick Add:</strong> Use `#` to assign a group (e.g. `Read #Learning`).</span></li>
             </ul>
-            <button onClick={() => setShowHelp(false)} className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-indigo-500 active:scale-95 transition-all duration-200">
+            <button onClick={() => setShowHelp(false)} className="w-full py-3 bg-[var(--foreground)] text-[var(--background)] rounded-xl font-bold hover:bg-indigo-500 active:scale-95 transition-all duration-200">
               Got it, let's go
             </button>
           </div>
@@ -359,9 +359,9 @@ export default function MatrixView({
       )}
 
       {pendingDelete && (
-        <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-xl z-[150] text-sm flex items-center gap-4 animate-in slide-in-from-bottom-5">
+        <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-[var(--foreground)] text-[var(--background)] px-5 py-3 rounded-2xl shadow-xl z-[150] text-sm flex items-center gap-4 animate-in slide-in-from-bottom-5">
           <span>Deleted <strong>{pendingDelete.name}</strong></span>
-          <button title="Undo delete" onClick={undoDelete} className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-bold bg-gray-800 px-3 py-1.5 rounded-lg active:scale-95 transition-all duration-200">
+          <button title="Undo delete" onClick={undoDelete} className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-bold bg-[var(--surface-alt)] px-3 py-1.5 rounded-lg active:scale-95 transition-all duration-200">
             <RotateCcw size={14}/> Undo
           </button>
         </div>
@@ -369,8 +369,8 @@ export default function MatrixView({
 
       <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 flex flex-col gap-2 z-[100] pointer-events-none">
         {errors.map((err) => (
-          <div key={err.id} className={`bg-white border border-gray-100 px-6 py-3 rounded-[20px] shadow-xl text-sm font-bold flex items-center gap-3 transition-all duration-300
-            ${err.type === 'lock' ? 'border-amber-200 text-amber-700' : err.type === 'future' ? 'border-blue-200 text-blue-700' : 'border-red-200 text-red-600'}`}
+          <div key={err.id} className={`bg-[var(--surface)] border border-[var(--border)] px-6 py-3 rounded-[20px] shadow-xl text-sm font-bold flex items-center gap-3 transition-all duration-300
+            ${err.type === 'lock' ? 'border-amber-500/30 text-amber-500' : err.type === 'future' ? 'border-blue-500/30 text-blue-500' : 'border-red-500/30 text-red-500'}`}
             style={{ animation: 'shake 0.4s ease-in-out' }}
           >
             {err.type === 'lock' && <Lock size={18} className="text-amber-500" />}
@@ -395,7 +395,6 @@ export default function MatrixView({
         />
       )}
 
-      {/* 9. Focus Mode max-w-[900px] + 10. Gap-8 spacing */}
       <div className={`flex-1 flex flex-col xl:flex-row mx-auto w-full gap-8 transition-all duration-500 ${isFocusMode ? 'max-w-[900px] p-2 md:p-4 justify-center' : 'max-w-[1500px] p-4 md:p-8'}`}>
         <div className="flex-1 flex flex-col gap-8 overflow-hidden">
           
@@ -406,59 +405,59 @@ export default function MatrixView({
             />
           )}
 
-          {/* 3. Summary Cards Row - Desktop New Structure */}
+          {/* Summary Cards */}
           {!isFocusMode && activeTasks.length > 0 && (
             <div className="grid grid-cols-3 gap-4 md:gap-6 w-full">
-              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200">
-                <p className="text-sm text-gray-500 mb-1">Today</p>
-                <p className="text-2xl font-bold text-gray-900">{todayDataLength} Tasks</p>
+              <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] transition-all duration-200">
+                <p className="text-sm text-[var(--muted)] mb-1">Today</p>
+                <p className="text-2xl font-bold text-[var(--foreground)]">{todayDataLength} Tasks</p>
               </div>
-              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200">
-                <p className="text-sm text-gray-500 mb-1">Week Score</p>
-                <p className="text-2xl font-bold text-gray-900">{consistencyScore}%</p>
+              <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] transition-all duration-200">
+                <p className="text-sm text-[var(--muted)] mb-1">Week Score</p>
+                <p className="text-2xl font-bold text-[var(--foreground)]">{consistencyScore}%</p>
               </div>
-              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200">
-                <p className="text-sm text-gray-500 mb-1">Streak</p>
-                <p className="text-2xl font-bold text-gray-900">{bestGlobalStreak} <span className="text-sm font-normal text-gray-500">Days</span></p>
+              <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] transition-all duration-200">
+                <p className="text-sm text-[var(--muted)] mb-1">Streak</p>
+                <p className="text-2xl font-bold text-[var(--foreground)]">{bestGlobalStreak} <span className="text-sm font-normal text-[var(--muted)]">Days</span></p>
               </div>
             </div>
           )}
 
           {!isLoaded ? (
-            <div className="bg-white border border-gray-100 rounded-2xl p-6 animate-pulse min-h-[400px] shadow-sm hover:shadow-md transition-all duration-200">
-              <div className="flex justify-between items-center mb-6"><div className="h-6 bg-gray-100 rounded w-48"></div><div className="h-8 bg-gray-50 rounded-full w-24"></div></div>
-              <div className="space-y-4">{[1, 2, 3, 4].map(i => (<div key={i} className="flex gap-4 items-center"><div className="h-12 bg-gray-50 rounded-xl w-1/4"></div><div className="h-12 bg-gray-50 rounded-xl flex-1"></div></div>))}</div>
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 animate-pulse min-h-[400px] shadow-sm hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] transition-all duration-200">
+              <div className="flex justify-between items-center mb-6"><div className="h-6 bg-[var(--surface-alt)] rounded w-48"></div><div className="h-8 bg-[var(--surface-alt)] rounded-full w-24"></div></div>
+              <div className="space-y-4">{[1, 2, 3, 4].map(i => (<div key={i} className="flex gap-4 items-center"><div className="h-12 bg-[var(--surface-alt)] rounded-xl w-1/4"></div><div className="h-12 bg-[var(--surface-alt)] rounded-xl flex-1"></div></div>))}</div>
             </div>
           ) : activeTasks.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-12 bg-white border border-dashed border-gray-300 rounded-2xl text-gray-400 min-h-[400px] shadow-sm hover:shadow-md transition-all duration-200 hover:border-indigo-300">
-              <div className="bg-indigo-50 p-4 rounded-full mb-4"><Target size={48} className="text-indigo-400" /></div>
-              <p className="font-bold text-xl text-gray-900 mb-2">Start Tracking Your System</p>
-              <p className="text-sm text-gray-500 mb-4 text-center">Add your first performance objective to begin analyzing.</p>
-              <div className="flex items-center gap-2 mb-6 text-xs text-gray-500 font-medium">Try adding: <span className="bg-gray-100 text-gray-900 px-2 py-1 rounded">Workout #Health</span> <span className="bg-gray-100 text-gray-900 px-2 py-1 rounded">Reading #Mind</span></div>
+            <div className="flex-1 flex flex-col items-center justify-center p-12 bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-2xl text-[var(--muted)] min-h-[400px] shadow-sm hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] transition-all duration-200 hover:border-indigo-400">
+              <div className="bg-indigo-500/10 p-4 rounded-full mb-4"><Target size={48} className="text-indigo-400" /></div>
+              <p className="font-bold text-xl text-[var(--foreground)] mb-2">Start Tracking Your System</p>
+              <p className="text-sm text-[var(--muted)] mb-4 text-center">Add your first performance objective to begin analyzing.</p>
+              <div className="flex items-center gap-2 mb-6 text-xs text-[var(--muted)] font-medium">Try adding: <span className="bg-[var(--surface-alt)] text-[var(--foreground)] px-2 py-1 rounded">Workout #Health</span> <span className="bg-[var(--surface-alt)] text-[var(--foreground)] px-2 py-1 rounded">Reading #Mind</span></div>
               <div className="relative mt-4">
                 <input type="text" placeholder="Workout #Health (Press Enter)..." value={quickAddName} onChange={e => setQuickAddName(e.target.value)} onKeyDown={handleQuickAdd} autoFocus
-                  className={`pl-4 pr-10 py-3 border rounded-xl text-sm outline-none w-72 shadow-sm transition-all duration-200 ${quickAddSuccess ? 'bg-green-50 border-green-400 animate-[scaleUp_0.2s_ease]' : 'bg-gray-50 border-gray-100 focus:border-indigo-500 focus:bg-white text-gray-900'}`} />
-                <button onClick={executeQuickAdd} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-white bg-gray-900 rounded-lg hover:bg-indigo-500 active:scale-95 transition-all duration-200"><Plus size={16}/></button>
+                  className={`pl-4 pr-10 py-3 border rounded-xl text-sm outline-none w-72 shadow-sm transition-all duration-200 ${quickAddSuccess ? 'bg-green-500/10 border-green-500 animate-[scaleUp_0.2s_ease]' : 'bg-[var(--surface-alt)] border-[var(--border)] focus:border-indigo-500 focus:bg-[var(--surface)] text-[var(--foreground)]'}`} />
+                <button onClick={executeQuickAdd} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[var(--background)] bg-[var(--foreground)] rounded-lg hover:bg-indigo-500 active:scale-95 transition-all duration-200"><Plus size={16}/></button>
               </div>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              <div className={`flex flex-wrap items-center justify-between bg-white border border-gray-100 rounded-2xl px-5 py-3 shadow-sm hover:shadow-md transition-all duration-200 gap-4 ${isFocusMode ? 'sticky top-2 z-50 shadow-md' : ''}`}>
+              <div className={`flex flex-wrap items-center justify-between bg-[var(--surface)] border border-[var(--border)] rounded-2xl px-5 py-3 shadow-sm hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] transition-all duration-200 gap-4 ${isFocusMode ? 'sticky top-2 z-50 shadow-md opacity-100' : ''}`}>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2 text-xs font-semibold">
                     {meta.lockedDates?.includes(actualToday) ? (
-                      <span className="text-amber-600 flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-md"><Lock size={12}/> Locked Mode</span>
+                      <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-md"><Lock size={12}/> Locked Mode</span>
                     ) : (
-                      <span className="text-green-600 flex items-center gap-1.5 bg-green-50 px-2 py-1 rounded-md"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"/> Active Tracking</span>
+                      <span className="text-green-600 dark:text-green-400 flex items-center gap-1.5 bg-green-500/10 px-2 py-1 rounded-md"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"/> Active Tracking</span>
                     )}
-                    <span className="hidden sm:inline text-gray-500 font-medium ml-1">Today • {actualToday}</span>
+                    <span className="hidden sm:inline text-[var(--muted)] font-medium ml-1">Today • {actualToday}</span>
                   </div>
-                  {!isFocusMode && <div className="h-4 w-[1px] bg-gray-100 hidden md:block"></div>}
+                  {!isFocusMode && <div className="h-4 w-[1px] bg-[var(--border)] hidden md:block"></div>}
                   {!isFocusMode && (
                     <div className="hidden lg:flex items-center">
-                      {todayDataLength > yesterdayDataLength ? <span className="bg-green-50 text-green-600 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 drop-shadow-sm">🔥 Improved from yesterday</span> : 
-                        todayDataLength < yesterdayDataLength ? <span className="bg-amber-50 text-amber-600 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1">⚠️ Drop from yesterday</span> : 
-                        <span className="bg-gray-50 text-gray-500 px-2 py-1 rounded text-[10px] font-bold">➡️ Consistent volume</span>}
+                      {todayDataLength > yesterdayDataLength ? <span className="bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 drop-shadow-sm">🔥 Improved from yesterday</span> : 
+                        todayDataLength < yesterdayDataLength ? <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1">⚠️ Drop from yesterday</span> : 
+                        <span className="bg-[var(--surface-alt)] text-[var(--muted)] px-2 py-1 rounded text-[10px] font-bold">➡️ Consistent volume</span>}
                     </div>
                   )}
                 </div>
@@ -468,49 +467,51 @@ export default function MatrixView({
                     <>
                       <div className="relative hidden md:block group">
                         <input type="text" placeholder="Workout #Health (Press Enter)..." value={quickAddName} onChange={e => setQuickAddName(e.target.value)} onKeyDown={handleQuickAdd}
-                          className={`pl-3 pr-3 py-1.5 border rounded-lg text-xs outline-none transition-all duration-200 w-36 focus:w-56 text-gray-900 ${quickAddSuccess ? 'bg-green-50 border-green-400 animate-[scaleUp_0.2s_ease]' : 'bg-gray-50 border-gray-100 focus:border-indigo-400 focus:bg-white'}`} />
+                          className={`pl-3 pr-3 py-1.5 border rounded-lg text-xs outline-none transition-all duration-200 w-36 focus:w-56 text-[var(--foreground)] ${quickAddSuccess ? 'bg-green-500/10 border-green-500 animate-[scaleUp_0.2s_ease]' : 'bg-[var(--surface-alt)] border-[var(--border)] focus:border-indigo-400 focus:bg-[var(--surface)]'}`} />
                       </div>
                       <div className="relative hidden lg:block">
-                          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                          <input type="text" placeholder="Filter..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 pr-7 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs outline-none focus:border-indigo-400 focus:bg-white transition-all duration-200 w-24 focus:w-32 text-gray-900" />
-                          {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={12}/></button>}
+                          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+                          <input type="text" placeholder="Filter..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 pr-7 py-1.5 bg-[var(--surface-alt)] border border-[var(--border)] rounded-lg text-xs outline-none focus:border-indigo-400 focus:bg-[var(--surface)] transition-all duration-200 w-24 focus:w-32 text-[var(--foreground)]" />
+                          {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)]"><X size={12}/></button>}
                       </div>
                     </>
                   )}
-                  <div className="flex items-center gap-1 bg-gray-50 border border-gray-100 rounded-lg p-1 shadow-sm">
-                    <button onClick={() => setWeekOffset(prev => Math.max(prev - 1, -4))} className="p-1 hover:bg-white text-gray-600 rounded transition-colors active:scale-95"><ChevronLeft size={14}/></button>
-                    {!isFocusMode && <button onClick={() => { setWeekOffset(0); scrollToToday(); }} className="px-3 text-xs font-bold text-gray-600 hover:text-gray-900 transition-colors active:scale-95">Week {activeWeekIndex + 1}</button>}
-                    <button onClick={() => setWeekOffset(prev => Math.min(prev + 1, 4))} className="p-1 hover:bg-white text-gray-600 rounded transition-colors active:scale-95"><ChevronRight size={14}/></button>
+                  <div className="flex items-center gap-1 bg-[var(--surface-alt)] border border-[var(--border)] rounded-lg p-1 shadow-sm">
+                    <button onClick={() => setWeekOffset(prev => Math.max(prev - 1, -4))} className="p-1 hover:bg-[var(--surface)] text-[var(--muted)] rounded transition-colors active:scale-95"><ChevronLeft size={14}/></button>
+                    {!isFocusMode && <button onClick={() => { setWeekOffset(0); scrollToToday(); }} className="px-3 text-xs font-bold text-[var(--muted)] hover:text-[var(--foreground)] transition-colors active:scale-95">Week {activeWeekIndex + 1}</button>}
+                    <button onClick={() => setWeekOffset(prev => Math.min(prev + 1, 4))} className="p-1 hover:bg-[var(--surface)] text-[var(--muted)] rounded transition-colors active:scale-95"><ChevronRight size={14}/></button>
                   </div>
-                  <div className="h-4 w-[1px] bg-gray-100"></div>
-                  <button onClick={() => setIsFocusMode(!isFocusMode)} title="Toggle Focus Mode" className={`p-1.5 rounded-lg transition-colors active:scale-95 ${isFocusMode ? 'bg-indigo-100 text-indigo-600' : 'hover:bg-gray-100 text-gray-500'}`}>
+                  <div className="h-4 w-[1px] bg-[var(--border)]"></div>
+                  <button onClick={() => setIsFocusMode(!isFocusMode)} title="Toggle Focus Mode" className={`p-1.5 rounded-lg transition-colors active:scale-95 ${isFocusMode ? 'bg-indigo-500/10 text-indigo-500' : 'hover:bg-[var(--surface-alt)] text-[var(--muted)]'}`}>
                     {isFocusMode ? <Minimize size={16}/> : <Maximize size={16}/>}
                   </button>
-                  <button onClick={() => setShowHelp(true)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors active:scale-95"><HelpCircle size={16}/></button>
+                  <button onClick={() => setShowHelp(true)} className="p-1.5 text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-alt)] rounded-lg transition-colors active:scale-95"><HelpCircle size={16}/></button>
                 </div>
               </div>
 
-              <Grid 
-                tasks={filteredTasks}
-                meta={meta}
-                groupedTasks={groupedTasks}
-                groups={groups}
-                weeksInMonth={weeksInMonth}
-                visibleDays={visibleDays}
-                actualToday={actualToday}
-                todayRef={todayRef}
-                handleToggleSafe={handleToggleSafe}
-                deleteTask={requestDelete} 
-                activeWeekIndex={activeWeekIndex}
-                showScrollHint={showScrollHint}
-                dismissScrollHint={dismissScrollHint}
-              />
+              {/* Explicit horizontal scroll wrapper to fix the white edge overflow bleed */}
+              <div className="overflow-x-auto bg-[var(--background)]">
+                <Grid 
+                  tasks={filteredTasks}
+                  meta={meta}
+                  groupedTasks={groupedTasks}
+                  groups={groups}
+                  weeksInMonth={weeksInMonth}
+                  visibleDays={visibleDays}
+                  actualToday={actualToday}
+                  todayRef={todayRef}
+                  handleToggleSafe={handleToggleSafe}
+                  deleteTask={requestDelete} 
+                  activeWeekIndex={activeWeekIndex}
+                  showScrollHint={showScrollHint}
+                  dismissScrollHint={dismissScrollHint}
+                />
+              </div>
 
             </div>
           )}
         </div>
 
-        {/* Desktop Sidebar, Hidden on mobile per Bottom Sheet instructions */}
         {(!isFocusMode || (!isMobile && isFocusMode)) && !isFocusMode && (
           <div className="hidden xl:block w-[320px] shrink-0 sticky top-8 h-fit">
             <Sidebar 
@@ -523,22 +524,22 @@ export default function MatrixView({
         )}
       </div>
 
-      {/* 6. Floating Add Button & Modal (Mobile Only) */}
+      {/* Floating Add Button & Modal (Mobile Only) */}
       {isMobile && (
         <>
           <button 
             onClick={() => setShowMobileAdd(true)}
-            className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-500 text-white rounded-full shadow-lg flex items-center justify-center hover:shadow-xl active:scale-95 transition-all duration-200 z-[90]"
+            className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-500 text-white rounded-full shadow-lg flex items-center justify-center hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] active:scale-95 transition-all duration-200 z-[90]"
           >
             <Plus size={24} />
           </button>
 
           {showMobileAdd && (
-            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-end justify-center z-[200] animate-in fade-in" onClick={() => setShowMobileAdd(false)}>
-              <div className="bg-white rounded-t-3xl p-6 w-full space-y-5 shadow-2xl animate-in slide-in-from-bottom-10" onClick={(e) => e.stopPropagation()}>
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end justify-center z-[200] animate-in fade-in" onClick={() => setShowMobileAdd(false)}>
+              <div className="bg-[var(--surface)] rounded-t-3xl p-6 w-full space-y-5 shadow-2xl animate-in slide-in-from-bottom-10 border-t border-[var(--border)]" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-xl text-gray-900">Add Objective</h3>
-                  <button onClick={() => setShowMobileAdd(false)} className="p-2 text-gray-400 bg-gray-50 rounded-full"><X size={16}/></button>
+                  <h3 className="font-bold text-xl text-[var(--foreground)]">Add Objective</h3>
+                  <button onClick={() => setShowMobileAdd(false)} className="p-2 text-[var(--muted)] bg-[var(--surface-alt)] rounded-full hover:text-[var(--foreground)]"><X size={16}/></button>
                 </div>
                 
                 <div className="relative">
@@ -552,7 +553,7 @@ export default function MatrixView({
                       if (e.key === 'Enter') setShowMobileAdd(false);
                     }}
                     autoFocus
-                    className="w-full px-4 py-4 bg-[#F8FAFC] border border-gray-100 rounded-2xl outline-none focus:border-indigo-400 focus:bg-white text-gray-900 transition-all duration-200 text-base" 
+                    className="w-full px-4 py-4 bg-[var(--surface-alt)] border border-[var(--border)] rounded-2xl outline-none focus:border-indigo-500 focus:bg-[var(--surface)] text-[var(--foreground)] transition-all duration-200 text-base shadow-sm" 
                   />
                 </div>
 

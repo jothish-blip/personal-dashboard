@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut
 } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 import NotificationCenter from "@/notifications/NotificationCenter";
 import { NexNotification } from "@/notifications/types";
@@ -68,6 +69,7 @@ export default function MobileNav(props: MobileNavProps) {
         </div>
 
         <div className="flex items-center gap-3"> {/* Reduced gap-4 to gap-3 */}
+          <ThemeToggle />
 
           {/* 🔔 Notifications */}
           <div className="relative">
