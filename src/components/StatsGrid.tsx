@@ -331,12 +331,13 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
 
   return (
     <div 
-      className={`flex-1 p-4 md:p-8 max-w-[1200px] mx-auto w-full flex flex-col gap-8 pb-24 relative transition-colors duration-300 ${
+      // 🔥 FIX: Changed px/pb to prevent top-padding double stacking and set the gap tighter
+      className={`flex-1 px-4 md:px-8 pb-24 max-w-[1200px] mx-auto w-full flex flex-col gap-8 relative transition-colors duration-300 ${
         isDarkMode ? "bg-[#050505] text-white" : "bg-white text-gray-900"
       }`}
-      // 🔥 FIX: Cleanly handles padding for top fixed navbars and variable tab bars
       style={{
-        paddingTop: "calc(var(--navbar-h, 64px) + var(--tabs-h, 0px) + 1.5rem)"
+        // 🔥 FIX: Reduced the gap from 1.5rem to 0.5rem so it sits much higher and closer to the navbar
+        paddingTop: "calc(var(--navbar-h, 64px) + var(--tabs-h, 0px) + 0.5rem)"
       }}
     >
       

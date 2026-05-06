@@ -104,7 +104,8 @@ function FocusPageContent() {
 
         {/* ✅ STANDARD DASHBOARD (Hides during Focus Mode) */}
         {!isFocusMode && (
-          <div className="max-w-[1400px] mx-auto p-4 md:p-6 space-y-6 animate-in fade-in duration-500">
+          // Applied padding-top fixes here to push content below the fixed Navbar
+          <div className="max-w-[1400px] mx-auto px-4 md:px-6 pt-24 md:pt-28 pb-6 space-y-6 animate-in fade-in duration-500">
             
             <div className="mb-2">
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900">
@@ -127,7 +128,8 @@ function FocusPageContent() {
                   <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 ml-1">
                     1. Execution Setup
                   </h3>
-                  <div className="sticky top-20 z-30">
+                  {/* Updated top offset and z-index to avoid Navbar overlap */}
+                  <div className="sticky top-28 z-20">
                     <TaskSelector />
                   </div>
                 </div>

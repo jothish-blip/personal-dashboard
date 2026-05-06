@@ -1,14 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Plus, 
   Target, 
   CheckCircle2,
   AlertCircle,
   CalendarDays,
-  LayoutList,
-  Activity
+  LayoutList
 } from "lucide-react";
 
 import { PlannerEvent } from "./types";
@@ -37,38 +36,12 @@ export default function TopBar({
 }: TopBarProps) {
   
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [topbarOffset, setTopbarOffset] = useState(64); 
   const [scrollY, setScrollY] = useState(0); 
-  const lastScrollY = useRef(0);
 
   // --- SCROLL LOGIC (GPU OPTIMIZED + THRESHOLD) ---
   useEffect(() => {
-    const SCROLL_THRESHOLD = 10; 
-
     const handleScroll = () => {
-      const currentScroll = window.scrollY;
-      setScrollY(currentScroll); 
-      
-      const diff = currentScroll - lastScrollY.current;
-      const isMobile = window.innerWidth < 768;
-
-      if (isMobile) return; 
-
-      if (Math.abs(diff) < SCROLL_THRESHOLD) return;
-
-      const updateOffset = (val: number) => {
-        setTopbarOffset(prev => (prev === val ? prev : val));
-      };
-
-      if (currentScroll < 20) {
-        updateOffset(64); 
-      } else if (diff > 0) {
-        updateOffset(0);  
-      } else {
-        updateOffset(64); 
-      }
-
-      lastScrollY.current = currentScroll;
+      setScrollY(window.scrollY); 
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -116,20 +89,24 @@ export default function TopBar({
   const statusLabel = stats.rate >= 70 ? "High Productivity" : stats.rate >= 40 ? "Steady Progress" : "Planning Phase";
   
   // --- SCROLL INTELLIGENCE ---
-  const isCompressed = topbarOffset === 0 && scrollY > 50;
+  // Keeps a slight visual compression effect if the user scrolls down
+  const isCompressed = scrollY > 50;
 
   return (
     <>
       <nav 
-        style={{ 
-          transform: `translateY(${topbarOffset === 0 ? -64 : 0}px)` 
+        // ✅ FIX: Dynamically grabs the exact height of your Navbar using the CSS variable 
+        // with a fallback of 80px and adds a 16px (1rem) gap below it.
+        style={{
+          marginTop: "calc(var(--navbar-h, 80px) + 1rem)"
         }}
-        className={`relative z-30 bg-white/70 backdrop-blur-md border-b transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-          isCompressed ? "border-transparent shadow-sm" : "border-gray-50 shadow-none"
+        // ✅ FIX: Standard relative positioning. Removed sticky behavior and translate transforms.
+        className={`relative z-10 bg-white/70 backdrop-blur-md border border-gray-100 rounded-2xl transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+          isCompressed ? "shadow-sm" : "shadow-none"
         }`}
       >
-        <div className={`max-w-[1500px] mx-auto px-4 md:px-6 min-h-[120px] md:min-h-[80px] transition-all duration-300 ${
-          isCompressed ? "py-2 space-y-2" : "py-4 space-y-4"
+        <div className={`max-w-[1500px] mx-auto px-4 md:px-6 transition-all duration-300 ${
+          isCompressed ? "py-3 space-y-3" : "py-5 space-y-5"
         }`}>
 
           {/* ROW 1 — CONTEXT */}

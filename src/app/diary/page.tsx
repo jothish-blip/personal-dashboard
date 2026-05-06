@@ -47,7 +47,11 @@ export default function DiaryPage() {
       />
 
       {/* Main Dashboard Layout */}
-      <main className="p-4 sm:p-6 md:p-8 max-w-[1040px] mx-auto w-full flex flex-col gap-8 md:gap-10 pt-6 md:pt-10 animate-in fade-in duration-500 slide-in-from-bottom-4 text-left">
+      {/* ✅ FIX: Replaced hardcoded pt-6 md:pt-10 with dynamic calculation based on global Navbar height */}
+      <main 
+        style={{ paddingTop: "calc(var(--navbar-h, 80px) + 1.5rem)" }}
+        className="p-4 sm:p-6 md:p-8 max-w-[1040px] mx-auto w-full flex flex-col gap-8 md:gap-10 animate-in fade-in duration-500 slide-in-from-bottom-4 text-left"
+      >
         
         {/* The Cockpit */}
         <section aria-label="System Controls">
