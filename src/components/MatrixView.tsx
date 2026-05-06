@@ -524,51 +524,6 @@ export default function MatrixView({
         )}
       </div>
 
-      {/* Floating Add Button & Modal (Mobile Only) */}
-      {isMobile && (
-        <>
-          <button 
-            onClick={() => setShowMobileAdd(true)}
-            className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-500 text-white rounded-full shadow-lg flex items-center justify-center hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] active:scale-95 transition-all duration-200 z-[90]"
-          >
-            <Plus size={24} />
-          </button>
-
-          {showMobileAdd && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end justify-center z-[200] animate-in fade-in" onClick={() => setShowMobileAdd(false)}>
-              <div className="bg-[var(--surface)] rounded-t-3xl p-6 w-full space-y-5 shadow-2xl animate-in slide-in-from-bottom-10 border-t border-[var(--border)]" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-xl text-[var(--foreground)]">Add Objective</h3>
-                  <button onClick={() => setShowMobileAdd(false)} className="p-2 text-[var(--muted)] bg-[var(--surface-alt)] rounded-full hover:text-[var(--foreground)]"><X size={16}/></button>
-                </div>
-                
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    placeholder="E.g. Workout #Health" 
-                    value={quickAddName} 
-                    onChange={e => setQuickAddName(e.target.value)} 
-                    onKeyDown={(e) => {
-                      handleQuickAdd(e);
-                      if (e.key === 'Enter') setShowMobileAdd(false);
-                    }}
-                    autoFocus
-                    className="w-full px-4 py-4 bg-[var(--surface-alt)] border border-[var(--border)] rounded-2xl outline-none focus:border-indigo-500 focus:bg-[var(--surface)] text-[var(--foreground)] transition-all duration-200 text-base shadow-sm" 
-                  />
-                </div>
-
-                <button 
-                  onClick={() => { executeQuickAdd(); setShowMobileAdd(false); }}
-                  className="w-full py-4 bg-indigo-500 text-white rounded-2xl font-bold hover:bg-indigo-600 active:scale-95 transition-all duration-200 text-lg shadow-sm"
-                >
-                  Create
-                </button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
     </div>
   );
 }

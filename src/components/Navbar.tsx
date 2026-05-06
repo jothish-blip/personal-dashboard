@@ -38,6 +38,12 @@ export default function Navbar({
 
   const [showNavbar, setShowNavbar] = useState(true);
   const lastScrollY = useRef(0);
+  
+  // 🔥 FIX: Ref for dynamic height tracking
+  const navRef = useRef<HTMLElement>(null);
+
+  // 🔥 FIX 5: Check if we are in the workspace
+  const isWorkspace = pathname === "/mini-nisc";
 
   useEffect(() => {
     let isMounted = true;
@@ -104,6 +110,7 @@ export default function Navbar({
     userProfile,
   };
 
+  // Scroll detection for auto-hiding
   useEffect(() => {
     const handleScroll = () => {
       const currentScroll = window.scrollY;
@@ -123,20 +130,32 @@ export default function Navbar({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  return (
-    <>
-      <nav
-        className={`fixed top-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-[0_4px_20px_rgba(0,0,0,0.05)] transition-transform duration-300 ease-in-out ${
-          showNavbar ? "translate-y-0" : "-translate-y-full"
-        }`}
-      >
-        <DesktopNav {...navProps} />
-        <MobileNav {...navProps} />
-      </nav>
+  // 🔥 FIX: Track exact navbar height and expose as CSS variable
+  useEffect(() => {
+    const updateHeight = () => {
+      if (navRef.current) {
+        const height = navRef.current.offsetHeight;
+        document.documentElement.style.setProperty("--navbar-h", `${height}px`);
+      }
+    };
 
-      <div className="h-[120px] md:h-[64px]" />
-      
-    </>
-    
+    updateHeight();
+    window.addEventListener("resize", updateHeight);
+
+    return () => window.removeEventListener("resize", updateHeight);
+  }, []);
+
+  return (
+    <nav
+      ref={navRef}
+      style={{ height: "auto" }}
+      className={`fixed top-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-[0_4px_20px_rgba(0,0,0,0.05)] transition-transform duration-300 ease-in-out ${
+        /* 🔥 FIX 5: If in workspace, NEVER hide. Otherwise, follow scroll behavior */
+        isWorkspace ? "translate-y-0" : showNavbar ? "translate-y-0" : "-translate-y-full"
+      }`}
+    >
+      <DesktopNav {...navProps} />
+      <MobileNav {...navProps} />
+    </nav>
   );
 }

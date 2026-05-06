@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Task, Meta } from '../types';
 import { getSupabaseClient } from "@/lib/supabase";
-import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
+import { useTheme } from "@/components/ThemeProvider";
 
 import { getLocalDate, getISODay, calculateBestStreak } from './stats/utils';
 import OnboardingFlow from './stats/OnboardingFlow';
@@ -51,7 +51,7 @@ const InfoHint = ({ text }: { text: string }) => {
 };
 
 export default function StatsGrid({ tasks, meta }: StatsProps) {
-  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
+  const { isDarkMode } = useTheme();
   const actualToday = getLocalDate(new Date());
 
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -330,9 +330,15 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
   const progressTextColor = goalProgress >= 100 ? "text-emerald-500" : goalProgress < 50 ? "text-red-500" : "text-orange-500";
 
   return (
-    <div className={`flex-1 p-4 md:p-8 max-w-[1200px] mx-auto w-full flex flex-col gap-8 pb-24 relative transition-colors duration-300 ${
-      isDarkMode ? "bg-[#050505] text-white" : "bg-white text-gray-900"
-    }`}>
+    <div 
+      className={`flex-1 p-4 md:p-8 max-w-[1200px] mx-auto w-full flex flex-col gap-8 pb-24 relative transition-colors duration-300 ${
+        isDarkMode ? "bg-[#050505] text-white" : "bg-white text-gray-900"
+      }`}
+      // 🔥 FIX: Cleanly handles padding for top fixed navbars and variable tab bars
+      style={{
+        paddingTop: "calc(var(--navbar-h, 64px) + var(--tabs-h, 0px) + 1.5rem)"
+      }}
+    >
       
       {showOnboarding && <OnboardingFlow onComplete={handleInitialize} />}
 

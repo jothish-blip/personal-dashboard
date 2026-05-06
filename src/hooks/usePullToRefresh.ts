@@ -16,6 +16,12 @@ export function usePullToRefresh(onRefresh: () => void) {
       // ✅ Only start if at top of page
       if (window.scrollY > 0) return;
 
+      // 🔥 CRITICAL FIX: Ignore touches on the toolbar, menus, or editor
+      const target = e.target as HTMLElement;
+      if (target && target.closest('.prevent-pull-refresh')) {
+        return; // Abort pull-to-refresh
+      }
+
       startY.current = e.touches[0].clientY;
       startX.current = e.touches[0].clientX;
       isPulling.current = true;
@@ -30,7 +36,7 @@ export function usePullToRefresh(onRefresh: () => void) {
       const diffY = currentY - startY.current;
       const diffX = currentX - startX.current;
 
-      // 🔥 CRITICAL FIX: Ignore horizontal scroll
+      // Ignore horizontal scroll
       if (Math.abs(diffX) > Math.abs(diffY)) {
         isPulling.current = false;
         return;
@@ -53,9 +59,7 @@ export function usePullToRefresh(onRefresh: () => void) {
 
       if (readyToRefresh) {
         setIsRefreshing(true);
-
         await onRefresh();
-
         setIsRefreshing(false);
       }
 
@@ -65,9 +69,10 @@ export function usePullToRefresh(onRefresh: () => void) {
       isPulling.current = false;
     };
 
-    window.addEventListener("touchstart", handleTouchStart);
-    window.addEventListener("touchmove", handleTouchMove);
-    window.addEventListener("touchend", handleTouchEnd);
+    // Use passive: false so we have precise control if needed in the future
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
 
     return () => {
       window.removeEventListener("touchstart", handleTouchStart);
