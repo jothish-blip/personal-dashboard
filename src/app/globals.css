@@ -51,10 +51,12 @@ html, body {
   overscroll-behavior-y: contain;
   touch-action: pan-y;
 }
-
 body {
   @apply min-h-screen flex flex-col;
-  transform: translateZ(0); /* GPU acceleration to prevent flicker */
+}
+
+.some-heavy-element {
+  transform: translateZ(0);
 }
 
 /* GLOBAL SMOOTH THEME TRANSITION */

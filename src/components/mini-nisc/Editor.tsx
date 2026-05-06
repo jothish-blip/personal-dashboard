@@ -18,13 +18,13 @@ import TaskItem from '@tiptap/extension-task-item';
 import Typography from '@tiptap/extension-typography';
 import Link from '@tiptap/extension-link';
 import ListKeymap from '@tiptap/extension-list-keymap';
-import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
+import { useTheme } from "@/components/ThemeProvider";
 import {
   Bold, Italic, Strikethrough, Underline as UnderlineIcon, Highlighter, Undo, Redo,
   Heading1, Heading2, Heading3, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, AlignJustify, 
   Minus, Plus, MoreHorizontal, Subscript as SubscriptIcon, Superscript as SuperscriptIcon, 
   Code, SquareTerminal, Quote, Indent, Outdent, Circle, Share, Link as LinkIcon,
-  Pin, Copy, Tag, Wand2, Settings2
+  Pin, Copy, Tag, Wand2, Settings2, GripHorizontal, Maximize2, Minimize2, ArrowLeftToLine, ArrowRightToLine, MonitorSmartphone
 } from 'lucide-react';
 
 const FontSize = Extension.create({
@@ -73,7 +73,6 @@ const AutoCorrect = Extension.create({
   }
 });
 
-// Prevent Extension Duplication Warnings
 const editorExtensions = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
@@ -109,7 +108,6 @@ const editorExtensions = [
   }),
 ];
 
-// 🔥 Updated ToolbarButton to accept and use isDarkMode
 const ToolbarButton = ({ children, onClick, isActive, title, className = "", isDarkMode }: any) => (
   <button
     type="button"
@@ -147,11 +145,10 @@ export default function Editor({ system }: any) {
     removeTag, saveState, lastSavedTime, editingDocRef
   } = system;
 
-  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
+  const { isDarkMode } = useTheme();
 
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
+  
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashQuery, setSlashQuery] = useState("");
   const [showQuickMenu, setShowQuickMenu] = useState(false);
@@ -166,20 +163,24 @@ export default function Editor({ system }: any) {
   const [autoSave] = useState(true);
   
   const [currentFontSize, setCurrentFontSize] = useState(17);
-  const [tagInput, setTagInput] = useState("");
   const [wordGoal, setWordGoal] = useState(500);
 
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   
-  // DRAG STATE
-  const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 });
+  // DRAG & RESIZE STATE
+  const [toolbarPos, setToolbarPos] = useState({ x: 10, y: 16 });
+  const [toolbarSize, setToolbarSize] = useState({ width: 320 });
+  const [dock, setDock] = useState<'float' | 'left' | 'right'>('float');
+  const [resizeMode, setResizeMode] = useState(false); // Mobile resize protection
+
   const toolbarDrag = useRef(false);
   const toolbarOffset = useRef({ x: 0, y: 0 });
+  const resizeRef = useRef(false);
+  const resizeStart = useRef({ x: 0, width: 320 });
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
   const activeDocIdRef = useRef(activeDocId);
   const autoSaveRef = useRef(autoSave);
   
@@ -188,66 +189,163 @@ export default function Editor({ system }: any) {
 
   useEffect(() => { activeDocIdRef.current = activeDocId; }, [activeDocId]);
   useEffect(() => { autoSaveRef.current = autoSave; }, [autoSave]);
-  useEffect(() => {
-    if (activeDocument && !activeDocument.title) {
-      document.querySelector("input")?.focus();
-    }
-  }, [activeDocId]);
 
+  // LOAD SETTINGS FROM LOCALSTORAGE
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const isMobile = window.innerWidth < 768;
+    setMounted(true);
+    const isMobile = window.innerWidth < 768;
+    const storageKey = isMobile ? "toolbar-settings-mobile" : "toolbar-settings-desktop";
+    const saved = localStorage.getItem(storageKey);
+
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setToolbarPos(parsed.pos || { x: isMobile ? 10 : window.innerWidth / 2 - 160, y: 16 });
+        setToolbarSize(parsed.size || { width: isMobile ? window.innerWidth - 20 : 320 });
+        if (parsed.dock) setDock(parsed.dock);
+      } catch (e) { console.error("Storage parse error", e); }
+    } else {
       setToolbarPos({
-        x: isMobile ? 10 : Math.max(10, window.innerWidth / 2 - 200),
+        x: isMobile ? 10 : window.innerWidth / 2 - 160,
         y: isMobile ? 80 : 16,
       });
+      setToolbarSize({ width: isMobile ? window.innerWidth - 20 : 320 });
     }
   }, []);
 
+  // SAVE SETTINGS TO LOCALSTORAGE
+  useEffect(() => {
+    if (!mounted) return;
+    const isMobile = window.innerWidth < 768;
+    const storageKey = isMobile ? "toolbar-settings-mobile" : "toolbar-settings-desktop";
+    localStorage.setItem(storageKey, JSON.stringify({
+      pos: toolbarPos,
+      size: toolbarSize,
+      dock: dock
+    }));
+  }, [toolbarPos, toolbarSize, dock, mounted]);
+
+  // DRAG HANDLERS
   const handleToolbarMouseDown = (e: React.MouseEvent) => {
+    if (resizeRef.current) return;
     toolbarDrag.current = true;
     toolbarOffset.current = { x: e.clientX - toolbarPos.x, y: e.clientY - toolbarPos.y };
   };
 
   const handleToolbarTouchStart = (e: React.TouchEvent) => {
+    if (resizeRef.current) return;
     toolbarDrag.current = true;
     const touch = e.touches[0];
     toolbarOffset.current = { x: touch.clientX - toolbarPos.x, y: touch.clientY - toolbarPos.y };
   };
 
+  // RESIZE HANDLERS
+  const handleResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    resizeRef.current = true;
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    resizeStart.current = { x: clientX, width: toolbarSize.width };
+  };
+
+  // GLOBAL LISTENERS FOR DRAG & RESIZE
   useEffect(() => {
-    const move = (e: MouseEvent) => {
-      if (!toolbarDrag.current) return;
-      const newX = e.clientX - toolbarOffset.current.x;
-      const newY = e.clientY - toolbarOffset.current.y;
-      setToolbarPos({
-        x: Math.max(0, Math.min(window.innerWidth - 100, newX)),
-        y: Math.max(0, Math.min(window.innerHeight - 60, newY)),
-      });
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+      const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+
+      if (resizeRef.current) {
+        const delta = clientX - resizeStart.current.x;
+        const newWidth = Math.min(
+          Math.max(260, resizeStart.current.width + delta), 
+          window.innerWidth - 20
+        );
+        setToolbarSize(prev => ({ ...prev, width: newWidth }));
+        return;
+      }
+
+      if (toolbarDrag.current) {
+        let newX = clientX - toolbarOffset.current.x;
+        let newY = clientY - toolbarOffset.current.y;
+
+        // Magnet / Snap to edges
+        if (newX < 30) newX = 0; // Snap left
+        if (newX > window.innerWidth - toolbarSize.width - 30) {
+          newX = window.innerWidth - toolbarSize.width; // Snap right
+        }
+
+        // Bounds
+        newX = Math.max(0, Math.min(window.innerWidth - toolbarSize.width, newX));
+        newY = Math.max(0, Math.min(window.innerHeight - 60, newY));
+
+        // Auto-update dock state based on drag position
+        if (newX === 0) setDock('left');
+        else if (newX === window.innerWidth - toolbarSize.width) setDock('right');
+        else setDock('float');
+
+        setToolbarPos({ x: newX, y: newY });
+      }
     };
-    const up = () => (toolbarDrag.current = false);
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-    return () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+
+    const handleUp = () => {
+      toolbarDrag.current = false;
+      resizeRef.current = false;
+    };
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    window.addEventListener("touchmove", handleMove, { passive: false });
+    window.addEventListener("touchend", handleUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+      window.removeEventListener("touchmove", handleMove);
+      window.removeEventListener("touchend", handleUp);
+    };
+  }, [toolbarSize.width]);
+
+  // SMART MOBILE MODE (Keyboard Detection)
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const handleResize = () => {
+      const isKeyboardOpen = viewport.height < window.innerHeight * 0.75;
+      setKeyboardOpen(isKeyboardOpen);
+      document.documentElement.style.setProperty('--vh', `${viewport.height * 0.01}px`);
+
+      if (isKeyboardOpen) {
+        setShowQuickMenu(false);
+        setShowSelectionMenu(false);
+        setShowConvertMenu(false);
+        
+        // Smart adjust toolbar
+        if (window.innerWidth < 768) {
+          setToolbarPos(prev => ({ ...prev, y: 10, x: 10 }));
+          setToolbarSize({ width: window.innerWidth - 20 });
+        }
+      }
+    };
+
+    viewport.addEventListener("resize", handleResize);
+    return () => viewport.removeEventListener("resize", handleResize);
   }, []);
 
-  useEffect(() => {
-    const move = (e: TouchEvent) => {
-      if (!toolbarDrag.current) return;
-      const touch = e.touches[0];
-      const newX = touch.clientX - toolbarOffset.current.x;
-      const newY = touch.clientY - toolbarOffset.current.y;
-      setToolbarPos({
-        x: Math.max(0, Math.min(window.innerWidth - 100, newX)),
-        y: Math.max(0, Math.min(window.innerHeight - 60, newY)),
-      });
-    };
-    const up = () => (toolbarDrag.current = false);
-    window.addEventListener("touchmove", move);
-    window.addEventListener("touchend", up);
-    return () => { window.removeEventListener("touchmove", move); window.removeEventListener("touchend", up); };
-  }, []);
+  const setPresetSize = (width: number) => {
+    setToolbarSize({ width });
+    // Adjust position if it bleeds out
+    if (toolbarPos.x + width > window.innerWidth) {
+      setToolbarPos(prev => ({ ...prev, x: Math.max(0, window.innerWidth - width - 10) }));
+    }
+  };
 
+  const handleDock = (mode: 'float' | 'left' | 'right') => {
+    setDock(mode);
+    if (mode === 'left') setToolbarPos(prev => ({ ...prev, x: 0 }));
+    if (mode === 'right') setToolbarPos(prev => ({ ...prev, x: window.innerWidth - toolbarSize.width }));
+  };
+
+  // EDITOR INSTANCE
   const editor = useEditor({
     immediatelyRender: false,
     extensions: editorExtensions, 
@@ -297,11 +395,8 @@ export default function Editor({ system }: any) {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
         if (!activeDocIdRef.current || !autoSaveRef.current) return;
-        try {
-          updateDocumentContent(activeDocIdRef.current, html);
-        } catch(e) {
-          console.log("Supabase save ignored for now.");
-        }
+        try { updateDocumentContent(activeDocIdRef.current, html); } 
+        catch(e) { console.log("Supabase save ignored for now."); }
       }, 500);
     },
   });
@@ -314,12 +409,10 @@ export default function Editor({ system }: any) {
         setShowSelectionMenu(false);
         return;
       }
-
       setTimeout(() => {
         try {
           const { from } = editor.state.selection;
           const coords = editor.view.coordsAtPos(from);
-
           const top = Math.max(10, coords.top - 60);
           const left = Math.min(window.innerWidth - 200, Math.max(10, coords.left));
 
@@ -352,7 +445,6 @@ export default function Editor({ system }: any) {
     };
     editor.on("selectionUpdate", updateFontSize);
     editor.on("transaction", updateFontSize);
-
     return () => {
       editor.off("selectionUpdate", updateFontSize);
       editor.off("transaction", updateFontSize);
@@ -373,28 +465,6 @@ export default function Editor({ system }: any) {
       editor.commands.setContent(activeDocument.content || "<p></p>");
     }
   }, [activeDocId, editor, activeDocument?.content, editingDocRef]);
-
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
-
-    document.documentElement.style.setProperty('--vh', `${viewport.height * 0.01}px`);
-
-    const handleResize = () => {
-      const isKeyboardOpen = viewport.height < window.innerHeight * 0.75;
-      setKeyboardOpen(isKeyboardOpen);
-      document.documentElement.style.setProperty('--vh', `${viewport.height * 0.01}px`);
-
-      if (isKeyboardOpen) {
-        setShowQuickMenu(false);
-        setShowSelectionMenu(false);
-        setShowConvertMenu(false);
-      }
-    };
-
-    viewport.addEventListener("resize", handleResize);
-    return () => viewport.removeEventListener("resize", handleResize);
-  }, []);
 
   if (!mounted || !activeDocument || !editor) return null;
 
@@ -455,7 +525,7 @@ export default function Editor({ system }: any) {
   return (
     <div className={`min-h-screen transition-colors duration-500 overflow-visible relative ${isDarkMode ? "bg-[#050505] text-white" : "bg-[#f9fafb] text-gray-900"}`}>
       
-      {/* SELECTION MENU WITH NEW TOOLS */}
+      {/* SELECTION MENU */}
       {showSelectionMenu && editor && (
         <div 
           className={`fixed z-[110] flex flex-wrap items-center gap-1 border rounded-xl px-2 py-1.5 shadow-xl -translate-x-1/2 transition-all duration-150 ease-out animate-in zoom-in-95 ${
@@ -488,31 +558,66 @@ export default function Editor({ system }: any) {
         </div>
       )}
 
-      {/* 🔥 UNIVERSAL DRAGGABLE TOOLBAR */}
+      {/* 🔥 UNIVERSAL DRAGGABLE & RESIZABLE TOOLBAR */}
       <div
-        style={{
-          position: "fixed",
-          top: toolbarPos.y,
-          left: toolbarPos.x,
-          zIndex: 9999,
-          width: "fit-content",
-        }}
-        className={`shadow-2xl rounded-2xl backdrop-blur-xl border flex flex-col max-w-[95vw] overflow-hidden ${
-          isDarkMode ? "bg-[#111111]/95 border-gray-800" : "bg-white/95 border-gray-200"
-        }`}
-      >
-        {/* TOUCH/MOUSE DRAG HANDLE */}
+      style={{
+      position: "fixed",
+      top: toolbarPos.y,
+      left: toolbarPos.x,
+      width: toolbarSize.width,
+      zIndex: 9999,
+       borderRadius: dock === 'left' ? '0 1rem 1rem 0' : dock === 'right' ? '1rem 0 0 1rem' : '1rem',
+       }}
+    // 👇 ADD 'prevent-pull-refresh' RIGHT HERE
+     className={`prevent-pull-refresh shadow-2xl backdrop-blur-xl border flex flex-col max-h-[90vh] transition-[width,border-radius] duration-200 ease-out overflow-hidden ${
+     isDarkMode ? "bg-[#111111]/95 border-gray-800" : "bg-white/95 border-gray-200"
+       }    `}
+        >
+        {/* DRAG HANDLE & HEADER */}
         <div
           onMouseDown={handleToolbarMouseDown}
           onTouchStart={handleToolbarTouchStart}
-          className={`cursor-move px-3 py-1.5 text-[10px] font-bold tracking-widest rounded-t-2xl border-b flex items-center justify-center uppercase transition-colors touch-none ${
-            isDarkMode ? "text-gray-500 bg-[#0a0a0a] border-gray-800 hover:bg-[#1f1f1f]" : "text-gray-400 bg-gray-50/80 border-gray-100 hover:bg-gray-100/80"
+          className={`cursor-move px-3 py-2 border-b flex items-center justify-between transition-colors touch-none ${
+            isDarkMode ? "bg-[#0a0a0a] border-gray-800 hover:bg-[#1f1f1f]" : "bg-gray-50/80 border-gray-100 hover:bg-gray-100/80"
           }`}
         >
-          Drag Tools
+          <div className="flex items-center gap-2">
+            <GripHorizontal size={14} className={isDarkMode ? "text-gray-500" : "text-gray-400"} />
+            <span className={`text-[10px] font-bold tracking-widest uppercase ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+              Tools
+            </span>
+          </div>
+
+          {/* DOCK & PRESET CONTROLS */}
+          <div className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
+            <button onClick={() => handleDock('left')} title="Dock Left" className={`p-1 rounded ${dock === 'left' ? (isDarkMode ? 'bg-gray-800 text-white' : 'bg-gray-200 text-black') : (isDarkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-200 text-gray-500')}`}>
+              <ArrowLeftToLine size={12} />
+            </button>
+            <button onClick={() => handleDock('float')} title="Float" className={`p-1 rounded ${dock === 'float' ? (isDarkMode ? 'bg-gray-800 text-white' : 'bg-gray-200 text-black') : (isDarkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-200 text-gray-500')}`}>
+              <Minimize2 size={12} />
+            </button>
+            <button onClick={() => handleDock('right')} title="Dock Right" className={`p-1 rounded ${dock === 'right' ? (isDarkMode ? 'bg-gray-800 text-white' : 'bg-gray-200 text-black') : (isDarkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-200 text-gray-500')}`}>
+              <ArrowRightToLine size={12} />
+            </button>
+            
+            <div className={`w-px h-3 mx-0.5 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`} />
+            
+            <button onClick={() => setPresetSize(260)} title="Compact" className={`text-[9px] font-bold px-1 py-0.5 rounded ${isDarkMode ? "hover:bg-gray-800 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}>C</button>
+            <button onClick={() => setPresetSize(320)} title="Default" className={`text-[9px] font-bold px-1 py-0.5 rounded ${isDarkMode ? "hover:bg-gray-800 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}>D</button>
+            <button onClick={() => setPresetSize(420)} title="Wide" className={`text-[9px] font-bold px-1 py-0.5 rounded ${isDarkMode ? "hover:bg-gray-800 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}>W</button>
+
+            {/* Mobile specific toggle */}
+            <button 
+              className={`md:hidden p-1 rounded ml-1 ${resizeMode ? (isDarkMode ? 'bg-green-900 text-green-400' : 'bg-green-100 text-green-700') : (isDarkMode ? 'hover:bg-gray-800 text-gray-500' : 'hover:bg-gray-200 text-gray-500')}`}
+              onClick={() => setResizeMode(!resizeMode)}
+              title="Toggle Mobile Resize"
+            >
+              <MonitorSmartphone size={12} />
+            </button>
+          </div>
         </div>
 
-        <div className="px-3 py-2 flex flex-col gap-2 max-h-[70vh] overflow-y-auto overflow-x-auto no-scrollbar">
+        <div className="px-3 py-2 flex flex-col gap-2 overflow-y-auto overflow-x-auto no-scrollbar pb-3 relative">
           {/* Row 1: Primary Tools */}
           <div className="flex flex-wrap items-center gap-1">
             <ToolbarButton isDarkMode={isDarkMode} onClick={() => editor.chain().focus().undo().run()} title="Undo"><Undo size={16}/></ToolbarButton>
@@ -667,6 +772,18 @@ export default function Editor({ system }: any) {
             </div>
           </div>
         </div>
+
+        {/* RESIZE HANDLE UI */}
+        <div
+          onMouseDown={handleResizeStart}
+          onTouchStart={(e) => { if (resizeMode || window.innerWidth >= 768) handleResizeStart(e); }}
+          className={`absolute bottom-0 right-0 w-6 h-6 flex items-center justify-center cursor-se-resize transition-opacity ${
+            resizeMode || window.innerWidth >= 768 ? "opacity-50 hover:opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+          title="Resize Toolbar"
+        >
+          <Maximize2 size={12} className={isDarkMode ? "text-gray-400 rotate-90" : "text-gray-500 rotate-90"} />
+        </div>
       </div>
 
       {/* TITLE SECTION */}
@@ -726,7 +843,7 @@ export default function Editor({ system }: any) {
         </div>
       </div>
 
-      {/* ✅ RESTORED STABLE EDITOR CONTENT (WITH BULLETPROOF DARK MODE CSS) */}
+      {/* CONTENT AREA */}
       <div 
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -735,7 +852,6 @@ export default function Editor({ system }: any) {
         <div className={`relative rounded-[3rem] shadow-sm transition-all duration-500 border ${
           isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-200"
         }`}>
-          {/* 🔥 THE FIX: Injecting dynamic color variables into the global styles based on isDarkMode */}
           <style jsx global>{`
             .ProseMirror { 
               outline: none !important; 
@@ -779,7 +895,6 @@ export default function Editor({ system }: any) {
         </div>
       </div>
 
-      {/* Hide floating button on mobile when keyboard is open */}
       <button
         onClick={() => setShowQuickMenu(!showQuickMenu)}
         className={`md:hidden fixed z-50 p-4 rounded-full shadow-xl transition-all duration-300 ease-out border bottom-[5.5rem] right-6 ${

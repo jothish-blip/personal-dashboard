@@ -7,9 +7,10 @@ import OfflineView from "@/app/not-found/OfflineView";
 import PWARegistration from "@/components/PWARegistration";
 import ClientWrapper from "@/components/ClientWrapper";
 import ScrollRestoration from "@/app/refresh/ScrollRestoration";
-
-// Make sure this path is pointing to your actual components folder!
 import { FocusProvider } from "@/components/focus/useFocusSystem";
+
+// ✅ Sidebar import
+import Sidebar from "@/components/sidebar/Sidebar";
 
 import "./globals.css";
 
@@ -54,7 +55,7 @@ export default function RootLayout({
       className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
     >
       <body className="overflow-x-hidden">
-        {/* Proper Theme Resolution Script */}
+        {/* Theme Script */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -81,11 +82,18 @@ export default function RootLayout({
         {/* APP LAYER */}
         <FocusProvider>
           <ClientWrapper>
+            
+            {/* ✅ Floating Sidebar */}
+            <Sidebar />
+
+            {/* ✅ Main App Content */}
             <main className="min-h-screen w-full">
               {children}
             </main>
+
           </ClientWrapper>
         </FocusProvider>
+
         <ScrollRestoration />
       </body>
     </html>

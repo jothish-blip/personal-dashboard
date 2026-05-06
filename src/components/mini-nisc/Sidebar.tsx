@@ -7,7 +7,7 @@ import {
   Briefcase, X, Command, CheckSquare, Menu, Lock, Unlock
 } from 'lucide-react';
 import { Folder, Document } from './types';
-import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
+import { useTheme } from "@/components/ThemeProvider";
 
 const getFileIcon = (type?: string) => {
   switch (type) {
@@ -32,7 +32,7 @@ export default function Sidebar({ system }: any) {
     isSidebarOpen, setIsSidebarOpen, lockModal, setLockModal
   } = system;
 
-  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
+  const { isDarkMode } = useTheme();
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -373,9 +373,10 @@ export default function Sidebar({ system }: any) {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-250" onClick={() => setIsSidebarOpen(false)} />
       )}
 
+      {/* 🔥 FIX: Sidebar is now consistently fixed directly underneath the navbar */}
       <div 
         onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
-        className={`fixed lg:static z-50 top-[56px] md:top-[64px] h-[calc(100vh-56px)] md:h-[calc(100vh-64px)] w-[300px] border-r transition-transform duration-250 ease-out ${
+        className={`fixed z-50 top-[var(--navbar-h)] left-0 h-[calc(100vh-var(--navbar-h))] w-[300px] border-r transition-transform duration-250 ease-out ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         } shadow-2xl lg:shadow-none flex flex-col select-none pt-[env(safe-area-inset-top)] ${
           isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-200"
@@ -683,7 +684,7 @@ export default function Sidebar({ system }: any) {
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
                             <button 
                               onClick={(e) => { e.stopPropagation(); setRenamingId(doc.id); setRenameValue(doc.title); }} 
-                              className={`p-1 rounded transition-colors ${isDarkMode ? "text-gray-400 hover:bg-blue-900/30 hover:text-blue-400" : "text-gray-500 hover:bg-blue-100 hover:text-blue-700"}`}
+                              className={`p-1 rounded transition-colors ${isDarkMode ? "text-gray-400 hover:bg-gray-800 hover:text-gray-200" : "text-gray-500 hover:bg-blue-100 hover:text-blue-700"}`}
                               title="Rename File"
                             >
                               <Edit3 size={12} />
