@@ -35,6 +35,9 @@ export default function ContactPage() {
   // ✅ Load user safely (NO LOCK ISSUE)
   useEffect(() => {
     const loadUser = async () => {
+      // 🔥 FIX: Guard clause to ensure supabase is not null
+      if (!supabase) return;
+
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -74,11 +77,18 @@ export default function ContactPage() {
 
     if (cooldown > 0) return;
 
+    // 🔥 FIX: Guard clause for submit action
+    if (!supabase) {
+      setStatus({ type: "error", msg: "Database connection failed. Please try again later." });
+      return;
+    }
+
     setLoading(true);
     setStatus({ type: null, msg: "" });
 
     try {
-      const { error } = await supabase.from("contact_messages").insert([
+      // 🔥 FIX: Cast supabase to any first to bypass strict table name checks
+      const { error } = await (supabase as any).from("contact_messages").insert([
         {
           user_id: user?.id ?? null,
           name: form.name || null,

@@ -34,6 +34,11 @@ export default function DeleteAccountPage() {
 
       const supabase = getSupabaseClient();
 
+      // 🔥 FIX: Guard clause to ensure supabase is not null
+      if (!supabase) {
+        throw new Error("Failed to initialize database connection. Please try again.");
+      }
+
       const {
         data: { session },
       } = await supabase.auth.getSession();

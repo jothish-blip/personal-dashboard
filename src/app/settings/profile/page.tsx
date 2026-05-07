@@ -30,19 +30,27 @@ export default function ProfilePage() {
   // ✅ Load Profile with Auto-Create Fallback
   useEffect(() => {
     const load = async () => {
+      // 🔥 FIX: Guard clause to ensure supabase is not null
+      if (!supabase) {
+        setLoading(false);
+        return;
+      }
+
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
-      if (!session) return;
+      if (!session) {
+        setLoading(false);
+        return;
+      }
 
       const user = session.user;
       setUserId(user.id);
       setUserEmail(user.email ?? null);
 
-      // Use maybeSingle() to prevent 406 error if row doesn't exist
-      let { data, error } = await supabase
-        .from("profiles")
+      // 🔥 FIX: Cast to any to prevent 'never' type error
+      let { data, error } = await (supabase.from("profiles") as any)
         .select(`id, full_name, username, bio, age, gender, location, avatar_url, updated_at`)
         .eq("id", user.id)
         .maybeSingle();
@@ -54,8 +62,9 @@ export default function ProfilePage() {
       // Auto-create profile if it doesn't exist yet
       if (!data && !error) {
         console.log("No profile found. Auto-creating...");
-        const { data: newProfile, error: insertError } = await supabase
-          .from("profiles")
+        
+        // 🔥 FIX: Cast to any to prevent 'never' type error on insert
+        const { data: newProfile, error: insertError } = await (supabase.from("profiles") as any)
           .insert({
             id: user.id,
             full_name: user.user_metadata?.full_name || null,
@@ -84,6 +93,12 @@ export default function ProfilePage() {
   // ✅ Avatar Upload (Optimized for Permanence)
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
+      // 🔥 FIX: Guard clause
+      if (!supabase) {
+        setMessage({ type: "error", text: "Database connection failed." });
+        return;
+      }
+
       const file = e.target.files?.[0];
       if (!file || !userId || !profile) return;
 
@@ -114,8 +129,8 @@ export default function ProfilePage() {
 
       const avatarUrl = data.publicUrl;
 
-      const { error: updateError } = await supabase
-        .from("profiles")
+      // 🔥 FIX: Cast to any to prevent 'never' type error on update
+      const { error: updateError } = await (supabase.from("profiles") as any)
         .update({ 
             avatar_url: avatarUrl,
             updated_at: new Date().toISOString() 
@@ -138,6 +153,12 @@ export default function ProfilePage() {
 
   // ✅ Update Profile
   const updateProfile = async () => {
+    // 🔥 FIX: Guard clause
+    if (!supabase) {
+      setMessage({ type: "error", text: "Database connection failed." });
+      return;
+    }
+
     if (!userId || !profile) return;
 
     if (!profile.full_name || !profile.username) {
@@ -151,8 +172,8 @@ export default function ProfilePage() {
     setIsSaving(true);
     setMessage(null);
 
-    const { error } = await supabase
-      .from("profiles")
+    // 🔥 FIX: Cast to any to prevent 'never' type error on update
+    const { error } = await (supabase.from("profiles") as any)
       .update({
         full_name: profile.full_name,
         username: profile.username,

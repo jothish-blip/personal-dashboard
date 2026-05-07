@@ -33,6 +33,12 @@ export default function SettingsLayout({
 
   useEffect(() => {
     const load = async () => {
+      // 🔥 FIX: Guard clause to ensure supabase is not null
+      if (!supabase) {
+        router.replace("/login");
+        return;
+      }
+
       const {
         data: { session },
       } = await supabase.auth.getSession();

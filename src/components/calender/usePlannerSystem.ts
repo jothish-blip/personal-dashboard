@@ -131,20 +131,23 @@ export function usePlannerSystem() {
         created_at: e.createdAt
       }));
 
-      await supabase.from('planner_events').upsert(payloads, { onConflict: 'id' });
+      // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type error
+      await (supabase as any).from('planner_events').upsert(payloads, { onConflict: 'id' });
     } catch (e) { console.error("Event Sync Exception", e); }
   };
 
   const deleteEventFromDB = async (id: string) => {
     if (!supabase) return;
-    await supabase.from('planner_events').delete().eq('id', id);
+    // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type error
+    await (supabase as any).from('planner_events').delete().eq('id', id);
   };
 
   const syncLogToDB = async (log: SystemLog) => {
     try {
       const user = userRef.current;
       if (!user || !supabase) return;
-      await supabase.from('planner_logs').insert({
+      // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type error
+      await (supabase as any).from('planner_logs').insert({
         id: log.id, user_id: user.id, action: log.action, details: log.details, timestamp: log.timestamp
       });
     } catch (e) { console.error("Log Sync Error", e); }
@@ -180,9 +183,10 @@ export function usePlannerSystem() {
         const user = userRef.current; 
 
         if (user && supabase) {
+          // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type error
           const [eventsRes, logsRes] = await Promise.all([
-            supabase.from('planner_events').select('*').eq('user_id', user.id).order('event_date', { ascending: false }),
-            supabase.from('planner_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }).limit(50)
+            (supabase as any).from('planner_events').select('*').eq('user_id', user.id).order('event_date', { ascending: false }),
+            (supabase as any).from('planner_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }).limit(50)
           ]);
 
           if (eventsRes.data) {
@@ -224,7 +228,7 @@ export function usePlannerSystem() {
     };
 
     initPlanner();
-  }, [currentUser, addNotification]); 
+  }, [currentUser, addNotification, supabase]); 
 
   // --- REALTIME ENGINE ---
   useEffect(() => {
@@ -288,8 +292,8 @@ export function usePlannerSystem() {
       const user = userRef.current;
       if (!user || !supabase) return;
 
-      supabase
-        .from('planner_events')
+      // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type error
+      (supabase as any).from('planner_events')
         .select('*')
         .eq('user_id', user.id)
         .order('event_date', { ascending: false })

@@ -242,8 +242,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      const { data: historyData, error: historyError } = await supabase
-        .from('focus_sessions')
+      // 🔥 FIX: Cast supabase to any FIRST
+      const { data: historyData, error: historyError } = await (supabase as any).from('focus_sessions')
         .select('*')
         .eq('user_id', currentUser.id) 
         .order('started_at', { ascending: false });
@@ -254,8 +254,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         setSessionHistory(historyData.map(mapDBSessionToFocusSession));
       }
 
-      const { data: activeData } = await supabase
-        .from('focus_active_sessions')
+      // 🔥 FIX: Cast supabase to any FIRST
+      const { data: activeData } = await (supabase as any).from('focus_active_sessions')
         .select('session')
         .eq('user_id', currentUser.id)
         .maybeSingle();
@@ -327,8 +327,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         score: session.score || 0                
       };
 
-      await supabase
-        .from('focus_sessions')
+      // 🔥 FIX: Cast supabase to any FIRST
+      await (supabase as any).from('focus_sessions')
         .upsert(payload, { onConflict: 'id' })
         .select()
         .throwOnError(); 
@@ -409,8 +409,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       if (!supabase) return;
 
       try {
-        await supabase
-          .from("focus_active_sessions")
+        // 🔥 FIX: Cast supabase to any FIRST
+        await (supabase as any).from("focus_active_sessions")
           .update({ last_seen: new Date().toISOString() })
           .eq("user_id", currentUser.id)
           .throwOnError();
@@ -660,7 +660,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     await syncSessionToDB(completedSession, true);
 
     if (currentUser && supabase) {
-      await supabase.from("focus_active_sessions").delete().eq("user_id", currentUser.id);
+      // 🔥 FIX: Cast supabase to any FIRST
+      await (supabase as any).from("focus_active_sessions").delete().eq("user_id", currentUser.id);
     }
 
     setCurrentSession(null);
@@ -744,7 +745,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
            localStorage.setItem("focus_active_session", JSON.stringify(s));
            
            if (currentUser?.id && supabase) {
-             supabase.from("focus_active_sessions").update({ session: s }).eq("user_id", currentUser.id).then();
+             // 🔥 FIX: Cast supabase to any FIRST
+             (supabase as any).from("focus_active_sessions").update({ session: s }).eq("user_id", currentUser.id).then();
            }
          }
       }, 10000);
@@ -841,7 +843,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         (async () => {
           if (currentUser?.id && supabase) {
             try {
-              await supabase.from("focus_active_sessions").update({
+              // 🔥 FIX: Cast supabase to any FIRST
+              await (supabase as any).from("focus_active_sessions").update({
                 session: updatedSession
               }).eq("user_id", currentUser.id).throwOnError(); 
             } catch (err) {
@@ -895,8 +898,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         .catch(() => {});
     }
 
-    const { data: existing } = await supabase
-      .from("focus_active_sessions")
+    // 🔥 FIX: Cast supabase to any FIRST
+    const { data: existing } = await (supabase as any).from("focus_active_sessions")
       .select("session")
       .eq("user_id", currentUser.id)
       .maybeSingle();
@@ -928,7 +931,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("focus_active_session", JSON.stringify(updatedSession));
       
       try {
-        await supabase.from("focus_active_sessions").update({ session: updatedSession }).eq("user_id", currentUser.id).throwOnError();
+        // 🔥 FIX: Cast supabase to any FIRST
+        await (supabase as any).from("focus_active_sessions").update({ session: updatedSession }).eq("user_id", currentUser.id).throwOnError();
       } catch (err) {}
 
       return; 
@@ -963,7 +967,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await supabase.from("focus_active_sessions").upsert({
+      // 🔥 FIX: Cast supabase to any FIRST
+      await (supabase as any).from("focus_active_sessions").upsert({
         user_id: currentUser.id,
         session: newSession,
         last_seen: new Date().toISOString()
@@ -1022,7 +1027,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
           if (currentUser?.id && supabase) {
             (async () => {
               try {
-                await supabase.from("focus_active_sessions").update({ session: updatedSession }).eq("user_id", currentUser.id).throwOnError();
+                // 🔥 FIX: Cast supabase to any FIRST
+                await (supabase as any).from("focus_active_sessions").update({ session: updatedSession }).eq("user_id", currentUser.id).throwOnError();
               } catch (e: unknown) {
                 console.error("Supabase pause error:", e);
               }
@@ -1063,7 +1069,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
             if (currentUser?.id && supabase) {
               (async () => {
                 try {
-                  await supabase.from("focus_active_sessions")
+                  // 🔥 FIX: Cast supabase to any FIRST
+                  await (supabase as any).from("focus_active_sessions")
                     .update({ session: updated })
                     .eq("user_id", currentUser.id)
                     .throwOnError();
@@ -1102,7 +1109,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
             if (currentUser?.id && supabase) {
               (async () => {
                 try {
-                  await supabase.from("focus_active_sessions")
+                  // 🔥 FIX: Cast supabase to any FIRST
+                  await (supabase as any).from("focus_active_sessions")
                     .update({ session: updated })
                     .eq("user_id", currentUser.id)
                     .throwOnError();

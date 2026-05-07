@@ -61,10 +61,17 @@ export default function Home() {
 
     const runFeedbackCheck = async () => {
       const supabase = getSupabaseClient();
+      
+      // 🔥 FIX: Guard clause to ensure supabase is not null
+      if (!supabase) {
+        console.warn("Supabase client failed to initialize.");
+        return;
+      }
+
       const today = new Date().toISOString().split("T")[0];
 
-      // ✅ SAFE FETCH
-      let { data } = await supabase
+      // ✅ FIX: Cast 'supabase' to any so it allows tables not in your TS types
+      let { data } = await (supabase as any)
         .from("user_feedback_status")
         .select("*")
         .eq("user_id", currentUser.id)
@@ -72,7 +79,7 @@ export default function Home() {
 
       // ✅ CREATE IF NOT EXISTS (SAFE INSERT)
       if (!data) {
-        const { data: newRow, error: insertError } = await supabase
+        const { data: newRow, error: insertError } = await (supabase as any)
           .from("user_feedback_status")
           .insert([
             {
@@ -96,7 +103,7 @@ export default function Home() {
 
       // ✅ RESET DAILY COUNT
       if (data.last_prompt_date !== today) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("user_feedback_status")
           .update({
             daily_prompt_count: 0,
@@ -114,7 +121,7 @@ export default function Home() {
 
       // ✅ SHOW POPUP
       if (!data.feedback_given && data.daily_prompt_count < 3) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("user_feedback_status")
           .update({
             daily_prompt_count: data.daily_prompt_count + 1,

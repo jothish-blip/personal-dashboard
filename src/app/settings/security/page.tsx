@@ -13,6 +13,12 @@ export default function SecurityPage() {
 
   useEffect(() => {
     const load = async () => {
+      // 🔥 FIX: Guard clause to ensure supabase is not null
+      if (!supabase) {
+        setLoading(false);
+        return;
+      }
+
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -33,6 +39,9 @@ export default function SecurityPage() {
   }, [supabase]);
 
   const handleLogoutAll = async () => {
+    // 🔥 FIX: Guard clause to ensure supabase is not null
+    if (!supabase) return;
+    
     await supabase.auth.signOut();
     window.location.href = "/login";
   };

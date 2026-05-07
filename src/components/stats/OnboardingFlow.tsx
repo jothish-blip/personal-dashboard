@@ -29,12 +29,16 @@ export default function OnboardingFlow({ onComplete }: OnboardingProps) {
       if (hasChecked.current) return;
       hasChecked.current = true;
 
+      // 🔥 FIX: Guard clause to ensure supabase is not null
+      if (!supabase) return;
+
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
 
       if (!user) return;
 
-      const { data } = await supabase
+      // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type errors
+      const { data } = await (supabase as any)
         .from("profiles")
         .select("onboarding_seen")
         .eq("id", user.id)
@@ -57,12 +61,16 @@ export default function OnboardingFlow({ onComplete }: OnboardingProps) {
     setIsVisible(false);
     onComplete();
 
+    // 🔥 FIX: Guard clause before doing background sync
+    if (!supabase) return;
+
     // Sync to database in the background
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
 
     if (user) {
-      await supabase
+      // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type errors
+      await (supabase as any)
         .from("profiles")
         .update({ onboarding_seen: true })
         .eq("id", user.id);

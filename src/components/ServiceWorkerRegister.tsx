@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AuthChangeEvent, Session } from "@supabase/supabase-js";
-import { startInactivityEngine, initActivityTracker } from "@/notifications/inactivityEngine"; // ✅ Added initActivityTracker
+import { startInactivityEngine, initActivityTracker } from "@/notifications/inactivityEngine";
 import { useNotificationSystem } from "@/notifications/useNotificationSystem";
 import { handlePlannerEvent } from "@/notifications/nexNotificationBrain";
 import { getSupabaseClient } from "@/lib/supabase";
@@ -16,13 +16,15 @@ export default function ServiceWorkerRegister() {
 
   // 2. Auth Listener with explicit types to satisfy TS
   useEffect(() => {
+    // 🔥 FIX: Check if supabase exists before running auth logic
+    if (!supabase) return;
+
     const checkUser = async () => {
       const { data } = await supabase.auth.getUser();
       setUserId(data.user?.id || null);
     };
     checkUser();
 
-    // ✅ Added explicit types for _event and session
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, session: Session | null) => {
         setUserId(session?.user?.id || null);

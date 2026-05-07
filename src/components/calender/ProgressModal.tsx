@@ -26,13 +26,16 @@ export default function ProgressModal({
   // ✅ CHECK FROM DATABASE (ONCE PER USER)
   useEffect(() => {
     const checkSeen = async () => {
+      // 🔥 FIX: Guard clause to ensure supabase is not null
+      if (!supabase) return;
+
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
 
       if (!user) return;
 
-      const { data } = await supabase
-        .from("profiles")
+      // 🔥 FIX: Cast to any to prevent strict 'never' typing errors
+      const { data } = await (supabase.from("profiles") as any)
         .select("progress_guide_seen")
         .eq("id", user.id)
         .single();
@@ -43,16 +46,22 @@ export default function ProgressModal({
     };
 
     if (isOpen) checkSeen();
-  }, [isOpen]);
+  }, [isOpen, supabase, onClose]);
 
   // ✅ SAVE TO DATABASE
   const handleClose = async () => {
+    // 🔥 FIX: Guard clause to ensure supabase is not null before closing
+    if (!supabase) {
+      onClose();
+      return;
+    }
+
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
 
     if (user) {
-      await supabase
-        .from("profiles")
+      // 🔥 FIX: Cast to any to prevent strict 'never' typing errors
+      await (supabase.from("profiles") as any)
         .update({ progress_guide_seen: true })
         .eq("id", user.id);
     }
