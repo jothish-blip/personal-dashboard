@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js'; 
 import { Task, Log, Meta, NexState } from '../types';
 import { useNotificationSystem } from '@/notifications/useNotificationSystem'; 
@@ -105,7 +105,8 @@ export function useNexCore() {
       if (action.retryCount > 3) continue;
 
       try {
-        const table = supabase.from("tasks") as any;
+        // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type error
+        const table = ((supabase as any).from("tasks"));
         if (action.type === "ADD") {
           const { data: exists } = await table.select("id").eq("id", action.payload.id).maybeSingle();
           if (!exists) {
@@ -159,7 +160,8 @@ export function useNexCore() {
     const is_missed = completed === 0 && total > 0;
     if (is_missed) score = -20;
 
-    await supabase.from("daily_stats").upsert({
+    // 🔥 FIX: Cast supabase to any FIRST
+    await ((supabase as any).from("daily_stats")).upsert({
       user_id: userId,
       date: today,
       completed,
@@ -173,8 +175,8 @@ export function useNexCore() {
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
-    const { data: lastEntry } = await supabase
-      .from("daily_stats")
+    // 🔥 FIX: Cast supabase to any FIRST
+    const { data: lastEntry } = await ((supabase as any).from("daily_stats"))
       .select("date")
       .eq("user_id", userId)
       .order("date", { ascending: false })
@@ -226,7 +228,8 @@ export function useNexCore() {
     }
 
     if (missingEntries.length > 0) {
-      await supabase.from("daily_stats").upsert(missingEntries, {
+      // 🔥 FIX: Cast supabase to any FIRST
+      await ((supabase as any).from("daily_stats")).upsert(missingEntries, {
         onConflict: "user_id, date"
       });
     }
@@ -239,7 +242,8 @@ export function useNexCore() {
     const supabase = getSupabaseClient();
     if (!supabase) return; 
 
-    const { data, error } = await supabase.from("tasks").select("*").eq("user_id", user.id);
+    // 🔥 FIX: Cast supabase to any FIRST
+    const { data, error } = await ((supabase as any).from("tasks")).select("*").eq("user_id", user.id);
     
     if (error) {
       console.error("Fetch error:", error);
@@ -260,7 +264,6 @@ export function useNexCore() {
       return newState;
     });
 
-    // Run backfill AND instantly sync today's actual score so UI reflects reality immediately
     await backfillMissedDays(newTasks, user.id);
     await storeDailyStats(newTasks, user.id); 
   };
@@ -274,7 +277,16 @@ export function useNexCore() {
     
     if (cleanupRef.current) cleanupRef.current();
 
-    const channel = supabase.channel(`tasks-${user.id}`);
+    const channelName = `tasks-${user.id}`;
+    
+    const existingChannels = supabase.getChannels();
+    existingChannels.forEach((c) => {
+      if (c.topic === `realtime:${channelName}`) {
+        supabase.removeChannel(c);
+      }
+    });
+
+    const channel = supabase.channel(channelName);
 
     channel.on(
       "postgres_changes",
@@ -287,11 +299,7 @@ export function useNexCore() {
       }
     );
 
-    channel.subscribe((status: any) => {
-      if (status === 'SUBSCRIBED') {
-        fetchTasksFromDB(); 
-      }
-    });
+    channel.subscribe();
 
     const cleanup = () => {
       supabase.removeChannel(channel);
@@ -330,7 +338,10 @@ export function useNexCore() {
       handleAuthChange(session);
     });
 
-    return () => listener?.subscription?.unsubscribe();
+    return () => {
+      listener?.subscription?.unsubscribe();
+      if (cleanupRef.current) cleanupRef.current();
+    };
   }, []);
 
   useEffect(() => {
@@ -394,6 +405,35 @@ export function useNexCore() {
     return () => clearInterval(interval);
   }, [state.tasks, addNotification]);
 
+  // 🔥 STREAK CALCULATION
+  const currentStreak = useMemo(() => {
+    if (state.tasks.length === 0) return 0;
+    
+    let streak = 0;
+    const todayStr = getTodayLocal();
+    const d = new Date(todayStr);
+
+    const isDayActive = (dateStr: string) => state.tasks.some(t => t.history?.[dateStr]);
+
+    let currentDateStr = todayStr;
+    
+    // If today hasn't been active yet, check yesterday to keep the streak going
+    if (!isDayActive(currentDateStr)) {
+      d.setDate(d.getDate() - 1);
+      currentDateStr = d.toISOString().split('T')[0];
+      if (!isDayActive(currentDateStr)) return 0;
+    }
+
+    // Count backwards while days are continually active
+    while (isDayActive(currentDateStr)) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+      currentDateStr = d.toISOString().split('T')[0];
+    }
+
+    return streak;
+  }, [state.tasks]);
+
   const addTask = async (name: string, group: string) => {
     if (!name.trim()) return;
     
@@ -425,7 +465,8 @@ export function useNexCore() {
       return;
     }
 
-    const { error } = await (supabase.from("tasks") as any).insert(newTaskDB);
+    // 🔥 FIX: Cast supabase to any FIRST
+    const { error } = await ((supabase as any).from("tasks")).insert(newTaskDB);
     if (error) {
       addToQueue({ type: "ADD", payload: newTaskDB });
     }
@@ -470,7 +511,8 @@ export function useNexCore() {
       return;
     }
 
-    const { error } = await (supabase.from("tasks") as any).update({ history: updatedHistory }).eq("id", id);
+    // 🔥 FIX: Cast supabase to any FIRST
+    const { error } = await ((supabase as any).from("tasks")).update({ history: updatedHistory }).eq("id", id);
     if (error) {
       addToQueue({ type: "UPDATE", id, payload: { history: updatedHistory } });
     }
@@ -500,7 +542,8 @@ export function useNexCore() {
       return;
     }
 
-    const { error } = await (supabase.from("tasks") as any).delete().eq("id", id);
+    // 🔥 FIX: Cast supabase to any FIRST
+    const { error } = await ((supabase as any).from("tasks")).delete().eq("id", id);
     if (error) {
       addToQueue({ type: "DELETE", id });
     }
@@ -600,6 +643,7 @@ export function useNexCore() {
     checkMomentum,
     addAuditLog,
     clearAllLogs, 
-    currentUser
+    currentUser,
+    currentStreak // 🔥 Returned so the Navbar can read it directly
   };
 }

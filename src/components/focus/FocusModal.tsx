@@ -12,13 +12,22 @@ export default function FocusModal() {
   // ✅ CHECK FROM DATABASE (ONCE PER USER)
   useEffect(() => {
     const checkSeen = async () => {
+      // 1. Fast local cache check to prevent UI flashing
+      if (typeof window !== "undefined" && localStorage.getItem("focus_guide_seen") === "true") {
+        setIsOpen(false);
+        return;
+      }
+
+      // 🔥 FIX: Guard clause to ensure supabase is not null
+      if (!supabase) return;
+
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
 
       if (!user) return;
 
-      const { data } = await supabase
-        .from("profiles")
+      // 🔥 FIX: Cast to any to prevent strict 'never' typing errors
+      const { data } = await (supabase.from("profiles") as any)
         .select("focus_guide_seen")
         .eq("id", user.id)
         .single();
@@ -35,26 +44,38 @@ export default function FocusModal() {
         }, 2500);
 
         return () => clearTimeout(timer);
+      } else {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("focus_guide_seen", "true");
+        }
       }
     };
 
     checkSeen();
-  }, []);
+  }, [supabase]);
 
   // ✅ SAVE TO DATABASE
   const handleAgree = async () => {
+    // Immediately hide and cache locally so it never opens again on this device
+    if (typeof window !== "undefined") {
+      localStorage.setItem("focus_guide_seen", "true");
+    }
+    
+    setIsOpen(false);
+    document.body.style.overflow = "auto";
+
+    // 🔥 FIX: Guard clause for database update
+    if (!supabase) return;
+
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
 
     if (user) {
-      await supabase
-        .from("profiles")
+      // 🔥 FIX: Cast to any to prevent strict 'never' typing errors
+      await (supabase.from("profiles") as any)
         .update({ focus_guide_seen: true })
         .eq("id", user.id);
     }
-
-    setIsOpen(false);
-    document.body.style.overflow = "auto";
   };
 
   if (!isOpen) return null;

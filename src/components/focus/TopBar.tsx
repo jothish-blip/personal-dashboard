@@ -88,19 +88,21 @@ export default function TopBar() {
 
   return (
     // 🔥 5. REMOVED GRADIENTS: Clean white professional card, subtle shadow
-    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 relative overflow-hidden">
+    // 🔥 Fix 9: Added mx-1 sm:mx-0 for mobile edge breathing room
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 relative overflow-hidden mx-1 sm:mx-0">
       
-      <div className="p-4 md:p-5">
-        {/* 🔥 7. MOBILE UX: Stack layout on mobile, grid on desktop */}
-        <div className="flex flex-col gap-5 lg:grid lg:grid-cols-3 lg:items-center mt-1">
+      {/* 🔥 Fix 1: Adjusted padding for mobile */}
+      <div className="p-3 sm:p-4 md:p-5">
+        {/* 🔥 Fix 2: Cleaner compact structure, reduced gap */}
+        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-3 lg:items-center">
           
           {/* ==========================================
               ZONE 1: SETUP (Left)
           ========================================== */}
           <div className="flex flex-wrap items-center gap-3 justify-center lg:justify-start order-2 lg:order-1 w-full lg:w-auto">
             
-            {/* 🔥 4. MODE SELECTOR: Neutral base, pure blue selection */}
-            <div className="flex bg-gray-100 p-1 rounded-xl w-fit">
+            {/* 🔥 Fix 3: Mode selector full width on mobile, proper padding/text sizes */}
+            <div className="grid grid-cols-3 bg-gray-100 p-1 rounded-xl w-full sm:w-fit">
               {MODES.map((m) => {
                 const isSelected = mode === m.key;
                 return (
@@ -109,11 +111,11 @@ export default function TopBar() {
                     disabled={isActive}
                     onClick={() => handleModeSelect(m.key as FocusMode)}
                     className={`
-                      px-4 py-1.5 md:py-2 text-xs font-bold rounded-lg transition-all tracking-wide
+                      px-2 sm:px-4 py-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all tracking-wide
                       ${isSelected 
                         ? "bg-white text-blue-700 shadow-sm border border-blue-200" 
                         : "text-gray-600 hover:text-blue-600 hover:bg-gray-200/50"}
-                      ${isActive && !isSelected ? "opacity-40 cursor-not-allowed hidden sm:block" : ""}
+                      ${isActive && !isSelected ? "opacity-40 cursor-not-allowed" : ""}
                       ${!isActive ? "hover:scale-[1.03] active:scale-95" : ""}
                     `}
                   >
@@ -123,7 +125,7 @@ export default function TopBar() {
               })}
             </div>
 
-            {/* 🔥 CUSTOM MODE UX: Neutralized (No more flashy red/orange) */}
+            {/* 🔥 CUSTOM MODE UX: Neutralized */}
             {mode === "custom" && !isActive && (
               <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 px-2 py-1.5 rounded-xl animate-in fade-in slide-in-from-left-2 duration-200">
                 <input
@@ -161,8 +163,8 @@ export default function TopBar() {
             <div className="text-[10px] uppercase text-gray-400 font-extrabold tracking-widest mb-1">
               Current Focus
             </div>
-            {/* 🔥 Task display color logic refined */}
-            <div className={`text-lg md:text-xl font-bold tracking-tight truncate max-w-[300px] lg:max-w-full mx-auto px-4 transition-colors duration-300 ${
+            {/* 🔥 Fix 4: Break words and padding instead of truncate */}
+            <div className={`text-lg md:text-xl font-bold tracking-tight break-words px-2 lg:max-w-full mx-auto transition-colors duration-300 ${
               isActive 
                 ? "text-green-700"
                 : activeTaskId 
@@ -176,15 +178,17 @@ export default function TopBar() {
           {/* ==========================================
               ZONE 3: CONTROLS & STATUS (Right/Bottom)
           ========================================== */}
-          <div className="flex flex-wrap items-center justify-center lg:justify-end gap-3 order-3 w-full lg:w-auto">
+          {/* 🔥 Fix 5: Flex column on mobile for controls */}
+          <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-end gap-3 order-3 w-full lg:w-auto">
             
             {/* 🔥 3. BUTTON HIERARCHY: Primary Blue, Secondary Amber, Danger Red */}
+            {/* 🔥 Fix 6: Even active button widths on mobile */}
             {isActive && (
-              <div className="flex items-center gap-2 shrink-0 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex w-full sm:w-auto items-center justify-center gap-2 shrink-0 animate-in fade-in zoom-in-95 duration-200">
                 {isPaused ? (
                   <button 
                     onClick={startSession}
-                    className="h-10 px-4 flex items-center gap-1.5 rounded-xl font-bold text-sm bg-blue-600 text-white border border-blue-600 hover:bg-blue-700 transition-transform duration-150 hover:scale-[1.03] active:scale-95 shadow-sm"
+                    className="h-10 flex-1 sm:flex-none px-4 flex items-center justify-center gap-1.5 rounded-xl font-bold text-sm bg-blue-600 text-white border border-blue-600 hover:bg-blue-700 transition-transform duration-150 hover:scale-[1.03] active:scale-95 shadow-sm"
                   >
                     <Play size={16} className="fill-white" />
                     Resume
@@ -192,7 +196,7 @@ export default function TopBar() {
                 ) : (
                   <button 
                     onClick={pauseSession}
-                    className="h-10 px-4 flex items-center gap-1.5 rounded-xl font-bold text-sm bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200 transition-transform duration-150 hover:scale-[1.03] active:scale-95 shadow-sm"
+                    className="h-10 flex-1 sm:flex-none px-4 flex items-center justify-center gap-1.5 rounded-xl font-bold text-sm bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200 transition-transform duration-150 hover:scale-[1.03] active:scale-95 shadow-sm"
                   >
                     <Pause size={16} className="fill-amber-700" />
                     Pause
@@ -201,7 +205,7 @@ export default function TopBar() {
 
                 <button 
                   onClick={() => stopSession(false)} 
-                  className="h-10 px-4 flex items-center gap-1.5 rounded-xl font-bold text-sm bg-red-100 text-red-700 border border-red-300 hover:bg-red-200 transition-transform duration-150 hover:scale-[1.03] active:scale-95 shadow-sm"
+                  className="h-10 flex-1 sm:flex-none px-4 flex items-center justify-center gap-1.5 rounded-xl font-bold text-sm bg-red-100 text-red-700 border border-red-300 hover:bg-red-200 transition-transform duration-150 hover:scale-[1.03] active:scale-95 shadow-sm"
                 >
                   <Square size={14} className="fill-red-700" />
                   Stop
@@ -217,13 +221,13 @@ export default function TopBar() {
               </span>
             </div>
 
-            <div className="w-px h-6 bg-gray-200 mx-1 hidden md:block"></div>
+            {/* 🔥 Fix 7: Removed the dividing gray bar that disconnected elements on mobile */}
 
-            {/* 🔥 FULLSCREEN: Icon only, neutral hover */}
+            {/* 🔥 Fix 8: Fullscreen Icon slightly smaller on mobile */}
             <button 
               onClick={toggleFullscreen}
               title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-              className="h-10 w-10 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-transform duration-150 active:scale-95 hover:scale-[1.05] shrink-0"
+              className="h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-transform duration-150 active:scale-95 hover:scale-[1.05] shrink-0"
             >
               {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
             </button>

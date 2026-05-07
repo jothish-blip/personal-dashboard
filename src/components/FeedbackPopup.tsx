@@ -80,6 +80,12 @@ export default function FeedbackPopup({
       return;
     }
 
+    // 🔥 FIX: Guard clause to ensure supabase is not null
+    if (!supabase) {
+      setErrorMsg("Database connection failed. Please try again.");
+      return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
 
@@ -88,14 +94,14 @@ export default function FeedbackPopup({
         ? `[Tags: ${selectedChips.join(", ")}] ${message}` 
         : message;
 
-      const { error: insertError } = await supabase
-        .from("feedbacks")
+      // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type errors
+      const { error: insertError } = await (supabase as any).from("feedbacks")
         .insert([{ user_id: userId, rating, message: finalMessage }]);
 
       if (insertError) throw insertError;
 
-      await supabase
-        .from("user_feedback_status")
+      // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type errors
+      await (supabase as any).from("user_feedback_status")
         .update({ feedback_given: true })
         .eq("user_id", userId);
 

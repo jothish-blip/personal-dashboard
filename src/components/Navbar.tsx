@@ -9,6 +9,8 @@ import MobileNav from "./navbar/MobileNav";
 import { useNotificationSystem } from "@/notifications/useNotificationSystem";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useFocusSystem } from "../components/focus/useFocusSystem";
+// 🔥 Imported useNexCore directly from your hooks path
+import { useNexCore } from "@/hooks/useNexCore"; 
 
 interface NavbarProps {
   meta: Meta;
@@ -28,6 +30,9 @@ export default function Navbar({
   const supabase = getSupabaseClient();
 
   const { currentUser } = useFocusSystem(); 
+  
+  // 🔥 Pull the active currentStreak directly from the core engine
+  const { currentStreak } = useNexCore();
   
   const [userProfile, setUserProfile] = useState<any>(null);
 
@@ -108,6 +113,7 @@ export default function Navbar({
     isNoteOpen,
     setIsNoteOpen,
     userProfile,
+    currentStreak, // 🔥 Passed down seamlessly to DesktopNav and MobileNav
   };
 
   // Scroll detection for auto-hiding

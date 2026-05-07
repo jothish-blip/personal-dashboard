@@ -34,11 +34,15 @@ export default function FeedbackPage({ onClose }: { onClose?: () => void }) {
   // Load User Data
   useEffect(() => {
     const fetchUser = async () => {
+      // 🔥 FIX: Guard clause to ensure supabase is not null
+      if (!supabase) return;
+
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
-        const { data: profile } = await supabase
-          .from("profiles")
+        
+        // 🔥 FIX: Cast supabase to any first
+        const { data: profile } = await (supabase as any).from("profiles")
           .select("full_name")
           .eq("id", user.id)
           .single();
@@ -119,6 +123,12 @@ export default function FeedbackPage({ onClose }: { onClose?: () => void }) {
       return;
     }
 
+    // 🔥 FIX: Guard clause for submit action
+    if (!supabase) {
+      setErrorMsg("Database connection failed. Please try again later.");
+      return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
 
@@ -129,8 +139,8 @@ export default function FeedbackPage({ onClose }: { onClose?: () => void }) {
         ? `[Tags: ${selectedChips.join(", ")}] ${message}` 
         : message;
 
-      const { error: insertError } = await supabase
-        .from("feedbacks")
+      // 🔥 FIX: Cast supabase to any first
+      const { error: insertError } = await (supabase as any).from("feedbacks")
         .insert([
           {
             user_id: userId,
@@ -141,8 +151,8 @@ export default function FeedbackPage({ onClose }: { onClose?: () => void }) {
 
       if (insertError) throw insertError;
 
-      const { error: updateError } = await supabase
-        .from("user_feedback_status")
+      // 🔥 FIX: Cast supabase to any first
+      const { error: updateError } = await (supabase as any).from("user_feedback_status")
         .update({ feedback_given: true })
         .eq("user_id", userId);
 

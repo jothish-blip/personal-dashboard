@@ -9,6 +9,7 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { useFocusSystem } from "@/components/focus/useFocusSystem";
 import { useTheme } from "@/components/ThemeProvider";
 import ThemeToggle from "@/components/ThemeToggle";
+import { useNexCore } from "@/hooks/useNexCore"; // 🔥 Pulled core for Streak
 
 import {
   LayoutGrid,
@@ -88,6 +89,9 @@ const ANIMATION_GROUPS = {
 
 type AnimationKey = keyof typeof ANIMATIONS;
 
+// 🔥 New Type for the Smart Indicator Mode
+type IndicatorMode = "logo" | "streak" | "smart";
+
 // 🔹 Extracted Config
 const NAV_ITEMS = [
   { icon: <LayoutGrid size={16} />, label: "Tasks", path: "/" },
@@ -102,6 +106,9 @@ export default function FloatingHub() {
   const pathname = usePathname();
   const { isDarkMode } = useTheme();
 
+  // 🔥 Fetch live streak from NexCore
+  const { currentStreak } = useNexCore(); 
+
   if (pathname === "/login" || pathname === "/register") return null;
 
   // 🔹 State
@@ -114,10 +121,14 @@ export default function FloatingHub() {
   const [mounted, setMounted] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isCustomizing, setIsCustomizing] = useState(false);
-  const [position, setPosition] = useState({ x: 16, y: 120 }); // Safer default start
+  const [position, setPosition] = useState({ x: 16, y: 120 });
   
   const [selectedTheme, setSelectedTheme] = useState<ThemeKey>("orange");
   const [selectedAnimation, setSelectedAnimation] = useState<AnimationKey>("flow");
+  
+  // 🔥 State for the living indicator system
+  const [indicatorMode, setIndicatorMode] = useState<IndicatorMode>("smart");
+  const [showStreakIndicator, setShowStreakIndicator] = useState(false);
 
   // 🔹 Refs
   const rootRef = useRef<HTMLDivElement>(null);
@@ -131,9 +142,11 @@ export default function FloatingHub() {
     const savedTheme = localStorage.getItem("hub-theme") as ThemeKey;
     const savedAnimation = localStorage.getItem("hub-animation") as AnimationKey;
     const savedPos = localStorage.getItem("hub-position");
+    const savedIndicator = localStorage.getItem("hub-indicator-mode") as IndicatorMode;
 
     if (savedTheme && THEMES[savedTheme]) setSelectedTheme(savedTheme);
     if (savedAnimation && ANIMATIONS[savedAnimation] !== undefined) setSelectedAnimation(savedAnimation);
+    if (savedIndicator) setIndicatorMode(savedIndicator);
     if (savedPos) {
       try { setPosition(JSON.parse(savedPos)); } catch (e) { }
     }
@@ -152,6 +165,10 @@ export default function FloatingHub() {
     if (mounted) localStorage.setItem("hub-position", JSON.stringify(position));
   }, [position, mounted]);
 
+  useEffect(() => {
+    if (mounted) localStorage.setItem("hub-indicator-mode", indicatorMode);
+  }, [indicatorMode, mounted]);
+
   // 🟢 FETCH PROFILE
   useEffect(() => {
     let isMounted = true;
@@ -163,6 +180,32 @@ export default function FloatingHub() {
     fetchProfile();
     return () => { isMounted = false; };
   }, [supabase, currentUser]);
+
+  // 🔥 SMART SWITCHING LOGIC
+  useEffect(() => {
+    if (indicatorMode !== "smart") {
+      setShowStreakIndicator(false);
+      return;
+    }
+
+    let timeout: NodeJS.Timeout;
+
+    const switchView = (isStreakCurrentlyShowing: boolean) => {
+      timeout = setTimeout(() => {
+        const nextState = !isStreakCurrentlyShowing;
+        setShowStreakIndicator(nextState);
+        switchView(nextState); // Recursively loop
+      }, isStreakCurrentlyShowing ? 3200 : 8500); // Show streak for 3.2s, N for 8.5s
+    };
+
+    // Initial trigger
+    timeout = setTimeout(() => {
+      setShowStreakIndicator(true);
+      switchView(true);
+    }, 5000);
+
+    return () => clearTimeout(timeout);
+  }, [indicatorMode]);
 
   // 🟢 EVENTS (Fixed UX)
   useEffect(() => {
@@ -279,6 +322,10 @@ export default function FloatingHub() {
   // Only use stateAnimation overrides if necessary, to let custom animations shine
   const stateAnimation = open && selectedAnimation === "none" ? "animated-n-neon" : isDragging && selectedAnimation === "none" ? "animated-n-pulse" : "";
 
+  // 🔥 DETERMINE WHAT TO SHOW (Force 'N' if streak is 0)
+  const shouldShowStreak = (indicatorMode === "streak" || (indicatorMode === "smart" && showStreakIndicator)) && currentStreak > 0;
+  const displayText = shouldShowStreak ? `🔥${currentStreak}` : "N";
+
   // 🔹 Helper Components for Clean UI Rendering
   const ThemeButton = ({ themeKey }: { themeKey: string }) => (
     <Tooltip text={THEMES[themeKey as ThemeKey].name}>
@@ -310,6 +357,21 @@ export default function FloatingHub() {
     </button>
   );
 
+  const IndicatorButton = ({ mode, label }: { mode: IndicatorMode; label: string }) => (
+    <button
+      onClick={() => setIndicatorMode(mode)}
+      className={`px-3 py-1.5 rounded-md ${UI_TEXT.label} transition-all duration-200 ${
+        indicatorMode === mode
+          ? `bg-gradient-to-br ${currentTheme.gradient} text-white shadow-md border border-transparent`
+          : isDarkMode
+          ? "bg-zinc-800/80 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 border border-transparent"
+          : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900 border border-transparent"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
   return createPortal(
     <>
       <style dangerouslySetInnerHTML={{ __html: `
@@ -324,9 +386,9 @@ export default function FloatingHub() {
         @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
         
         /* ORIGINAL STANDARD */
-        .animated-n-flow { font-weight: 700; font-size: 20px; background: linear-gradient(270deg, #ffffff, rgba(255,255,255,0.6), #ffffff); background-size: 300% 300%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: flowMove 4s ease infinite; }
+        .animated-n-flow { font-weight: 700; background: linear-gradient(270deg, #ffffff, rgba(255,255,255,0.6), #ffffff); background-size: 300% 300%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: flowMove 4s ease infinite; }
         @keyframes flowMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        .animated-n-rotate { font-weight: 700; font-size: 20px; background: linear-gradient(90deg, #fff, rgba(255,255,255,0.2), #fff); background-size: 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: rotateText 3s linear infinite; }
+        .animated-n-rotate { font-weight: 700; background: linear-gradient(90deg, #fff, rgba(255,255,255,0.2), #fff); background-size: 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: rotateText 3s linear infinite; }
         @keyframes rotateText { 0% { background-position: 0% } 100% { background-position: 200% } }
         
         /* 🌊 WAVE */
@@ -343,11 +405,11 @@ export default function FloatingHub() {
         @keyframes floatMove { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 
         /* ORIGINAL EXPRESSIVE */
-        .animated-n-pulse { font-weight: 700; font-size: 20px; color: #fff; animation: pulseGlow 2s ease-in-out infinite; }
+        .animated-n-pulse { font-weight: 700; color: #fff; animation: pulseGlow 2s ease-in-out infinite; }
         @keyframes pulseGlow { 0% { text-shadow: 0 0 5px rgba(255,255,255,0.4); transform: scale(1); } 50% { text-shadow: 0 0 20px rgba(255,255,255,0.9); transform: scale(1.05); } 100% { text-shadow: 0 0 5px rgba(255,255,255,0.4); transform: scale(1); } }
-        .animated-n-neon { font-weight: 700; font-size: 20px; background: linear-gradient(90deg, #fff, rgba(255,255,255,0.3), #fff); background-size: 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: neonSweep 2s linear infinite; }
+        .animated-n-neon { font-weight: 700; background: linear-gradient(90deg, #fff, rgba(255,255,255,0.3), #fff); background-size: 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: neonSweep 2s linear infinite; }
         @keyframes neonSweep { 0% { background-position: -100%; } 100% { background-position: 100%; } }
-        .animated-n-shine { font-weight: 700; font-size: 20px; color: white; position: relative; overflow: hidden; display: inline-block; }
+        .animated-n-shine { font-weight: 700; color: white; position: relative; overflow: hidden; display: inline-block; }
         .animated-n-shine::after { content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(120deg, transparent, rgba(255,255,255,0.8), transparent); animation: shineMove 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
         @keyframes shineMove { 100% { left: 200%; } }
 
@@ -373,7 +435,7 @@ export default function FloatingHub() {
           transition: isDragging ? "none" : "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
         }}
       >
-        {/* 🔥 FLOATING BUTTON */}
+        {/* 🔥 LIVING FLOATING BUTTON */}
         <div
           onMouseDown={(e) => {
             pressStart.current = Date.now(); dragging.current = true; setIsDragging(true);
@@ -392,10 +454,29 @@ export default function FloatingHub() {
               if (open) setIsCustomizing(false); 
             }
           }}
-          className={`w-14 h-14 rounded-full bg-gradient-to-br ${currentTheme.gradient} flex items-center justify-center text-white text-xl cursor-pointer touch-none select-none transition-all duration-300 ease-out ${isDragging ? "scale-105 opacity-90" : "hover:scale-105 active:scale-95"}`}
-          style={{ boxShadow: (open && !isDragging) || isDragging ? `0 0 30px ${currentTheme.glow}` : `0 8px 20px rgba(0,0,0,0.15), 0 0 15px ${currentTheme.glow.replace('0.5', '0.2')}` }}
+          className={`w-14 h-14 rounded-full bg-gradient-to-br ${currentTheme.gradient} flex items-center justify-center text-white cursor-pointer touch-none select-none transition-all duration-300 ease-out ${isDragging ? "scale-105 opacity-90" : "hover:scale-105 active:scale-95"}`}
+          style={{ 
+            boxShadow: shouldShowStreak
+              ? `0 0 35px rgba(249,115,22,0.55)` 
+              : (open && !isDragging) || isDragging 
+              ? `0 0 30px ${currentTheme.glow}` 
+              : `0 8px 20px rgba(0,0,0,0.15), 0 0 15px ${currentTheme.glow.replace('0.5', '0.2')}` 
+          }}
         >
-          <span className={`${baseAnimation} ${stateAnimation}`} style={{ animationDuration: open && selectedAnimation === "none" ? "1.2s" : "" }}>N</span>
+          <span 
+            className={`
+              ${baseAnimation} 
+              ${stateAnimation} 
+              transition-all duration-500 ease-out tracking-wide 
+              flex items-center justify-center font-bold text-xl
+            `}
+            style={{ 
+              transform: shouldShowStreak ? "scale(1.05)" : "scale(1)",
+              animationDuration: open && selectedAnimation === "none" ? "1.2s" : "" 
+            }}
+          >
+            {displayText}
+          </span>
         </div>
 
         {/* 🔥 COMMAND CENTER PANEL */}
@@ -467,7 +548,6 @@ export default function FloatingHub() {
                     <div className={`mt-4 pt-4 border-t ${isDarkMode ? "border-zinc-800/60" : "border-zinc-200"}`}>
                       <div className="flex items-center gap-3 px-3 py-3 rounded-2xl cursor-default transition-colors">
                         
-                        {/* 🔥 FIX: Render Avatar Tooltip on the right side so it doesn't clip */}
                         <Tooltip text="Change Avatar" position="right">
                           <label className="relative group cursor-pointer" onClick={(e) => isDragging && e.preventDefault()}>
                             <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={isUploadingAvatar} />
@@ -496,6 +576,16 @@ export default function FloatingHub() {
                     className="space-y-6 animate-in slide-in-from-right-4 duration-300 ease-out py-2 px-1"
                   >
                     
+                    {/* 🎛️ HUB INDICATOR */}
+                    <div>
+                      <p className={`${UI_TEXT.section} ${isDarkMode ? "text-zinc-300" : "text-zinc-700"}`}>Hub Indicator</p>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <IndicatorButton mode="logo" label="Always N" />
+                        <IndicatorButton mode="streak" label="Always Streak" />
+                        <IndicatorButton mode="smart" label="Smart Switch" />
+                      </div>
+                    </div>
+
                     {/* 🧊 MINIMAL */}
                     <div>
                       <p className={`${UI_TEXT.section} ${isDarkMode ? "text-zinc-300" : "text-zinc-700"}`}>Minimal</p>
@@ -567,7 +657,6 @@ function Tooltip({
   return (
     <div className="relative group flex items-center justify-center">
       {children}
-      {/* 🔥 Tooltip container with dynamic positioning and safety max-width */}
       <div
         className={`absolute z-[99999] max-w-[200px] px-2.5 py-1.5 rounded-md ${UI_TEXT.label} whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 ease-out shadow-xl ${
           position === "right"
@@ -580,7 +669,6 @@ function Tooltip({
         }`}
       >
         {text}
-        {/* 🔥 Tooltip arrow matching the position */}
         <div
           className={`absolute w-2 h-2 rotate-45 ${
             position === "right"

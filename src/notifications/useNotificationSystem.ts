@@ -41,7 +41,8 @@ export function useNotificationSystem(userId: string | null | undefined) {
   const fetchNotifications = useCallback(async () => {
     if (!userId || !supabase) return;
 
-    const { data, error } = await supabase
+    // 🔥 FIX: Cast supabase to any FIRST
+    const { data, error } = await (supabase as any)
       .from("notifications")
       .select("*")
       .eq("user_id", userId)
@@ -105,7 +106,8 @@ export function useNotificationSystem(userId: string | null | undefined) {
       return;
     }
 
-    const { data, error } = await supabase.from("notifications").insert({
+    // 🔥 FIX: Cast supabase to any FIRST
+    const { data, error } = await (supabase as any).from("notifications").insert({
       user_id: userId, 
       module, 
       title, 
@@ -128,14 +130,16 @@ export function useNotificationSystem(userId: string | null | undefined) {
   const markAsRead = useCallback(async (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
     if (supabase) {
-      await supabase.from("notifications").update({ read: true }).eq("id", id);
+      // 🔥 FIX: Cast supabase to any FIRST
+      await (supabase as any).from("notifications").update({ read: true }).eq("id", id);
     }
   }, [supabase]);
 
   const clearAll = useCallback(async () => {
     if (!userId || !supabase) return;
     setNotifications([]);
-    await supabase.from("notifications")
+    // 🔥 FIX: Cast supabase to any FIRST
+    await (supabase as any).from("notifications")
       .update({ archived: true })
       .eq("user_id", userId)
       .eq("archived", false);

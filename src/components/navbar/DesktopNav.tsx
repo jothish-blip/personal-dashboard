@@ -10,15 +10,15 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Bell,
-  User,
   Settings,
   LogOut
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
-import { useTheme } from "@/components/ThemeProvider"; // Added theme hook
+import { useTheme } from "@/components/ThemeProvider";
 
 import NotificationCenter from "@/notifications/NotificationCenter";
 import { NexNotification } from "@/notifications/types";
+import ProfileStreakSwitcher from "./ProfileStreakSwitcher"; // 🔥 Import the new Switcher
 
 interface DesktopNavProps {
   activePaths: {
@@ -37,6 +37,7 @@ interface DesktopNavProps {
   setIsNoteOpen: (v: boolean) => void;
   handleLogout: () => void;
   userProfile?: any;
+  currentStreak?: number;
 }
 
 const NAV_ITEMS = [
@@ -57,7 +58,8 @@ export default function DesktopNav({
   isNoteOpen,
   setIsNoteOpen,
   handleLogout,
-  userProfile
+  userProfile,
+  currentStreak = 0 
 }: DesktopNavProps) {
   const { isDarkMode } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -114,7 +116,7 @@ export default function DesktopNav({
 
       {/* RIGHT */}
       <div className="flex items-center gap-4">
-
+        
         <ThemeToggle />
 
         {/* 🔔 NOTIFICATIONS */}
@@ -148,25 +150,18 @@ export default function DesktopNav({
           />
         </div>
 
-        {/* PROFILE */}
+        {/* PROFILE / STREAK SWITCHER */}
         <div className="relative">
           <button
             onClick={() => setIsProfileOpen(!isProfileOpen)}
             className="flex items-center gap-2 hover:opacity-80 transition-all duration-200 hover:scale-[1.05]"
           >
-            {userProfile?.avatar_url ? (
-              <img
-                src={userProfile.avatar_url}
-                className={`w-8 h-8 rounded-full object-cover shadow-sm border ${isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-100 border-gray-200"}`}
-                alt="Profile"
-              />
-            ) : (
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-sm border text-sm font-bold uppercase ${
-                isDarkMode ? "bg-[#111111] border-gray-800 text-gray-300" : "bg-gray-100 border-gray-200 text-gray-700"
-              }`}>
-                {userProfile?.full_name?.[0] || "U"}
-              </div>
-            )}
+            {/* 🔥 Dynamic Profile/Streak Component */}
+            <ProfileStreakSwitcher 
+              userProfile={userProfile} 
+              currentStreak={currentStreak} 
+              isDarkMode={isDarkMode} 
+            />
 
             {userProfile?.full_name && (
               <span className={`text-sm font-semibold hidden lg:block ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>

@@ -18,6 +18,14 @@ export default function AuthCallbackInner() {
     const handleAuth = async () => {
       try {
         const supabase = getSupabaseClient();
+        
+        // 🔥 FIX: Guard clause to ensure supabase is not null
+        if (!supabase) {
+          console.error("❌ Supabase client failed to initialize.");
+          router.replace("/login");
+          return;
+        }
+
         const code = searchParams.get("code");
 
         // 🔥 Only exchange if code exists in the URL

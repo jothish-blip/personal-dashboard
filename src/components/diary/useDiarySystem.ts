@@ -280,7 +280,8 @@ export function useDiarySystem() {
         updated_at: new Date().toISOString()
       };
 
-      const { error } = await supabase.from('diary_entries').upsert(payload, { onConflict: 'user_id, entry_date' });
+      // 🔥 FIX: Cast supabase to any first to bypass strict 'never' table type error
+      const { error } = await (supabase as any).from('diary_entries').upsert(payload, { onConflict: 'user_id, entry_date' });
       if (error) throw error;
       logInfo(`Synced entry to DB for ${dateStr}`);
     } catch (err) { 
@@ -378,8 +379,8 @@ export function useDiarySystem() {
       try {
         const user = userRef.current; 
         if (user && supabase) {
-          const { data, error } = await supabase
-            .from('diary_entries')
+          // 🔥 FIX: Cast supabase to any first to bypass strict 'never' table type error
+          const { data, error } = await (supabase as any).from('diary_entries')
             .select('*')
             .eq('user_id', user.id)
             .order('entry_date', { ascending: false })

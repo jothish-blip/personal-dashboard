@@ -89,7 +89,8 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data } = await supabase
+      // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type error
+      const { data } = await (supabase as any)
         .from("daily_stats")
         .select("*")
         .eq("user_id", user.id)
@@ -286,14 +287,6 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
     return 'Low';
   }, [disciplineScore]);
 
-  const dailySummary = useMemo(() => {
-    if (zeroDays >= 3) return "System failure detected due to prolonged inactivity. Entering recovery mode.";
-    if (scoreDelta !== null && scoreDelta < -10) return "Severe drop in daily impact detected. Course correct immediately.";
-    if (momentum < 0) return "Output velocity dropping compared to recent baseline. Reduce friction points.";
-    if (consistencyPercent > 80) return "Execution parameters optimal. You are reinforcing a highly stable habit loop.";
-    return "Stable progress detected. The primary directive is eliminating system inconsistency.";
-  }, [zeroDays, momentum, consistencyPercent, scoreDelta]);
-
   const focusPrediction = useMemo(() => {
     if (momentum > 0 && consistencyPercent > 70) return "High momentum probability. You are positioned to perform at peak capacity tomorrow.";
     if (momentum < 0 || zeroDays >= 3) return "Forecast critical. Isolate focus strictly on completing one micro-task tomorrow.";
@@ -344,20 +337,6 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
       {showOnboarding && <OnboardingFlow onComplete={handleInitialize} />}
 
       {/* BEHAVIORAL WARNINGS */}
-      {zeroDays >= 3 && (
-        <div className={`border rounded-[20px] p-5 flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-4 ${
-          isDarkMode ? "bg-red-950/20 border-red-900/50" : "bg-red-50 border-red-200"
-        }`}>
-          <div className={`p-2.5 rounded-xl border shadow-sm mt-1 ${isDarkMode ? "bg-gray-900 border-red-900/50" : "bg-white border-red-200"}`}>
-            <AlertTriangle className="text-red-500" size={20} />
-          </div>
-          <div>
-            <h3 className={`font-bold text-sm tracking-tight mb-1 ${isDarkMode ? "text-red-400" : "text-red-900"}`}>Inactivity Detected</h3>
-            <p className={`text-xs leading-relaxed font-medium ${isDarkMode ? "text-red-500/80" : "text-red-700"}`}>You missed {zeroDays} days in this range. Discipline score was heavily penalized. <br/><b>Recovery Mode Activated:</b> Goal is to complete 1 task today.</p>
-          </div>
-        </div>
-      )}
-
       {currentStreak === 0 && previousStreak >= 3 && zeroDays < 3 && (
         <div className={`border rounded-[20px] p-5 flex items-start gap-4 shadow-sm ${
           isDarkMode ? "bg-orange-950/20 border-orange-900/50" : "bg-orange-50 border-orange-200"
@@ -419,7 +398,7 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
       {/* 🥇 PRIMARY INTELLIGENCE LAYER */}
       <div className="space-y-4">
         <p className={`text-[10px] uppercase font-bold tracking-widest px-1 ${isDarkMode ? "text-gray-600" : "text-gray-500"}`}>Primary Signals</p>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           
           <div className={`md:col-span-2 bg-gradient-to-r ${isDarkMode ? "from-emerald-900 to-[#0a0a0a]" : "from-emerald-500 to-emerald-600"} rounded-[24px] p-6 text-white shadow-md flex items-center gap-4 group relative overflow-hidden`}>
             <div className={`border p-3 rounded-2xl group-hover:rotate-12 transition-transform z-10 backdrop-blur-sm ${isDarkMode ? "bg-emerald-500/20 border-emerald-500/30" : "bg-white/20 border-white/10"}`}>
@@ -446,9 +425,9 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
               <p className="text-sm font-bold text-gray-400">/ 100</p>
             </div>
             <div className={`mt-3 inline-block w-max text-[10px] font-black px-2 py-0.5 rounded-md border ${
-               disciplineScore >= 70 ? (isDarkMode ? "bg-emerald-950/30 text-emerald-400 border-emerald-900/50" : "bg-green-50 text-green-600 border-green-200") : 
-               disciplineScore <= 40 ? (isDarkMode ? "bg-red-950/30 text-red-400 border-red-900/50" : "bg-red-50 text-red-600 border-red-200") : 
-               (isDarkMode ? "bg-gray-800 text-gray-400 border-gray-700" : "bg-gray-50 text-gray-600 border-gray-200")
+                disciplineScore >= 70 ? (isDarkMode ? "bg-emerald-950/30 text-emerald-400 border-emerald-900/50" : "bg-green-50 text-green-600 border-green-200") : 
+                disciplineScore <= 40 ? (isDarkMode ? "bg-red-950/30 text-red-400 border-red-900/50" : "bg-red-50 text-red-600 border-red-200") : 
+                (isDarkMode ? "bg-gray-800 text-gray-400 border-gray-700" : "bg-gray-50 text-gray-600 border-gray-200")
             }`}>
               {disciplineScore >= 70 ? "ELITE" : disciplineScore <= 40 ? "AT RISK" : "STABLE"}
             </div>
@@ -464,43 +443,12 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
                 </div>
             )}
           </div>
-
-          <div className={`border shadow-sm rounded-[24px] p-6 transition-all duration-200 flex flex-col justify-center relative ${
-            isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"
-          }`}>
-            <p className={`text-[10px] uppercase font-bold tracking-widest mb-1 flex items-center gap-1 ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>Daily Impact</p>
-            <div className="flex flex-col mt-1">
-              <p className={`text-5xl font-black tracking-tight ${
-                scoreDelta !== null && scoreDelta > 0 ? "text-emerald-500" :
-                scoreDelta !== null && scoreDelta < 0 ? "text-red-500" : "text-gray-600"
-              }`}>
-                {scoreDelta !== null && scoreDelta !== 0 ? (scoreDelta > 0 ? `+${scoreDelta}` : scoreDelta) : "-"}
-              </p>
-              {scoreDelta !== null && scoreDelta !== 0 && (
-                <p className={`text-xs font-bold mt-2 uppercase tracking-widest ${scoreDelta > 0 ? "text-emerald-500" : "text-red-500"}`}>
-                  {scoreDelta > 0 ? "GAIN" : "LOSS"}
-                </p>
-              )}
-            </div>
-            <p className="text-[10px] font-bold text-gray-500 mt-3 tracking-widest uppercase">Compared to Yesterday</p>
-          </div>
         </div>
 
         {/* 🥈 SECONDARY INTELLIGENCE LAYER */}
         <p className={`text-[10px] uppercase font-bold tracking-widest px-1 mt-6 ${isDarkMode ? "text-gray-600" : "text-gray-500"}`}>Interpretation & Forecast</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <div className={`md:col-span-2 border shadow-sm rounded-[20px] p-5 flex items-start gap-4 transition-colors ${
-            isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"
-          }`}>
-            <div className={`p-2.5 rounded-xl border ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
-                <BrainCircuit size={18} className={isDarkMode ? "text-gray-400" : "text-gray-500"} />
-            </div>
-            <div>
-                <span className={`font-bold block text-[10px] uppercase mb-1 tracking-tight ${isDarkMode ? "text-gray-400" : "text-gray-900"}`}>AI Summary</span>
-                <p className={`text-sm font-medium leading-relaxed ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>{dailySummary}</p>
-            </div>
-          </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
           <div className={`${zeroDays >= 3 ? 'bg-red-500' : 'bg-gray-900'} rounded-[20px] p-5 text-white flex flex-col justify-between hover:shadow-md transition-all shadow-sm relative overflow-hidden`}>
             <div className="flex items-center gap-2 font-bold uppercase text-[10px] tracking-widest text-white/70">
                 <Zap size={14} /> Forecast

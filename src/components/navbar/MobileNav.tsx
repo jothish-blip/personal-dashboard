@@ -8,15 +8,15 @@ import {
   Brain,
   CalendarDays,
   Bell,
-  User,
   Settings,
   LogOut
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
-import { useTheme } from "@/components/ThemeProvider"; // Added theme hook
+import { useTheme } from "@/components/ThemeProvider"; 
 
 import NotificationCenter from "@/notifications/NotificationCenter";
 import { NexNotification } from "@/notifications/types";
+import ProfileStreakSwitcher from "./ProfileStreakSwitcher"; // 🔥 Import the new Switcher
 
 interface MobileNavProps {
   activePaths: {
@@ -35,6 +35,7 @@ interface MobileNavProps {
   setIsNoteOpen: (v: boolean) => void;
   handleLogout: () => void;
   userProfile?: any;
+  currentStreak?: number;
 }
 
 const NAV_ITEMS = [
@@ -49,7 +50,8 @@ export default function MobileNav(props: MobileNavProps) {
   const {
     activePaths, handleNav,
     notifications, unreadCount, markAsRead, clearAll,
-    isNoteOpen, setIsNoteOpen, handleLogout, userProfile
+    isNoteOpen, setIsNoteOpen, handleLogout, userProfile,
+    currentStreak = 0 
   } = props;
 
   const { isDarkMode } = useTheme();
@@ -72,6 +74,7 @@ export default function MobileNav(props: MobileNavProps) {
         </div>
 
         <div className="flex items-center gap-3">
+
           <ThemeToggle />
 
           {/* 🔔 Notifications */}
@@ -104,21 +107,18 @@ export default function MobileNav(props: MobileNavProps) {
             />
           </div>
 
-          {/* PROFILE */}
+          {/* PROFILE / STREAK SWITCHER */}
           <div className="relative">
             <button
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className={`w-8 h-8 rounded-full flex items-center justify-center overflow-hidden border shadow-sm transition-all duration-200 hover:scale-[1.05] ${
-                isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-100 border-gray-200"
-              }`}
+              className="hover:opacity-80 transition-all duration-200 hover:scale-[1.05]"
             >
-              {userProfile?.avatar_url ? (
-                <img src={userProfile.avatar_url} className="w-full h-full object-cover" alt="Avatar"/>
-              ) : (
-                <span className={`text-sm font-bold uppercase ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-                  {userProfile?.full_name?.[0] || "U"}
-                </span>
-              )}
+              {/* 🔥 Dynamic Profile/Streak Component */}
+              <ProfileStreakSwitcher 
+                userProfile={userProfile} 
+                currentStreak={currentStreak} 
+                isDarkMode={isDarkMode} 
+              />
             </button>
 
             {isProfileOpen && (

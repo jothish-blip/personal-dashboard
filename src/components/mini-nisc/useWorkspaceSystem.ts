@@ -179,7 +179,8 @@ export function useWorkspaceSystem() {
     const colors = ['bg-blue-500', 'bg-purple-500', 'bg-emerald-500', 'bg-orange-500', 'bg-rose-500'];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
     
-    const { data, error } = await supabase
+    // 🔥 FIX: Cast to any
+    const { data, error } = await (supabase as any)
       .from('workspaces')
       .insert({
         name: name.trim(),
@@ -205,7 +206,8 @@ export function useWorkspaceSystem() {
   const renameWorkspace = async (id: string, name: string) => {
     if (!name.trim() || !supabase) return;
     try {
-      await supabase.from("workspaces").update({ name }).eq("id", id);
+      // 🔥 FIX: Cast to any
+      await (supabase as any).from("workspaces").update({ name }).eq("id", id);
       setWorkspaces((prev) => prev.map((w) => (w.id === id ? { ...w, name } : w)));
     } catch (e) {
       console.error("Rename workspace failed", e);
@@ -224,7 +226,8 @@ export function useWorkspaceSystem() {
 
     try {
       if (supabase && currentUser?.id) {
-        await supabase
+        // 🔥 FIX: Cast to any
+        await (supabase as any)
           .from("workspaces")
           .delete()
           .eq("id", workspaceId)
@@ -253,7 +256,8 @@ export function useWorkspaceSystem() {
   const setWorkspaceLock = async (workspaceId: string, pin: string) => {
     if (!pin || !supabase) return;
     const hash = await hashPin(pin);
-    await supabase.from("workspaces").update({
+    // 🔥 FIX: Cast to any
+    await (supabase as any).from("workspaces").update({
       is_locked: true, lock_hash: hash, lock_updated_at: new Date().toISOString()
     }).eq("id", workspaceId);
 
@@ -274,7 +278,8 @@ export function useWorkspaceSystem() {
 
   const removeWorkspaceLock = async (workspaceId: string) => {
     if (!supabase) return;
-    await supabase.from("workspaces").update({ is_locked: false, lock_hash: null }).eq("id", workspaceId);
+    // 🔥 FIX: Cast to any
+    await (supabase as any).from("workspaces").update({ is_locked: false, lock_hash: null }).eq("id", workspaceId);
     setWorkspaces(prev => prev.map(w => w.id === workspaceId ? { ...w, isLocked: false, lockHash: null } : w));
     addNotification('mini', 'Lock Removed', 'Workspace is now unprotected.', 'low', '/mini-nisc');
   };
@@ -327,7 +332,8 @@ export function useWorkspaceSystem() {
       const user = userRef.current;
       if (!user || !supabase) return { error: new Error("Not authenticated") };
       
-      const res = await supabase.from('workspace_documents').upsert({
+      // 🔥 FIX: Cast to any
+      const res = await (supabase as any).from('workspace_documents').upsert({
         id: doc.id, 
         user_id: user.id, 
         folder_id: doc.folderId ?? null, 
@@ -372,7 +378,8 @@ export function useWorkspaceSystem() {
 
   const syncFolderToDB = async (folder: Folder) => {
     if (!userRef.current || !supabase) return { error: new Error("No user") };
-    return await supabase.from('workspace_folders').upsert({ 
+    // 🔥 FIX: Cast to any
+    return await (supabase as any).from('workspace_folders').upsert({ 
       id: folder.id, 
       user_id: userRef.current.id, 
       name: folder.name,
@@ -383,7 +390,8 @@ export function useWorkspaceSystem() {
 
   const syncMediaToDB = async (mediaItem: Media) => {
     if (!userRef.current || !supabase) return;
-    await supabase.from('workspace_media').upsert({
+    // 🔥 FIX: Cast to any
+    await (supabase as any).from('workspace_media').upsert({
       id: mediaItem.id, user_id: userRef.current.id, folder_id: mediaItem.folderId ?? null,
       workspace_id: mediaItem.workspaceId, 
       type: mediaItem.type, url: mediaItem.url, name: mediaItem.name
@@ -423,7 +431,8 @@ export function useWorkspaceSystem() {
     
     setFolders(prev => prev.map(f => f.id === id ? { ...f, name } : f));
     if (userRef.current && supabase) {
-      await supabase.from('workspace_folders').update({ name }).eq('id', id);
+      // 🔥 FIX: Cast to any
+      await (supabase as any).from('workspace_folders').update({ name }).eq('id', id);
     }
   }, [supabase]);
 
@@ -477,8 +486,9 @@ export function useWorkspaceSystem() {
     if (activeFolderId && idsToDelete.includes(activeFolderId)) setActiveFolderId(null);
 
     if (supabase && userRef.current) {
-      await supabase.from("workspace_documents").update({ folder_id: null }).in("folder_id", idsToDelete);
-      const { error: folErr } = await supabase.from("workspace_folders").delete().in("id", idsToDelete);
+      // 🔥 FIX: Cast to any
+      await (supabase as any).from("workspace_documents").update({ folder_id: null }).in("folder_id", idsToDelete);
+      const { error: folErr } = await (supabase as any).from("workspace_folders").delete().in("id", idsToDelete);
 
       if (folErr) {
         console.error("Failed to delete folder from DB", folErr);
@@ -536,7 +546,8 @@ export function useWorkspaceSystem() {
     closeTab(id); 
 
     if (supabase && userRef.current) {
-      await supabase.from('workspace_documents').upsert({
+      // 🔥 FIX: Cast to any
+      await (supabase as any).from('workspace_documents').upsert({
         ...updatedDoc, user_id: userRef.current.id, folder_id: updatedDoc.folderId ?? null, deleted_at: new Date(updatedDoc.deletedAt!).toISOString()
       }, { onConflict: 'id' });
     }
@@ -551,7 +562,8 @@ export function useWorkspaceSystem() {
       setHistoryStack(prev => [...prev, { type: 'MOVE_DOC', id: draggedId, from: targetDoc.folderId, to: targetFolderId }]);
       setDocuments(prev => prev.map(d => d.id === draggedId ? { ...d, folderId: targetFolderId, updatedAt: Date.now() } : d));
 
-      if (userRef.current && supabase) await supabase.from('workspace_documents').update({ folder_id: targetFolderId }).eq('id', draggedId);
+      // 🔥 FIX: Cast to any
+      if (userRef.current && supabase) await (supabase as any).from('workspace_documents').update({ folder_id: targetFolderId }).eq('id', draggedId);
     } else if (type === 'folder') {
       if (draggedId === targetFolderId) return; 
       
@@ -561,7 +573,8 @@ export function useWorkspaceSystem() {
       setHistoryStack(prev => [...prev, { type: 'MOVE_FOLDER', id: draggedId, from: targetFolder.parentId, to: targetFolderId }]);
       setFolders(prev => prev.map(f => f.id === draggedId ? { ...f, parentId: targetFolderId } : f));
       
-      if (userRef.current && supabase) await supabase.from('workspace_folders').update({ parent_id: targetFolderId }).eq('id', draggedId);
+      // 🔥 FIX: Cast to any
+      if (userRef.current && supabase) await (supabase as any).from('workspace_folders').update({ parent_id: targetFolderId }).eq('id', draggedId);
     }
   }, [supabase]);
 
@@ -640,7 +653,8 @@ export function useWorkspaceSystem() {
   const deleteMedia = async (id: string) => {
     if (!confirm("Delete permanently?")) return;
     setMedia(prev => prev.filter(m => m.id !== id));
-    if (supabase) await supabase.from('workspace_media').delete().eq('id', id);
+    // 🔥 FIX: Cast to any
+    if (supabase) await (supabase as any).from('workspace_media').delete().eq('id', id);
     pingActivity();
   };
 
@@ -710,12 +724,14 @@ export function useWorkspaceSystem() {
     const initWorkspace = async () => {
       if (!currentUser?.id || !supabase) return;
 
-      const { data: wsData } = await supabase.from('workspaces').select('*').eq('user_id', currentUser.id);
+      // 🔥 FIX: Cast to any
+      const { data: wsData } = await (supabase as any).from('workspaces').select('*').eq('user_id', currentUser.id);
       
       let loadedWorkspaces: any[] = wsData?.map(mapWorkspace) || [];
       
       if (loadedWorkspaces.length === 0) {
-        const { data } = await supabase
+        // 🔥 FIX: Cast to any
+        const { data } = await (supabase as any)
           .from('workspaces')
           .insert({ name: "Personal Workspace", user_id: currentUser.id, color: "bg-blue-500" })
           .select()
@@ -729,10 +745,11 @@ export function useWorkspaceSystem() {
       const initialWsId = loadedWorkspaces.find((w: any) => w.id === savedWsId)?.id || loadedWorkspaces[0].id;
       setActiveWorkspaceId(initialWsId);
 
+      // 🔥 FIX: Cast all promises to any
       const [docsRes, foldersRes, mediaRes] = await Promise.all([
-        supabase.from('workspace_documents').select('*').eq('user_id', currentUser.id).order('updated_at', { ascending: false }),
-        supabase.from('workspace_folders').select('*').eq('user_id', currentUser.id),
-        supabase.from('workspace_media').select('*').eq('user_id', currentUser.id)
+        (supabase as any).from('workspace_documents').select('*').eq('user_id', currentUser.id).order('updated_at', { ascending: false }),
+        (supabase as any).from('workspace_folders').select('*').eq('user_id', currentUser.id),
+        (supabase as any).from('workspace_media').select('*').eq('user_id', currentUser.id)
       ]);
 
       if (foldersRes.data) setFolders(foldersRes.data.map(mapFolder)); 
@@ -792,10 +809,11 @@ export function useWorkspaceSystem() {
     const interval = setInterval(async () => {
       if (!navigator.onLine || !userRef.current || !supabase) return;
       const user = userRef.current;
+      // 🔥 FIX: Cast all promises to any
       const [docs, foldersRes, mediaRes] = await Promise.all([
-        supabase.from("workspace_documents").select("*").eq("user_id", user.id),
-        supabase.from("workspace_folders").select("*").eq("user_id", user.id),
-        supabase.from("workspace_media").select("*").eq("user_id", user.id),
+        (supabase as any).from("workspace_documents").select("*").eq("user_id", user.id),
+        (supabase as any).from("workspace_folders").select("*").eq("user_id", user.id),
+        (supabase as any).from("workspace_media").select("*").eq("user_id", user.id),
       ]);
       
       if (docs.data) {

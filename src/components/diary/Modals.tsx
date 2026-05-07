@@ -17,18 +17,30 @@ export function WipPopup({
 
   useEffect(() => {
     const checkSeen = async () => {
+      // 1. Fast local cache check to prevent UI flashing
+      if (typeof window !== "undefined" && localStorage.getItem("diary_guide_seen") === "true") {
+        setShowWipPopup(false);
+        return;
+      }
+
+      // 🔥 FIX: Guard clause to ensure supabase is not null
+      if (!supabase) return;
+
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
 
       if (!user) return;
 
-      const { data } = await supabase
-        .from("profiles")
+      // 🔥 FIX: Cast to any to prevent strict 'never' typing errors
+      const { data } = await (supabase.from("profiles") as any)
         .select("diary_guide_seen")
         .eq("id", user.id)
         .single();
 
       if (data?.diary_guide_seen) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("diary_guide_seen", "true");
+        }
         setShowWipPopup(false);
       }
     };
@@ -37,17 +49,25 @@ export function WipPopup({
   }, [showWipPopup, setShowWipPopup, supabase]);
 
   const handleClose = async () => {
+    // Immediately hide and cache locally so it never opens again on this device
+    if (typeof window !== "undefined") {
+      localStorage.setItem("diary_guide_seen", "true");
+    }
+    
+    setShowWipPopup(false);
+
+    // 🔥 FIX: Guard clause for database update
+    if (!supabase) return;
+
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
 
     if (user) {
-      await supabase
-        .from("profiles")
+      // 🔥 FIX: Cast to any to prevent strict 'never' typing errors
+      await (supabase.from("profiles") as any)
         .update({ diary_guide_seen: true })
         .eq("id", user.id);
     }
-
-    setShowWipPopup(false);
   };
 
   if (!showWipPopup) return null;
