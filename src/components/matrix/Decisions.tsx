@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Target, Zap, ArrowUpRight, ArrowDownRight, Minus, HelpCircle } from 'lucide-react';
-import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
-
+import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Consuming theme state
 interface DecisionsProps {
   todayDataLength: number;
   weekAvg: number;

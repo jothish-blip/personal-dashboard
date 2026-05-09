@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { Trash2, AlertCircle } from 'lucide-react';
-import { Log } from '../../types'; // Adjust path if needed
-import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
+import { Log } from '../../types/index';
+import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Consuming theme state
 
 interface LogTableProps {
   filteredLogs: Log[];

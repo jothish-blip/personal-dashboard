@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { FilteredData } from './utils'; // Adjust path if needed
 import EmptyState from './EmptyState'; // Adjust path if needed
-import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
+import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Consuming theme state
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
   ArcElement, PointElement, LineElement, Filler

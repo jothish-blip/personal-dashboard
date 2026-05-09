@@ -1,35 +1,57 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+
 import { usePathname, useRouter } from "next/navigation";
-import { useNexCore } from "../hooks/useNexCore";
+
+// Tasks Engine
+import { useNexCore } from "@/modules/tasks/engine/useNexCore";
+
+// Supabase
 import { getSupabaseClient } from "@/lib/supabase";
 
-import Navbar from "../components/Navbar";
-import StatsGrid from "../components/StatsGrid";
-import Tabs from "../components/Tabs";
-import MatrixView from "../components/MatrixView";
-import AnalyticsView from "../components/AnalyticsView";
-import AuditView from "../components/AuditView";
-import FeedbackPopup from "../components/FeedbackPopup";
+// Global Components
+import Navbar from "@/navigation/Navbar";
+import FeedbackPopup from "@/settings/components/FeedbackPopup/FeedbackPopup";
 
-// 🔥 FIX 1: Import the Focus context
-import { useFocusSystem } from "../components/focus/useFocusSystem";
+// Tasks Module Components
+import Tabs from "@/modules/tasks/Tabs";
+
+import StatsGrid from "@/modules/tasks/stats/StatsGrid";
+
+import MatrixView from "@/modules/tasks/matrix/MatrixView";
+
+import AnalyticsView from "@/modules/tasks/analytics/AnalyticsView";
+
+import AuditView from "@/modules/tasks/audit/AuditView";
+
+// Focus Engine
+import { useFocusSystem } from "@/modules/focus/engine/useFocusSystem";
 
 export const dynamic = "force-dynamic";
 
 export default function Home() {
+
   const router = useRouter();
+
   const pathname = usePathname();
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState("matrix");
-  const [isStateLoaded, setIsStateLoaded] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] =
+    useState<boolean | null>(null);
 
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] =
+    useState("matrix");
 
-  const isMini = pathname === "/mini-nisc";
+  const [isStateLoaded, setIsStateLoaded] =
+    useState(false);
+
+  const [showFeedback, setShowFeedback] =
+    useState(false);
+
+  const [userId, setUserId] =
+    useState<string | null>(null);
+
+  const isMini = pathname === "/Workspace";
 
   const {
     state,
@@ -39,47 +61,63 @@ export default function Home() {
     deleteTask,
     toggleTask,
     lockToday,
-    exportData
+    exportData,
   } = useNexCore();
 
-  // 🔥 FIX 2: Pull auth state directly from the global provider
-  const { currentUser, isLoaded: isFocusLoaded } = useFocusSystem();
+  // Focus Context
+  const {
+    currentUser,
+    isLoaded: isFocusLoaded,
+  } = useFocusSystem();
 
-  // 🔐 AUTH + FEEDBACK
+  // AUTH + FEEDBACK
   useEffect(() => {
-    // 🔥 Wait until the FocusProvider has finished initializing auth
+
     if (!isFocusLoaded) return;
 
     if (!currentUser) {
+
       setIsAuthenticated(false);
+
       router.replace("/login");
+
       return;
     }
 
     setIsAuthenticated(true);
+
     setUserId(currentUser.id);
 
     const runFeedbackCheck = async () => {
+
       const supabase = getSupabaseClient();
-      
-      // 🔥 FIX: Guard clause to ensure supabase is not null
+
       if (!supabase) {
-        console.warn("Supabase client failed to initialize.");
+        console.warn(
+          "Supabase client failed to initialize."
+        );
+
         return;
       }
 
-      const today = new Date().toISOString().split("T")[0];
+      const today =
+        new Date()
+          .toISOString()
+          .split("T")[0];
 
-      // ✅ FIX: Cast 'supabase' to any so it allows tables not in your TS types
       let { data } = await (supabase as any)
         .from("user_feedback_status")
         .select("*")
         .eq("user_id", currentUser.id)
         .maybeSingle();
 
-      // ✅ CREATE IF NOT EXISTS (SAFE INSERT)
+      // Create row if missing
       if (!data) {
-        const { data: newRow, error: insertError } = await (supabase as any)
+
+        const {
+          data: newRow,
+          error: insertError,
+        } = await (supabase as any)
           .from("user_feedback_status")
           .insert([
             {
@@ -92,7 +130,12 @@ export default function Home() {
           .single();
 
         if (insertError) {
-          console.error("Insert FULL error:", JSON.stringify(insertError));
+
+          console.error(
+            "Insert FULL error:",
+            JSON.stringify(insertError)
+          );
+
           return;
         }
 
@@ -101,8 +144,9 @@ export default function Home() {
 
       if (!data) return;
 
-      // ✅ RESET DAILY COUNT
+      // Reset daily count
       if (data.last_prompt_date !== today) {
+
         const { error } = await (supabase as any)
           .from("user_feedback_status")
           .update({
@@ -112,24 +156,39 @@ export default function Home() {
           .eq("user_id", currentUser.id);
 
         if (error) {
-          console.error("Reset error:", JSON.stringify(error));
+
+          console.error(
+            "Reset error:",
+            JSON.stringify(error)
+          );
+
           return;
         }
 
         data.daily_prompt_count = 0;
       }
 
-      // ✅ SHOW POPUP
-      if (!data.feedback_given && data.daily_prompt_count < 3) {
+      // Show popup
+      if (
+        !data.feedback_given &&
+        data.daily_prompt_count < 3
+      ) {
+
         const { error } = await (supabase as any)
           .from("user_feedback_status")
           .update({
-            daily_prompt_count: data.daily_prompt_count + 1,
+            daily_prompt_count:
+              data.daily_prompt_count + 1,
           })
           .eq("user_id", currentUser.id);
 
         if (error) {
-          console.error("Update error:", JSON.stringify(error));
+
+          console.error(
+            "Update error:",
+            JSON.stringify(error)
+          );
+
           return;
         }
 
@@ -140,21 +199,36 @@ export default function Home() {
     };
 
     runFeedbackCheck();
+
   }, [currentUser, isFocusLoaded, router]);
 
   // Load tab
   useEffect(() => {
-    const savedTab = sessionStorage.getItem("nexengine_active_tab");
-    if (savedTab) setActiveTab(savedTab);
+
+    const savedTab =
+      sessionStorage.getItem(
+        "nexengine_active_tab"
+      );
+
+    if (savedTab) {
+      setActiveTab(savedTab);
+    }
+
     setIsStateLoaded(true);
+
   }, []);
 
   const handleTabChange = (tab: string) => {
+
     setActiveTab(tab);
-    sessionStorage.setItem("nexengine_active_tab", tab);
+
+    sessionStorage.setItem(
+      "nexengine_active_tab",
+      tab
+    );
   };
 
-  // 🔥 Also wait for isFocusLoaded here so the screen doesn't flash before auth loads
+  // Loading Screen
   if (
     isAuthenticated === null ||
     isAuthenticated === false ||
@@ -172,6 +246,7 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
 
+      {/* Navbar */}
       <Navbar
         meta={state.meta}
         setMonthYear={setMonthYear}
@@ -181,10 +256,22 @@ export default function Home() {
 
       {!isMini ? (
         <>
-          <StatsGrid tasks={state.tasks} meta={state.meta} />
-          <Tabs activeTab={activeTab} setActiveTab={handleTabChange} />
 
+          {/* Stats */}
+          <StatsGrid
+            tasks={state.tasks}
+            meta={state.meta}
+          />
+
+          {/* Tabs */}
+          <Tabs
+            activeTab={activeTab}
+            setActiveTab={handleTabChange}
+          />
+
+          {/* Main Views */}
           <main className="flex-1">
+
             {activeTab === "matrix" && (
               <MatrixView
                 tasks={state.tasks}
@@ -198,7 +285,10 @@ export default function Home() {
             )}
 
             {activeTab === "analytics" && (
-              <AnalyticsView tasks={state.tasks} meta={state.meta} />
+              <AnalyticsView
+                tasks={state.tasks}
+                meta={state.meta}
+              />
             )}
 
             {activeTab === "audit" && (
@@ -209,19 +299,24 @@ export default function Home() {
                 deleteLog={() => {}}
               />
             )}
+
           </main>
         </>
       ) : (
+
         <div className="flex-1 flex items-center justify-center">
           Mini Nisc
         </div>
+
       )}
 
-      {/* 🔥 POPUP */}
+      {/* Feedback Popup */}
       {showFeedback && userId && (
         <FeedbackPopup
           userId={userId}
-          onClose={() => setShowFeedback(false)}
+          onClose={() =>
+            setShowFeedback(false)
+          }
         />
       )}
     </div>

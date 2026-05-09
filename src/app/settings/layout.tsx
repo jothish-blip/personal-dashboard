@@ -3,7 +3,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
-import { useTheme } from "@/components/ThemeProvider";
+import { useTheme } from "@/theme/ThemeProvider";
+
 
 import {
   ArrowLeft,

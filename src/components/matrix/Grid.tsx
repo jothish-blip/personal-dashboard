@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Flame, Zap, Star, ChevronDown, ChevronRight, Check, Trash2, ArrowRightLeft } from 'lucide-react';
-import { Task } from '../../types';
+import { Task } from '../../types/index';
 import { parseLocalDate, calculateCurrentStreak, getLocalDate } from './utils';
 // 🔥 IMPORT ThemeProvider (Update path if needed, matching TaskSelector)
-import { useTheme } from "@/components/ThemeProvider"; 
+import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Consuming theme state
 
 interface GridProps {
   tasks: Task[];

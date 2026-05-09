@@ -13,11 +13,12 @@ import {
   Settings,
   LogOut
 } from "lucide-react";
-import ThemeToggle from "@/components/ThemeToggle";
-import { useTheme } from "@/components/ThemeProvider";
+import { ThemeProvider } from "@/theme/ThemeProvider";
+import ThemeToggle from "@/theme/ThemeToggle";
 
 import NotificationCenter from "@/notifications/NotificationCenter";
-import { NexNotification } from "@/notifications/types";
+
+import { NexNotification } from "@/notifications/types/types";
 import ProfileStreakSwitcher from "./ProfileStreakSwitcher"; // 🔥 Import the new Switcher
 
 interface DesktopNavProps {
@@ -43,9 +44,9 @@ interface DesktopNavProps {
 const NAV_ITEMS = [
   { label: "Tasks", icon: LayoutGrid, path: "/", key: "isTasks" },
   { label: "Focus", icon: Brain, path: "/focus", key: "isFocus" },
-  { label: "Planner", icon: CalendarDays, path: "/calender-event", key: "isCalendar" },
+  { label: "Planner", icon: CalendarDays, path: "/Planner", key: "isCalendar" },
   { label: "Diary", icon: BookOpen, path: "/diary", key: "isDiary" },
-  { label: "Workspace", icon: ListTodo, path: "/mini-nisc", key: "isMini" },
+  { label: "Workspace", icon: ListTodo, path: "/Workspace", key: "isMini" },
 ];
 
 export default function DesktopNav({
@@ -225,4 +226,22 @@ export default function DesktopNav({
       </div>
     </div>
   );
+}
+
+function useTheme(): { isDarkMode: boolean; } {
+  const [isDarkMode, setIsDarkMode] = React.useState(false);
+
+  React.useEffect(() => {
+    const darkModeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    setIsDarkMode(darkModeQuery.matches);
+
+    const handleChange = (e: MediaQueryListEvent) => {
+      setIsDarkMode(e.matches);
+    };
+
+    darkModeQuery.addEventListener("change", handleChange);
+    return () => darkModeQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  return { isDarkMode };
 }

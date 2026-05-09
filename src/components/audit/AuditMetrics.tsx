@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Zap, Activity, Clock, BarChart3, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
+import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Consuming theme state
 
 interface AuditMetricsProps {
   focusScore: number;

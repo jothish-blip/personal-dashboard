@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { SearchX, ArrowLeft, Home, Grid, BookOpen, Calendar } from "lucide-react";
-import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
+import ThemeToggle from "@/theme/ThemeToggle";
 
 export default function NotFoundPage() {
   const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
@@ -93,7 +94,7 @@ export default function NotFoundPage() {
             </Link>
 
             <Link 
-              href="/calender-event" 
+              href="/Planner" 
               className={`p-3 rounded-xl text-xs font-semibold flex flex-col items-center gap-1 transition-colors border ${
                 isDarkMode 
                   ? "bg-[#111111] border-gray-800 hover:bg-[#1a1a1a] text-gray-300" 
@@ -108,4 +109,47 @@ export default function NotFoundPage() {
       </div>
     </div>
   );
+}
+
+function useTheme(): { isDarkMode: boolean } {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const getStoredTheme = () => {
+      if (typeof window === "undefined") return null;
+      return window.localStorage.getItem("theme");
+    };
+
+    const updateTheme = () => {
+      const storedTheme = getStoredTheme();
+      if (storedTheme === "dark") {
+        setIsDarkMode(true);
+      } else if (storedTheme === "light") {
+        setIsDarkMode(false);
+      } else {
+        setIsDarkMode(window.matchMedia("(prefers-color-scheme: dark)").matches);
+      }
+    };
+
+    updateTheme();
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = (event: MediaQueryListEvent) => setIsDarkMode(event.matches);
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", handleChange);
+    } else {
+      mediaQuery.addListener(handleChange);
+    }
+
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener("change", handleChange);
+      } else {
+        mediaQuery.removeListener(handleChange);
+      }
+    };
+  }, []);
+
+  return { isDarkMode };
 }

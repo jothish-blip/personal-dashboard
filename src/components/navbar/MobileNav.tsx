@@ -11,11 +11,13 @@ import {
   Settings,
   LogOut
 } from "lucide-react";
-import ThemeToggle from "@/components/ThemeToggle";
-import { useTheme } from "@/components/ThemeProvider"; 
+import { ThemeProvider } from "@/theme/ThemeProvider";
+import ThemeToggle from "@/theme/ThemeToggle";
+
 
 import NotificationCenter from "@/notifications/NotificationCenter";
-import { NexNotification } from "@/notifications/types";
+
+import { NexNotification } from "@/notifications/types/types";
 import ProfileStreakSwitcher from "./ProfileStreakSwitcher"; // 🔥 Import the new Switcher
 
 interface MobileNavProps {
@@ -41,9 +43,9 @@ interface MobileNavProps {
 const NAV_ITEMS = [
   { label: "Tasks", icon: LayoutGrid, path: "/", key: "isTasks" },
   { label: "Focus", icon: Brain, path: "/focus", key: "isFocus" },
-  { label: "Planner", icon: CalendarDays, path: "/calender-event", key: "isCalendar" },
+  { label: "Planner", icon: CalendarDays, path: "/Planner", key: "isCalendar" },
   { label: "Diary", icon: BookOpen, path: "/diary", key: "isDiary" },
-  { label: "Workspace", icon: ListTodo, path: "/mini-nisc", key: "isMini" },
+  { label: "Workspace", icon: ListTodo, path: "/Workspace", key: "isMini" },
 ];
 
 export default function MobileNav(props: MobileNavProps) {
@@ -193,4 +195,22 @@ export default function MobileNav(props: MobileNavProps) {
 
     </div>
   );
+}
+
+function useTheme(): { isDarkMode: boolean; } {
+  const [isDarkMode, setIsDarkMode] = React.useState(false);
+
+  React.useEffect(() => {
+    const darkModeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    setIsDarkMode(darkModeMediaQuery.matches);
+
+    const handleChange = (e: MediaQueryListEvent) => {
+      setIsDarkMode(e.matches);
+    };
+
+    darkModeMediaQuery.addEventListener("change", handleChange);
+    return () => darkModeMediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  return { isDarkMode };
 }

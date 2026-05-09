@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AlertTriangle, BrainCircuit } from 'lucide-react';
-import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
+import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Consuming theme state
 
 interface SystemStatusProps {
   focusScore: number;

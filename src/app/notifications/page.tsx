@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useNotificationSystem } from "@/notifications/useNotificationSystem";
-import { useNexCore } from "@/hooks/useNexCore"; 
+import { useNotificationSystem } from "@/notifications/engine/useNotificationSystem";
+import { useNexCore } from "@/modules/tasks/engine/useNexCore";
 import { 
   Bell, CheckCircle2, AlertTriangle, Brain, 
   Calendar, Book, FileText, ArrowLeft, Trash2, LayoutGrid, Search

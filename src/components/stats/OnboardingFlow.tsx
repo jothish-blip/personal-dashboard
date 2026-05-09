@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { BrainCircuit, ChevronLeft } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase";
-import { useTheme } from "@/components/ThemeProvider";
+import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Consuming theme state
 
 interface OnboardingProps {
   onComplete: () => void;

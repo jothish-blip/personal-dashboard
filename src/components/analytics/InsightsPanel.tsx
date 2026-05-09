@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Minus, Activity } from 'lucide-react';
 import { FilteredData } from './utils';
-import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
+import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Consuming theme state
 
 interface InsightsProps {
   stats: FilteredData['stats'];

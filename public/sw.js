@@ -27,9 +27,9 @@ self.addEventListener("message", (event) => {
     // Dynamic Action Labels
     let openLabel = "🚀 Open App";
     if (targetUrl.includes("/focus")) openLabel = "🔥 Resume Focus";
-    else if (targetUrl.includes("/calender-event")) openLabel = "📅 Open Planner";
+    else if (targetUrl.includes("/Planner")) openLabel = "📅 Open Planner";
     else if (targetUrl.includes("/diary")) openLabel = "📓 Open Diary";
-    else if (targetUrl.includes("/mini-nisc")) openLabel = "🧠 Open Workspace";
+    else if (targetUrl.includes("/Workspace")) openLabel = "🧠 Open Workspace";
     else if (targetUrl === "/") openLabel = "📊 Open Dashboard";
 
     const isCritical = title.includes("Alert") || title.includes("Missed") || title.includes("Pressure");

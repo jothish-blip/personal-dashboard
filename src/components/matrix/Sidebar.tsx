@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Activity, Flame, BarChart2, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, Minus, HelpCircle, ChevronDown } from 'lucide-react';
 import { parseLocalDate } from './utils';
-import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
+import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Consuming theme state
 
 interface SidebarProps {
   overallDiff: number;
