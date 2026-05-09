@@ -10,7 +10,7 @@ import {
   Distraction,
 } from "../types/types";
 import { useNotificationSystem } from '@/notifications/engine/useNotificationSystem'; 
-import { getSupabaseClient } from "@/lib/supabase"; 
+import { supabase } from "@/lib/supabase"; 
 
 export type ExtendedActiveSession = ActiveSession & {
   extraStartTime?: number;
@@ -96,7 +96,6 @@ const mapDBSessionToFocusSession = (row: DBFocusSession): FocusSession => {
 };
 
 export function FocusProvider({ children }: { children: ReactNode }) {
-  const supabase = getSupabaseClient();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
   const { addNotification } = useNotificationSystem(currentUser?.id);
@@ -243,7 +242,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     setIsLoaded(false);
 
     try {
-      if (!currentUser?.id || !supabase) {
+      if (!currentUser?.id) {
         setIsLoaded(true);
         return false;
       }
@@ -304,7 +303,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       isFetchingRef.current = false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, currentUser, triggerSessionComplete]);
+  }, [currentUser, triggerSessionComplete]);
 
   useEffect(() => {
     fetchSessionsRef.current = fetchSessionsFromDB;
@@ -316,7 +315,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         console.error("❌ No user → abort save");
         return;
       }
-      if (!supabase) return;
 
       const payload = {
         id: session.id,
@@ -349,8 +347,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (!supabase) return;
-
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, session: Session | null) => {
         const user = session?.user ?? null;
@@ -360,7 +356,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     );
 
     return () => listener.subscription.unsubscribe();
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     if (!authInitialized) return;
@@ -412,8 +408,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     if (!isActive || !currentSession || !currentUser?.id || typeof window === "undefined") return;
 
     const interval = setInterval(async () => {
-      if (!supabase) return;
-
       try {
         // 🔥 FIX: Cast supabase to any FIRST
         await (supabase as any).from("focus_active_sessions")
@@ -430,7 +424,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   }, [isActive, currentSession, currentUser]);
 
   useEffect(() => {
-    if (!supabase || !currentUser?.id) return;
+    if (!currentUser?.id) return;
 
     const channelName = `focus-sync-${currentUser.id}`;
 
@@ -520,7 +514,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     return () => { 
       supabase.removeChannel(channel); 
     };
-  }, [supabase, currentUser?.id, triggerSessionComplete]); 
+  }, [currentUser?.id, triggerSessionComplete]); 
 
   useEffect(() => {
     const handleStorageSync = (e: StorageEvent) => {
@@ -665,7 +659,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
     await syncSessionToDB(completedSession, true);
 
-    if (currentUser && supabase) {
+    if (currentUser) {
       // 🔥 FIX: Cast supabase to any FIRST
       await (supabase as any).from("focus_active_sessions").delete().eq("user_id", currentUser.id);
     }
@@ -750,7 +744,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
            currentSessionRef.current = s;
            localStorage.setItem("focus_active_session", JSON.stringify(s));
            
-           if (currentUser?.id && supabase) {
+           if (currentUser?.id) {
              // 🔥 FIX: Cast supabase to any FIRST
              (supabase as any).from("focus_active_sessions").update({ session: s }).eq("user_id", currentUser.id).then();
            }
@@ -847,7 +841,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("focus_active_session", JSON.stringify(updatedSession));
 
         (async () => {
-          if (currentUser?.id && supabase) {
+          if (currentUser?.id) {
             try {
               // 🔥 FIX: Cast supabase to any FIRST
               await (supabase as any).from("focus_active_sessions").update({
@@ -862,7 +856,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [currentUser?.id, supabase, getRemainingTime, getElapsedTime, triggerSessionComplete, getPausedTime, getExtraTime]); 
+  }, [currentUser?.id, getRemainingTime, getElapsedTime, triggerSessionComplete, getPausedTime, getExtraTime]); 
 
   useEffect(() => {
     const handleFsChange = () => { if (!document.fullscreenElement) setIsFocusMode(false); };
@@ -886,7 +880,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   };
 
   const startSession = async () => {
-    if (!currentUser?.id || !supabase) {
+    if (!currentUser?.id) {
       addNotification('system', 'Auth Error', 'User not authenticated.', 'high');
       return;
     }
@@ -1030,7 +1024,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
           setIsPaused(true);
           localStorage.setItem("focus_active_session", JSON.stringify(updatedSession));
           
-          if (currentUser?.id && supabase) {
+          if (currentUser?.id) {
             (async () => {
               try {
                 // 🔥 FIX: Cast supabase to any FIRST
@@ -1072,7 +1066,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         
             localStorage.setItem("focus_active_session", JSON.stringify(updated));
             
-            if (currentUser?.id && supabase) {
+            if (currentUser?.id) {
               (async () => {
                 try {
                   // 🔥 FIX: Cast supabase to any FIRST
@@ -1112,7 +1106,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
             
             localStorage.setItem("focus_active_session", JSON.stringify(updated));
             
-            if (currentUser?.id && supabase) {
+            if (currentUser?.id) {
               (async () => {
                 try {
                   // 🔥 FIX: Cast supabase to any FIRST

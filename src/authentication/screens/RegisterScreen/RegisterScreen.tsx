@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
-import { getSupabaseClient } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { FaGithub, FaDiscord } from "react-icons/fa";
 import { Loader2, ShieldCheck, Sun, Moon } from "lucide-react";
 
@@ -21,7 +21,6 @@ const GoogleIcon = () => (
 
 function RegisterContent() {
   const router = useRouter();
-  const supabase = getSupabaseClient();
   
   // Consuming your local app theme state to perfectly sync light/dark mode
   const { isDarkMode, toggleTheme } = useTheme(); 
@@ -29,20 +28,10 @@ function RegisterContent() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [mounted, setMounted] = useState(false);
-
-  // Prevent hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Session State Awareness
   useEffect(() => {
     const checkUser = async () => {
-      if (!supabase) {
-        setCheckingSession(false);
-        return;
-      }
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         router.replace("/");
@@ -51,10 +40,10 @@ function RegisterContent() {
       }
     };
     checkUser();
-  }, [router, supabase]);
+  }, [router]);
 
   const handleSocialLogin = async (provider: string) => {
-    if (loadingProvider || !supabase) return; 
+    if (loadingProvider) return; 
     
     setLoadingProvider(provider);
     setError("");
@@ -78,9 +67,7 @@ function RegisterContent() {
     }
   };
 
-  if (!supabase) return null;
-
-  if (checkingSession || !mounted) {
+  if (checkingSession) {
     return (
       <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${isDarkMode ? "bg-[#050505]" : "bg-[#FAFAFA]"}`}>
         <Loader2 className={`w-8 h-8 animate-spin ${isDarkMode ? "text-white" : "text-gray-900"}`} />
@@ -271,7 +258,7 @@ function RegisterContent() {
         <p className={`mt-8 text-sm font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
           Already have a system?{" "}
           <button
-            onClick={() => router.push("/login")}
+            onClick={() => router.replace("/login")}
             className={`font-bold transition-colors underline underline-offset-4 ${
               isDarkMode 
                 ? "text-white decoration-gray-700 hover:text-orange-400 hover:decoration-orange-400" 
