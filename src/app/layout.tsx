@@ -2,16 +2,15 @@ import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 
-import TopProgressBar from "@/components/TopProgressBar";
+import TopProgressBar from "@/refresh/TopProgressBar";
 import OfflineView from "@/app/not-found/OfflineView";
-import PWARegistration from "@/components/PWARegistration";
-import ClientWrapper from "@/components/ClientWrapper";
-import ScrollRestoration from "@/app/refresh/ScrollRestoration";
-import { FocusProvider } from "@/components/focus/useFocusSystem";
+import PWARegistration from "@/pwa/PWARegistration";
+import ClientWrapper from "@/pwa/ClientWrapper";
+import ScrollRestoration from "@/refresh/ScrollRestoration";
+import { FocusProvider } from "@/modules/focus/engine/useFocusSystem";
 
 // ✅ Sidebar import
-import Sidebar from "@/components/sidebar/Sidebar";
-
+import Sidebar from "@/navigation/components/Sidebar/Sidebar";
 import "./globals.css";
 
 export const viewport: Viewport = {

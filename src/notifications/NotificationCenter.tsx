@@ -6,8 +6,9 @@ import {
   Bell, Trash2, X, Info, Calendar, Brain, 
   Book, ListTodo, Search, LayoutGrid, FileText
 } from 'lucide-react';
-import { NexNotification, NexModule } from './types';
-import { useTheme } from "@/components/ThemeProvider"; // 🔥 Added Theme Provider
+import { NexNotification, NexModule } from "@/notifications/types/types";
+
+import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Consuming theme state
 
 interface NotificationCenterProps {
   notifications: NexNotification[];
