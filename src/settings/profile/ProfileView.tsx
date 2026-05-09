@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
-import { Profile } from "@/types";
-
+import { Profile } from "@/modules/tasks/types";
 import {
   User,
   Loader2,

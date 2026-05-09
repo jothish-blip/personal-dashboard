@@ -108,8 +108,6 @@ export default function FloatingHub() {
   // 🔥 Fetch live streak from NexCore
   const { currentStreak } = useNexCore(); 
 
-  if (pathname === "/login" || pathname === "/register") return null;
-
   // 🔹 State
   const supabase = getSupabaseClient();
   const { currentUser } = useFocusSystem();
@@ -271,6 +269,7 @@ export default function FloatingHub() {
     window.addEventListener("mouseup", stopDragging);
     window.addEventListener("touchmove", handleTouchMove, { passive: false });
     window.addEventListener("touchend", stopDragging);
+    
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", stopDragging);
@@ -279,6 +278,16 @@ export default function FloatingHub() {
     };
   }, []);
 
+  // ✅ AFTER ALL HOOKS - Safe route hiding logic
+  const hiddenRoutes = [
+    "/login",
+    "/register",
+    "/auth/callback",
+  ];
+
+  const shouldHideHub = hiddenRoutes.includes(pathname);
+
+  if (shouldHideHub) return null;
   if (!mounted) return null;
 
   const go = (path: string) => {

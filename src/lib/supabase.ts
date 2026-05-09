@@ -1,27 +1,24 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { Database } from "@/types/supabase";
 
-let supabaseInstance: SupabaseClient<Database> | null = null;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
+// 1. Initialize the client immediately to prevent the loading flicker
+export const supabase = createClient<Database>(
+  supabaseUrl,
+  supabaseAnonKey,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: "nextask-auth-token",
+    },
+  }
+);
+
+// 2. Export your original function so you DON'T have to rewrite the rest of your app!
 export const getSupabaseClient = () => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    console.error("Missing Supabase environment variables");
-    return null;
-  }
-
-  if (!supabaseInstance) {
-    supabaseInstance = createClient<Database>(url, key, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: typeof window !== "undefined",
-        storageKey: "nextask-auth-token",
-      },
-    });
-  }
-
-  return supabaseInstance;
+  return supabase;
 };
