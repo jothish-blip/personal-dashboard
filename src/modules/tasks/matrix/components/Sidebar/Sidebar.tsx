@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Activity, Flame, BarChart2, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, Minus, HelpCircle, ChevronDown } from 'lucide-react';
+import { Activity, Flame, BarChart2, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, Minus, ChevronDown } from 'lucide-react';
 import { parseLocalDate } from "../../utils";
 import { useTheme } from "@/theme/ThemeProvider";
 
@@ -20,16 +20,23 @@ interface SidebarProps {
   actualToday: string;
 }
 
+const getConsistencyLabel = (score: number) => {
+  if (score >= 85) return "EXCELLENT";
+  if (score >= 70) return "STRONG";
+  if (score >= 50) return "MODERATE";
+  if (score >= 30) return "WEAK";
+  return "UNSTABLE";
+};
+
 export default function Sidebar({
   overallDiff, consistencyScore, validDays, chartMaxCount, bestGlobalStreak,
   globalWeekStats, compareCurrentWeek, comparePrevWeek, weekOffset, setWeekOffset,
   totalCurrent, actualToday
 }: SidebarProps) {
   
-  const { isDarkMode } = useTheme(); // 🔥 Consuming theme state
+  const { isDarkMode } = useTheme();
   const todayDateObj = useMemo(() => parseLocalDate(actualToday), [actualToday]);
 
-  const [activeHelp, setActiveHelp] = useState<string | null>(null);
   const [openSection, setOpenSection] = useState<string>('hud');
 
   // PERFORMANCE OPTIMIZATION: Best Day calculation
@@ -37,6 +44,9 @@ export default function Sidebar({
     if (!validDays || validDays.length === 0) return null;
     return validDays.reduce((max, d) => d.count > max.count ? d : max, validDays[0]);
   }, [validDays]);
+
+  // Ensure it's rounded for UI consistency
+  const roundedConsistency = Math.round(consistencyScore);
 
   return (
     <div className="w-full xl:w-[340px] flex-shrink-0 flex flex-col gap-4 md:gap-7">
@@ -54,20 +64,12 @@ export default function Sidebar({
           onClick={() => setOpenSection(openSection === 'hud' ? '' : 'hud')}
         >
           <div className="flex flex-col gap-1.5 flex-1 pr-4">
-            <div className="flex items-center gap-2">
-              <span className={`text-[10px] font-semibold uppercase tracking-widest flex items-center gap-1.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-                <Activity size={12} /> Performance HUD
-              </span>
-              <button 
-                onClick={(e) => { e.stopPropagation(); setActiveHelp('hud'); }} 
-                className={`transition-colors p-1 rounded-md ${isDarkMode ? "text-gray-600 hover:text-gray-400 hover:bg-gray-800" : "text-gray-300 hover:text-gray-500 hover:bg-gray-50"}`}
-              >
-                <HelpCircle size={12} />
-              </button>
-            </div>
+            <span className={`text-[10px] font-semibold uppercase tracking-widest flex items-center gap-1.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+              <Activity size={12} /> Performance HUD
+            </span>
             
             <span className={`text-sm font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}>
-              {overallDiff > 0 ? "You're doing better than last week 🔥" : overallDiff < 0 ? "Performance dropped — take action" : "Same as last week"}
+              {overallDiff > 0 ? "Output volume expanding." : overallDiff < 0 ? "Output volume degrading." : "Output volume stable."}
             </span>
 
             {/* ONE-LINE INSIGHT */}
@@ -75,10 +77,10 @@ export default function Sidebar({
               isDarkMode ? "bg-gray-900/50 border-gray-800 text-gray-300" : "bg-gray-100/60 border-gray-200 text-gray-700"
             }`}>
               {overallDiff > 0 
-                ? "You're improving — keep momentum 🔥"
+                ? "Positive variance vs last week."
                 : overallDiff < 0 
-                  ? "You're slipping — act today ⚠️"
-                  : "Stable performance — push further"}
+                  ? "Negative variance detected."
+                  : "No variance. Push for growth."}
             </div>
           </div>
           
@@ -86,14 +88,18 @@ export default function Sidebar({
             <div className="flex flex-col items-center">
               <div 
                 className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm"
-                style={{ background: `conic-gradient(${isDarkMode ? '#10b981' : '#22c55e'} ${consistencyScore}%, ${isDarkMode ? '#1f2937' : '#f3f4f6'} 0%)` }}
+                style={{ background: `conic-gradient(${isDarkMode ? '#10b981' : '#22c55e'} ${roundedConsistency}%, ${isDarkMode ? '#1f2937' : '#f3f4f6'} 0%)` }}
               >
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDarkMode ? "bg-[#111111]" : "bg-white"}`}>
-                  <span className={`text-sm font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}>{consistencyScore}%</span>
+                  <span className={`text-sm font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}>{roundedConsistency}%</span>
                 </div>
               </div>
               <span className={`text-[8px] font-bold mt-1.5 uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Consistency</span>
-              <span className={`text-[9px] font-medium text-center mt-0.5 leading-tight w-16 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Based on completed days</span>
+              <span className={`text-[9px] font-bold uppercase tracking-widest text-center mt-0.5 leading-tight w-16 ${
+                roundedConsistency >= 70 ? "text-green-500" : roundedConsistency >= 50 ? "text-orange-500" : "text-red-500"
+              }`}>
+                {getConsistencyLabel(roundedConsistency)}
+              </span>
             </div>
             {/* Mobile Indicator Bounce */}
             <div className={`md:hidden ${openSection !== 'hud' ? 'animate-bounce' : ''}`}>
@@ -235,14 +241,6 @@ export default function Sidebar({
             <h2 className={`text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-800"}`}>
               <BarChart2 size={16} className={isDarkMode ? "text-gray-500" : "text-gray-500"} /> Comparison
             </h2>
-            <button 
-              onClick={(e) => { e.stopPropagation(); setActiveHelp('comparison'); }} 
-              className={`transition-colors p-1 rounded-md ${
-                isDarkMode ? "text-gray-600 hover:text-gray-400 hover:bg-gray-800" : "text-gray-300 hover:text-gray-500 hover:bg-gray-50"
-              }`}
-            >
-              <HelpCircle size={12} />
-            </button>
           </div>
           
           {/* Mobile Indicator Bounce */}
@@ -333,54 +331,11 @@ export default function Sidebar({
               <span className={`font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}>{totalCurrent}</span>
             </div>
             <div className={`mt-1 italic text-right font-medium ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
-              {totalCurrent > 20 ? "Strong week 💪" : totalCurrent > 0 ? "Building momentum" : "Room to improve"}
+              {totalCurrent > 20 ? "HIGH VOLUME" : totalCurrent > 0 ? "ACTIVE LOAD" : "CRITICAL DEFICIT"}
             </div>
           </div>
         </div>
       </div>
-
-      {/* =========================================
-          HELP MODAL SYSTEM
-      ========================================= */}
-      {activeHelp && (
-        <div 
-          className={`fixed inset-0 backdrop-blur-sm flex items-center justify-center z-[100] p-4 ${
-            isDarkMode ? "bg-black/60" : "bg-gray-900/40"
-          }`}
-          onClick={() => setActiveHelp(null)}
-        >
-          <div 
-            className={`p-6 rounded-3xl max-w-sm w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200 border ${
-              isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-transparent"
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className={`p-2 rounded-xl ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
-                <HelpCircle size={20} className={isDarkMode ? "text-gray-400" : "text-gray-600"} />
-              </div>
-              <h3 className={`font-bold text-lg ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                {activeHelp === 'hud' && "Performance Overview"}
-                {activeHelp === 'comparison' && "Week Comparison"}
-              </h3>
-            </div>
-
-            <p className={`text-sm leading-relaxed mb-6 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-              {activeHelp === 'hud' && "Shows your overall improvement trajectory, consistency score, and daily activity trends at a glance. The heatmap helps you spot long-term habits."}
-              {activeHelp === 'comparison' && "Directly compares your output this week against the previous week. Green arrows mean you completed more tasks on that specific day."}
-            </p>
-
-            <button 
-              onClick={() => setActiveHelp(null)}
-              className={`w-full py-3 rounded-xl text-sm font-bold transition-colors active:scale-95 ${
-                isDarkMode ? "bg-white text-black hover:bg-gray-200" : "bg-gray-900 hover:bg-gray-800 text-white"
-              }`}
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
 
     </div>
   );

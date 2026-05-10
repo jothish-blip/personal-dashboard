@@ -105,7 +105,6 @@ export function useNexCore() {
       if (action.retryCount > 3) continue;
 
       try {
-        // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type error
         const table = ((supabase as any).from("tasks"));
         if (action.type === "ADD") {
           const { data: exists } = await table.select("id").eq("id", action.payload.id).maybeSingle();
@@ -150,17 +149,12 @@ export function useNexCore() {
     const missed = total - completed;
     
     const efficiency = total === 0 ? 0 : completed / total;
-    let score = 0;
     
-    if (efficiency === 1) score = 15;
-    else if (efficiency >= 0.7) score = 8;
-    else if (efficiency >= 0.4) score = 2;
-    else score = -15;
+    let score = (efficiency * 20) - ((1 - efficiency) * 20); 
 
     const is_missed = completed === 0 && total > 0;
     if (is_missed) score = -20;
 
-    // 🔥 FIX: Cast supabase to any FIRST
     await ((supabase as any).from("daily_stats")).upsert({
       user_id: userId,
       date: today,
@@ -175,7 +169,6 @@ export function useNexCore() {
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
-    // 🔥 FIX: Cast supabase to any FIRST
     const { data: lastEntry } = await ((supabase as any).from("daily_stats"))
       .select("date")
       .eq("user_id", userId)
@@ -206,11 +199,8 @@ export function useNexCore() {
       const missed = total - completed;
       
       const efficiency = total === 0 ? 0 : completed / total;
-      let score = 0;
-      if (efficiency === 1) score = 15;
-      else if (efficiency >= 0.7) score = 8;
-      else if (efficiency >= 0.4) score = 2;
-      else score = -15;
+      
+      let score = (efficiency * 20) - ((1 - efficiency) * 20);
 
       const is_missed = completed === 0 && total > 0;
       if (is_missed) score = -20;
@@ -228,7 +218,6 @@ export function useNexCore() {
     }
 
     if (missingEntries.length > 0) {
-      // 🔥 FIX: Cast supabase to any FIRST
       await ((supabase as any).from("daily_stats")).upsert(missingEntries, {
         onConflict: "user_id, date"
       });
@@ -242,7 +231,6 @@ export function useNexCore() {
     const supabase = getSupabaseClient();
     if (!supabase) return; 
 
-    // 🔥 FIX: Cast supabase to any FIRST
     const { data, error } = await ((supabase as any).from("tasks")).select("*").eq("user_id", user.id);
     
     if (error) {
@@ -405,7 +393,6 @@ export function useNexCore() {
     return () => clearInterval(interval);
   }, [state.tasks, addNotification]);
 
-  // 🔥 STREAK CALCULATION
   const currentStreak = useMemo(() => {
     if (state.tasks.length === 0) return 0;
     
@@ -417,14 +404,12 @@ export function useNexCore() {
 
     let currentDateStr = todayStr;
     
-    // If today hasn't been active yet, check yesterday to keep the streak going
     if (!isDayActive(currentDateStr)) {
       d.setDate(d.getDate() - 1);
       currentDateStr = d.toISOString().split('T')[0];
       if (!isDayActive(currentDateStr)) return 0;
     }
 
-    // Count backwards while days are continually active
     while (isDayActive(currentDateStr)) {
       streak++;
       d.setDate(d.getDate() - 1);
@@ -465,7 +450,6 @@ export function useNexCore() {
       return;
     }
 
-    // 🔥 FIX: Cast supabase to any FIRST
     const { error } = await ((supabase as any).from("tasks")).insert(newTaskDB);
     if (error) {
       addToQueue({ type: "ADD", payload: newTaskDB });
@@ -511,7 +495,6 @@ export function useNexCore() {
       return;
     }
 
-    // 🔥 FIX: Cast supabase to any FIRST
     const { error } = await ((supabase as any).from("tasks")).update({ history: updatedHistory }).eq("id", id);
     if (error) {
       addToQueue({ type: "UPDATE", id, payload: { history: updatedHistory } });
@@ -542,7 +525,6 @@ export function useNexCore() {
       return;
     }
 
-    // 🔥 FIX: Cast supabase to any FIRST
     const { error } = await ((supabase as any).from("tasks")).delete().eq("id", id);
     if (error) {
       addToQueue({ type: "DELETE", id });
@@ -644,6 +626,6 @@ export function useNexCore() {
     addAuditLog,
     clearAllLogs, 
     currentUser,
-    currentStreak // 🔥 Returned so the Navbar can read it directly
+    currentStreak 
   };
 }
