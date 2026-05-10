@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { Activity, TrendingUp, TrendingDown, Flame, ShieldCheck } from 'lucide-react';
+import { Activity, Flame, ShieldCheck } from 'lucide-react';
 
-interface MetricsProps {
+export interface MetricsProps {
   consistencyPercent: number;
   consistencyDelta: number;
   avgPerDay: number;
@@ -9,6 +9,7 @@ interface MetricsProps {
   disciplineScore: number;
   disciplineDelta: number;
   momentum: number;
+  momentumDelta: number;
   bestStreak: number;
   currentGlobalStreak: number;
   zeroDays: number;
@@ -31,11 +32,37 @@ const MetricCircle = ({ value, color, label }: { value: number, color: string, l
   </div>
 );
 
+const formatDelta = (num: number) => {
+  if (Math.abs(num) < 0.1) return "Stable";
+  return `${num > 0 ? "+" : ""}${num.toFixed(1)}`;
+};
+
+const getTrendColor = (val: number) => {
+  if (Math.abs(val) < 0.1) return 'text-gray-400';
+  return val > 0 ? 'text-green-500' : 'text-red-500';
+};
+
+const getConsistencyLabel = (score: number) => {
+  if (score >= 80) return "EXCELLENT";
+  if (score >= 60) return "STRONG";
+  if (score >= 40) return "MODERATE";
+  if (score >= 20) return "WEAK";
+  return "UNSTABLE";
+};
+
+const getMomentumLabel = (score: number) => {
+  if (score >= 80) return "UNSTOPPABLE";
+  if (score >= 60) return "HIGH";
+  if (score >= 40) return "MODERATE";
+  if (score >= 20) return "LOW";
+  return "CRITICAL";
+};
+
 export default function Metrics({
   consistencyPercent, consistencyDelta,
   avgPerDay, avgDelta,
   disciplineScore, disciplineDelta,
-  momentum, bestStreak,
+  momentum, momentumDelta, bestStreak,
   currentGlobalStreak, zeroDays, peakDayCount, bestDayInsight
 }: MetricsProps) {
 
@@ -60,14 +87,8 @@ export default function Metrics({
           <div className={`text-[11px] font-bold mt-3 uppercase tracking-tight ${disciplineScore >= 40 ? 'text-blue-600' : 'text-red-500'}`}>
             {disciplineScore >= 75 ? "Elite" : disciplineScore >= 40 ? "Steady" : "Reset Needed"}
           </div>
-          <div className={`text-[10px] font-bold mt-1 ${
-            disciplineDelta > 0 ? 'text-green-500' :
-            disciplineDelta < 0 ? 'text-red-500' :
-            'text-gray-400'
-          }`}>
-            {disciplineDelta > 0 && `+${disciplineDelta} Increased`}
-            {disciplineDelta < 0 && `${disciplineDelta} Decreased`}
-            {disciplineDelta === 0 && "No Change"}
+          <div className={`text-[10px] font-bold mt-1 tracking-wide ${getTrendColor(disciplineDelta)}`}>
+            {formatDelta(disciplineDelta)}
           </div>
         </div>
 
@@ -76,19 +97,13 @@ export default function Metrics({
           <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Consistency</span>
           <MetricCircle 
             value={consistencyPercent} 
-            color={consistencyPercent >= 70 ? "border-green-500" : consistencyPercent >= 40 ? "border-orange-500" : "border-red-500"} 
+            color={consistencyPercent >= 60 ? "border-green-500" : consistencyPercent >= 40 ? "border-orange-500" : "border-red-500"} 
           />
-          <div className="text-[11px] font-bold mt-3 text-gray-700 uppercase tracking-tight">
-            {consistencyPercent >= 70 ? "Strong" : consistencyPercent >= 40 ? "Moderate" : "Low"}
+          <div className={`text-[11px] font-bold mt-3 uppercase tracking-tight ${consistencyPercent >= 60 ? 'text-green-600' : consistencyPercent >= 40 ? 'text-orange-500' : 'text-red-500'}`}>
+            {getConsistencyLabel(consistencyPercent)}
           </div>
-          <div className={`text-[10px] font-bold mt-1 ${
-            consistencyDelta > 0 ? 'text-green-500' :
-            consistencyDelta < 0 ? 'text-red-500' :
-            'text-gray-400'
-          }`}>
-            {consistencyDelta > 0 && `+${consistencyDelta}%`}
-            {consistencyDelta < 0 && `${consistencyDelta}%`}
-            {consistencyDelta === 0 && "No Change"}
+          <div className={`text-[10px] font-bold mt-1 tracking-wide ${getTrendColor(consistencyDelta)}`}>
+            {formatDelta(consistencyDelta)}
           </div>
         </div>
 
@@ -103,30 +118,23 @@ export default function Metrics({
           <div className="text-[10px] text-gray-400 mt-3 font-bold uppercase tracking-tighter">
             Reps / Day
           </div>
-          <div className={`text-[10px] font-bold mt-1 ${
-            avgDelta > 0 ? 'text-green-500' :
-            avgDelta < 0 ? 'text-red-500' :
-            'text-gray-400'
-          }`}>
-            {avgDelta > 0 && `+${avgDelta}`}
-            {avgDelta < 0 && `${avgDelta}`}
-            {avgDelta === 0 && "No Change"}
+          <div className={`text-[10px] font-bold mt-1 tracking-wide ${getTrendColor(avgDelta)}`}>
+            {formatDelta(avgDelta)}
           </div>
         </div>
 
         {/* 🚀 STEP 4 — MOMENTUM */}
         <div className="border border-gray-200 rounded-[20px] p-6 bg-white shadow-sm flex flex-col justify-center items-center text-center group hover:border-purple-200 transition-all">
-          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Momentum</span>
-          <div className={`mt-4 mb-2 flex items-center justify-center transition-transform duration-500 group-hover:translate-y-[-4px] ${momentum > 0 ? 'text-green-500' : momentum < 0 ? 'text-red-500' : 'text-gray-400'}`}>
-            {momentum > 0 ? <TrendingUp size={48} strokeWidth={3} /> : momentum < 0 ? <TrendingDown size={48} strokeWidth={3} /> : <Activity size={48} strokeWidth={2} />}
+          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest flex items-center gap-1.5"><Flame size={12} className="text-purple-500" /> Momentum</span>
+          <MetricCircle 
+            value={momentum} 
+            color={momentum >= 60 ? "border-purple-500" : momentum >= 40 ? "border-orange-500" : "border-red-500"} 
+          />
+          <div className={`text-[11px] font-bold mt-3 uppercase tracking-tight ${momentum >= 60 ? 'text-purple-600' : momentum >= 40 ? 'text-orange-500' : 'text-red-500'}`}>
+            {getMomentumLabel(momentum)}
           </div>
-          <div className={`text-2xl font-black ${momentum > 0 ? 'text-green-600' : momentum < 0 ? 'text-red-600' : 'text-gray-500'}`}>
-            {momentum > 0 ? `+${momentum}` : momentum === 0 ? "0" : momentum}
-          </div>
-          <div className={`text-[10px] font-bold uppercase mt-1 ${momentum > 0 ? 'text-green-500' : momentum < 0 ? 'text-red-500' : 'text-gray-400'}`}>
-            {momentum > 0 && "Increase"}
-            {momentum < 0 && "Decrease"}
-            {momentum === 0 && "No Change"}
+          <div className={`text-[10px] font-bold mt-1 tracking-wide ${getTrendColor(momentumDelta)}`}>
+            {formatDelta(momentumDelta)}
           </div>
         </div>
       </div>
