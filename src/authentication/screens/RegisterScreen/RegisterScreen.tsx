@@ -22,14 +22,12 @@ const GoogleIcon = () => (
 function RegisterContent() {
   const router = useRouter();
   
-  // Consuming your local app theme state to perfectly sync light/dark mode
   const { isDarkMode, toggleTheme } = useTheme(); 
   
   const [checkingSession, setCheckingSession] = useState(true);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  // Session State Awareness
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getSession();
@@ -41,6 +39,16 @@ function RegisterContent() {
     };
     checkUser();
   }, [router]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && !loadingProvider) {
+        handleSocialLogin("google");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [loadingProvider]);
 
   const handleSocialLogin = async (provider: string) => {
     if (loadingProvider) return; 
@@ -69,59 +77,80 @@ function RegisterContent() {
 
   if (checkingSession) {
     return (
-      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${isDarkMode ? "bg-[#050505]" : "bg-[#FAFAFA]"}`}>
-        <Loader2 className={`w-8 h-8 animate-spin ${isDarkMode ? "text-white" : "text-gray-900"}`} />
+      <div className={`min-h-screen flex flex-col items-center justify-center transition-colors duration-300 select-none ${isDarkMode ? "bg-[#050505] text-white" : "bg-[#FAFAFA] text-gray-900"}`}>
+        <div className="w-12 h-12 bg-[#111111] border border-white/10 rounded-2xl flex items-center justify-center mb-6 shadow-lg animate-pulse">
+          <img src="/favicon.ico" alt="NexTask" className="w-6 h-6 object-contain" />
+        </div>
+        <Loader2 className={`w-5 h-5 mb-4 animate-spin ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
+        <p className={`text-xs font-medium tracking-widest uppercase animate-pulse ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
+          Initializing workspace...
+        </p>
       </div>
     );
   }
 
+  const getProviderName = (id: string | null) => {
+    if (id === 'google') return 'Google';
+    if (id === 'github') return 'GitHub';
+    if (id === 'discord') return 'Discord';
+    return '';
+  };
+
   return (
-    <div className={`min-h-screen flex relative overflow-hidden transition-colors duration-300 ${
-      isDarkMode 
-        ? "bg-[#050505] text-white selection:bg-indigo-900" 
-        : "bg-[#FAFAFA] text-[#111827] selection:bg-indigo-100"
-    }`}>
-      
-      {/* 🌓 THEME TOGGLE BUTTON */}
-      <button
-        onClick={toggleTheme}
-        className={`absolute top-6 right-6 z-50 p-3 rounded-full border shadow-sm hover:shadow-md transition-all active:scale-95 flex items-center justify-center group ${
-          isDarkMode 
-            ? "bg-[#111111] border-gray-800 text-gray-300" 
-            : "bg-white border-gray-200 text-gray-600"
-        }`}
-        aria-label="Toggle theme"
-      >
-        {isDarkMode ? (
-          <Sun size={20} className="group-hover:text-orange-400 transition-colors" />
-        ) : (
-          <Moon size={20} className="group-hover:text-indigo-500 transition-colors" />
-        )}
-      </button>
+    <div 
+      style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
+      className={`min-h-screen flex relative overflow-hidden transition-colors duration-500 select-none animate-in fade-in duration-1000 ${
+        isDarkMode 
+          ? "bg-[#050505] text-white selection:bg-indigo-900" 
+          : "bg-[#FAFAFA] text-[#111827] selection:bg-indigo-100"
+      }`}
+    >
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes floatIdle {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-4px); }
+        }
+      `}} />
 
-      {/* 🌌 DEPTH LAYERS: Ambient Light Background Orbs */}
-      <div className={`absolute top-[-10%] left-[-5%] w-[40vw] h-[40vw] rounded-full blur-[120px] pointer-events-none transition-colors duration-500 ${isDarkMode ? "bg-indigo-900/20" : "bg-indigo-200/40"}`} />
-      <div className={`absolute bottom-[-10%] right-[-5%] w-[30vw] h-[30vw] rounded-full blur-[100px] pointer-events-none transition-colors duration-500 ${isDarkMode ? "bg-blue-900/20" : "bg-blue-200/40"}`} />
-      <div className={`absolute top-[40%] left-[60%] w-[20vw] h-[20vw] rounded-full blur-[80px] pointer-events-none transition-colors duration-500 ${isDarkMode ? "bg-orange-900/20" : "bg-orange-100/50"}`} />
-
-      {/* 🖥️ LEFT SIDE: Brand & Emotion (Hidden on Mobile) */}
-      <div className="hidden lg:flex w-1/2 flex-col justify-between p-16 relative z-10">
-        
-        {/* Brand Header */}
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 shadow-sm border rounded-xl flex items-center justify-center ${
-            isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"
-          }`}>
-            <span className={`font-bold text-lg ${isDarkMode ? "text-white" : "text-gray-900"}`}>Nx</span>
+      {loadingProvider && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/10 backdrop-blur-sm transition-all duration-300 animate-in fade-in">
+          <div className="w-14 h-14 bg-[#111111] border border-white/10 rounded-2xl flex items-center justify-center mb-6 shadow-2xl animate-pulse">
+            <img src="/favicon.ico" alt="NexTask" className="w-7 h-7 object-contain" />
           </div>
-          <span className={`font-semibold tracking-wide text-xl ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-            NexTask <span className="text-orange-500 font-black text-sm">OS</span>
+          <div className={`px-6 py-3 rounded-full flex items-center gap-3 backdrop-blur-md shadow-xl border ${
+            isDarkMode ? "bg-[#111111]/90 border-gray-800 text-gray-200" : "bg-white/90 border-gray-200 text-gray-800"
+          }`}>
+            <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
+            <span className="font-semibold text-sm">Connecting to {getProviderName(loadingProvider)}...</span>
+          </div>
+        </div>
+      )}
+
+      <div className={`absolute top-[-10%] left-[-5%] w-[40vw] h-[40vw] rounded-full blur-[120px] pointer-events-none transition-colors duration-700 delay-200 ${isDarkMode ? "bg-indigo-900/[0.12]" : "bg-indigo-200/30"}`} />
+      <div className={`absolute bottom-[-10%] right-[-5%] w-[30vw] h-[30vw] rounded-full blur-[100px] pointer-events-none transition-colors duration-700 delay-300 ${isDarkMode ? "bg-blue-900/[0.12]" : "bg-blue-200/30"}`} />
+      <div className={`absolute top-[40%] left-[60%] w-[20vw] h-[20vw] rounded-full blur-[80px] pointer-events-none transition-colors duration-700 delay-500 ${isDarkMode ? "bg-orange-900/[0.12]" : "bg-orange-100/40"}`} />
+
+      <div className="hidden lg:flex w-1/2 flex-col justify-between p-16 relative z-10 animate-in fade-in slide-in-from-left-8 duration-1000 delay-100 fill-mode-both">
+        
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-11 h-11 bg-[#111111] border border-white/10 rounded-2xl flex items-center justify-center shadow-sm hover:scale-[1.03] transition-all duration-300 cursor-pointer"
+            style={{ animation: 'floatIdle 6s ease-in-out infinite' }}
+          >
+            <img src="/favicon.ico" alt="NexTask" className="w-6 h-6 object-contain" />
+          </div>
+          <span className={`font-semibold tracking-wide text-xl flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+            NexTask 
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${isDarkMode ? "bg-white/10 text-gray-300" : "bg-gray-100 text-gray-600"}`}>
+              v1.2
+            </span>
           </span>
         </div>
 
-        {/* Emotional Copy */}
         <div className="max-w-xl">
-          <h1 className={`text-5xl xl:text-6xl font-black tracking-tight leading-[1.1] mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+          <h1 className={`text-[56px] xl:text-[64px] whitespace-nowrap font-black tracking-[-0.03em] leading-[1.05] mb-8 ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}>
             Build your system.<br />
             <span className={`text-transparent bg-clip-text bg-gradient-to-r ${
               isDarkMode ? "from-gray-500 to-gray-300" : "from-gray-400 to-gray-600"
@@ -129,116 +158,120 @@ function RegisterContent() {
               Not just your tasks.
             </span>
           </h1>
-          <p className={`text-lg leading-relaxed font-light ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-            Your personal execution engine designed for deep work, relentless focus, and compounding daily growth. 
-          </p>
+          
+          <div className={`flex flex-col text-[10px] sm:text-xs font-bold tracking-[0.25em] leading-loose mb-10 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
+            <span>HARDER TO OPEN</span>
+            <span>HARDER TO CLOSE</span>
+          </div>
+
+          <div className={`text-lg leading-relaxed font-light space-y-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+            <p>Built for deep work.</p>
+            <p>Designed for consistency.</p>
+            <p>Made for compound growth.</p>
+          </div>
         </div>
 
-        {/* Trust Footer */}
-        <div className={`flex items-center gap-3 text-sm font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-          <ShieldCheck size={18} className="text-emerald-500" />
-          Enterprise-grade encryption by Supabase
+        <div className={`flex items-center gap-2 text-sm font-medium ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+          <ShieldCheck size={18} className={isDarkMode ? "text-gray-600" : "text-gray-400"} />
+          Secure sign in. Private by default.
         </div>
       </div>
 
-      {/* 📱 RIGHT SIDE / MOBILE: Auth Actions */}
       <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 sm:p-12 relative z-10">
         
-        {/* Mobile Header */}
-        <div className="lg:hidden flex flex-col items-center text-center mb-10 mt-8">
-          <div className={`w-12 h-12 shadow-sm border rounded-2xl flex items-center justify-center mb-6 ${
-            isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"
-          }`}>
-            <span className={`font-bold text-xl ${isDarkMode ? "text-white" : "text-gray-900"}`}>Nx</span>
+        <div className="lg:hidden flex flex-col items-center text-center mb-10 mt-10 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 fill-mode-both">
+          <div 
+            className="w-[52px] h-[52px] bg-[#111111] border border-white/10 rounded-2xl flex items-center justify-center mb-6 shadow-sm hover:scale-[1.03] transition-all duration-300"
+            style={{ animation: 'floatIdle 6s ease-in-out infinite' }}
+          >
+            <img src="/favicon.ico" alt="NexTask" className="w-7 h-7 object-contain" />
           </div>
-          <h1 className={`text-3xl sm:text-4xl font-black tracking-tight leading-[1.1] mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+          <h1 className={`text-3xl sm:text-4xl font-black tracking-tight leading-[1.1] mb-6 max-w-[300px] mx-auto ${isDarkMode ? "text-white" : "text-gray-900"}`}>
             Build your system.
           </h1>
-          <p className={`text-sm px-4 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-            Your execution engine for focus and growth.
+          
+          <div className={`flex flex-col text-[10px] font-bold tracking-[0.25em] leading-loose mb-2 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
+            <span>HARDER TO OPEN</span>
+            <span>HARDER TO CLOSE</span>
+          </div>
+          
+          <p className={`text-xs mt-2 font-medium ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+            Deep work. Consistency. Growth.
           </p>
         </div>
 
-        {/* ✨ PREMIUM LIGHT GLASS CARD */}
-        <div className={`w-full max-w-[420px] backdrop-blur-2xl rounded-3xl p-8 sm:p-10 transition-all duration-300 border ${
+        <div className={`relative w-full max-w-[390px] backdrop-blur-2xl rounded-3xl p-6 sm:p-10 transition-all duration-500 border animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150 fill-mode-both ${
           isDarkMode 
-            ? "bg-[#111111]/80 border-gray-800 shadow-[0_8px_30px_rgb(0,0,0,0.3)]" 
-            : "bg-white/80 border-gray-100 shadow-xl"
+            ? "bg-[#111111]/80 border-gray-800 shadow-[0_0_40px_rgba(249,115,22,0.04)]" 
+            : "bg-white/80 border-gray-100 shadow-[0_10px_50px_rgba(0,0,0,0.06)]"
         }`}>
           
-          <div className="text-center mb-8">
+          <button
+            onClick={toggleTheme}
+            className={`absolute top-5 right-5 sm:top-6 sm:right-6 w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center group transition-all duration-300 active:scale-95 ${
+              isDarkMode 
+                ? "bg-[#1A1A1A] border-gray-800 text-gray-400 hover:text-orange-400 hover:border-gray-700" 
+                : "bg-gray-50 border-gray-200 text-gray-500 hover:text-indigo-500 hover:border-gray-300"
+            }`}
+            aria-label="Toggle theme"
+          >
+            {isDarkMode ? (
+              <Sun size={16} className="transition-transform group-hover:rotate-45" />
+            ) : (
+              <Moon size={16} className="transition-transform group-hover:-rotate-12" />
+            )}
+          </button>
+
+          <div className="text-center mb-8 pr-12">
             <h2 className={`text-2xl font-bold tracking-tight mb-2 ${isDarkMode ? "text-white" : "text-[#111827]"}`}>
-              Initialize Your Account
+              Create Account
             </h2>
             <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-              Create your account to start building.
+              Sign up to initialize your workspace.
             </p>
           </div>
 
-          {/* Provider Grid */}
           <div className="flex flex-col gap-4">
             
-            {/* Google */}
             <button
               onClick={() => handleSocialLogin('google')}
               disabled={!!loadingProvider}
-              className={`group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm transition-all duration-200 border ${
+              className={`group relative flex items-center justify-center gap-3 w-full min-h-[56px] rounded-xl font-semibold text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300 border hover:-translate-y-[1px] hover:shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-500 delay-[150ms] fill-mode-both ${
                 isDarkMode 
-                  ? "bg-[#0a0a0a] border-gray-700 text-[#E5E7EB] hover:bg-[#1f1f1f]" 
-                  : "bg-white border-gray-200 text-[#374151] hover:bg-[#F9FAFB]"
+                  ? "bg-[#0a0a0a] border-gray-700 text-[#E5E7EB] hover:bg-[#1f1f1f] hover:border-gray-600" 
+                  : "bg-white border-gray-200 text-[#374151] hover:bg-[#F9FAFB] hover:border-gray-300 shadow-sm"
               }`}
             >
-              {loadingProvider === 'google' ? (
-                <Loader2 size={18} className={`animate-spin ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} />
-              ) : (
-                <>
-                  <GoogleIcon />
-                  <span>Continue with Google</span>
-                </>
-              )}
+              <GoogleIcon />
+              <span>Continue with Google</span>
             </button>
 
-            {/* GitHub - BULLETPROOF CONDITIONAL INVERSION */}
             <button
               onClick={() => handleSocialLogin('github')}
               disabled={!!loadingProvider}
-              className={`group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm transition-all duration-200 border ${
+              className={`group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300 border hover:-translate-y-[1px] hover:shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-500 delay-[250ms] fill-mode-both ${
                 isDarkMode 
                   ? "bg-[#ffffff] border-[#ffffff] text-[#111827] hover:bg-[#f3f4f6]" 
                   : "bg-[#24292f] border-[#24292f] text-[#ffffff] hover:bg-[#1b1f23]"
               }`}
             >
-              {loadingProvider === 'github' ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <>
-                  <FaGithub className="text-xl" />
-                  <span>Continue with GitHub</span>
-                </>
-              )}
+              <FaGithub className="text-xl" />
+              <span>Continue with GitHub</span>
             </button>
 
-            {/* Discord */}
             <button
               onClick={() => handleSocialLogin("discord")}
               disabled={!!loadingProvider}
-              className="group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl bg-[#5865F2] border border-[#5865F2] text-[#ffffff] hover:bg-[#4752C4] hover:shadow-[0_4px_14px_rgba(88,101,242,0.3)] transition-all duration-200 font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
+              className="group flex items-center justify-center gap-3 w-full min-h-[52px] rounded-xl bg-[#5865F2] border border-[#5865F2] text-[#ffffff] hover:bg-[#4752C4] transition-all duration-300 font-semibold text-sm sm:text-base active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed hover:-translate-y-[1px] hover:shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-500 delay-[350ms] fill-mode-both"
             >
-              {loadingProvider === "discord" ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <>
-                  <FaDiscord className="text-xl" />
-                  <span>Continue with Discord</span>
-                </>
-              )}
+              <FaDiscord className="text-xl" />
+              <span>Continue with Discord</span>
             </button>
 
           </div>
 
-          {/* Error UI */}
           {error && (
-            <div className={`mt-6 p-4 rounded-xl text-sm font-medium flex items-center gap-3 animate-in fade-in border ${
+            <div className={`mt-6 p-4 rounded-xl text-sm font-medium flex items-center gap-3 animate-in fade-in border select-text ${
               isDarkMode 
                 ? "bg-red-900/20 border-red-800/50 text-red-400" 
                 : "bg-red-50 border-red-100 text-red-600"
@@ -247,15 +280,13 @@ function RegisterContent() {
             </div>
           )}
 
-          {/* Mobile Trust Signals */}
-          <div className={`lg:hidden mt-8 flex justify-center items-center gap-2 text-[11px] font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-            <ShieldCheck size={14} className="text-emerald-500" />
-            Secured by Supabase Auth
+          <div className={`lg:hidden mt-8 flex justify-center items-center gap-2 text-[11px] font-medium ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+            <ShieldCheck size={14} className={isDarkMode ? "text-gray-600" : "text-gray-400"} />
+            Secure sign in. Private by default.
           </div>
         </div>
 
-        {/* Login Link */}
-        <p className={`mt-8 text-sm font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+        <p className={`mt-8 text-sm font-medium animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-[500ms] fill-mode-both ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
           Already have a system?{" "}
           <button
             onClick={() => router.replace("/login")}

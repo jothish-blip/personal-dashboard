@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "@/theme/ThemeProvider";
 
 // Tasks Engine
 import { useNexCore } from "@/modules/tasks/engine/useNexCore";
@@ -9,8 +10,8 @@ import { useNexCore } from "@/modules/tasks/engine/useNexCore";
 // Supabase
 import { supabase } from "@/lib/supabase";
 
-// Global Components
-import Navbar from "@/navigation/Navbar";
+// 🔥 IMPORTANT: This MUST import the wrapper file above!
+import Navbar from "@/navigation/Navbar"; 
 import FeedbackPopup from "@/settings/components/FeedbackPopup/FeedbackPopup";
 
 // Tasks Module Components
@@ -28,6 +29,7 @@ export const dynamic = "force-dynamic";
 export default function Home() {
   const router = useRouter();
   const pathname = usePathname();
+  const { isDarkMode } = useTheme();
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState("matrix");
@@ -44,11 +46,12 @@ export default function Home() {
     addTask,
     deleteTask,
     toggleTask,
+    renameTask,   
+    renameGroup,  
     lockToday,
     exportData,
   } = useNexCore();
 
-  // Focus Context
   const {
     currentUser,
     isLoaded: isFocusLoaded,
@@ -76,7 +79,6 @@ export default function Home() {
         .eq("user_id", currentUser.id)
         .maybeSingle();
 
-      // Create row if missing
       if (!data) {
         const {
           data: newRow,
@@ -93,22 +95,14 @@ export default function Home() {
           .select()
           .single();
 
-        if (insertError) {
-          console.error(
-            "Insert FULL error:",
-            JSON.stringify(insertError)
-          );
-          return;
-        }
-
+        if (insertError) return;
         data = newRow;
       }
 
       if (!data) return;
 
-      // Reset daily count
       if (data.last_prompt_date !== today) {
-        const { error } = await (supabase as any)
+        await (supabase as any)
           .from("user_feedback_status")
           .update({
             daily_prompt_count: 0,
@@ -116,36 +110,16 @@ export default function Home() {
           })
           .eq("user_id", currentUser.id);
 
-        if (error) {
-          console.error(
-            "Reset error:",
-            JSON.stringify(error)
-          );
-          return;
-        }
-
         data.daily_prompt_count = 0;
       }
 
-      // Show popup
-      if (
-        !data.feedback_given &&
-        data.daily_prompt_count < 3
-      ) {
-        const { error } = await (supabase as any)
+      if (!data.feedback_given && data.daily_prompt_count < 3) {
+        await (supabase as any)
           .from("user_feedback_status")
           .update({
             daily_prompt_count: data.daily_prompt_count + 1,
           })
           .eq("user_id", currentUser.id);
-
-        if (error) {
-          console.error(
-            "Update error:",
-            JSON.stringify(error)
-          );
-          return;
-        }
 
         setTimeout(() => {
           setShowFeedback(true);
@@ -157,14 +131,11 @@ export default function Home() {
 
   }, [currentUser, isFocusLoaded, router]);
 
-  // Load tab
   useEffect(() => {
     const savedTab = sessionStorage.getItem("nexengine_active_tab");
-
     if (savedTab) {
       setActiveTab(savedTab);
     }
-
     setIsStateLoaded(true);
   }, []);
 
@@ -173,7 +144,6 @@ export default function Home() {
     sessionStorage.setItem("nexengine_active_tab", tab);
   };
 
-  // Loading Screen
   if (
     isAuthenticated === null ||
     isAuthenticated === false ||
@@ -182,16 +152,22 @@ export default function Home() {
     !isFocusLoaded
   ) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        Initializing Workspace...
+      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${
+        isDarkMode ? "bg-[#050505] text-gray-400" : "bg-[#F9FAFB] text-gray-500"
+      }`}>
+        <div className="flex flex-col items-center gap-3 animate-pulse">
+          <span className="text-sm font-bold uppercase tracking-widest text-orange-500">Initializing Workspace...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className={`flex flex-col min-h-screen transition-colors duration-300 ${
+      isDarkMode ? "bg-[#050505]" : "bg-[#F9FAFB]"
+    }`}>
 
-      {/* Navbar */}
+      {/* 🔥 Rendering the Navbar Wrapper */}
       <Navbar
         meta={state.meta}
         setMonthYear={setMonthYear}
@@ -201,21 +177,15 @@ export default function Home() {
 
       {!isMini ? (
         <>
-          {/* Stats */}
           <StatsGrid
             tasks={state.tasks}
             meta={state.meta}
           />
-
-          {/* Tabs */}
           <Tabs
             activeTab={activeTab}
             setActiveTab={handleTabChange}
           />
-
-          {/* Main Views */}
           <main className="flex-1">
-
             {activeTab === "matrix" && (
               <MatrixView
                 tasks={state.tasks}
@@ -223,18 +193,18 @@ export default function Home() {
                 addTask={addTask}
                 deleteTask={deleteTask}
                 toggleTask={toggleTask}
+                renameTask={renameTask}   
+                renameGroup={renameGroup}  
                 lockToday={lockToday}
                 setMonthYear={setMonthYear}
               />
             )}
-
             {activeTab === "analytics" && (
               <AnalyticsView
                 tasks={state.tasks}
                 meta={state.meta}
               />
             )}
-
             {activeTab === "audit" && (
               <AuditView
                 logs={state.logs}
@@ -243,18 +213,14 @@ export default function Home() {
                 deleteLog={() => {}}
               />
             )}
-
           </main>
         </>
       ) : (
-
-        <div className="flex-1 flex items-center justify-center">
+        <div className={`flex-1 flex items-center justify-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
           Mini Nisc
         </div>
-
       )}
 
-      {/* Feedback Popup */}
       {showFeedback && userId && (
         <FeedbackPopup
           userId={userId}

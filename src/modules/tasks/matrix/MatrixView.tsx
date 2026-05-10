@@ -2,9 +2,9 @@
 
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { 
-  AlertTriangle, Target, Lock, Clock, Activity, Search, 
+  AlertTriangle, Target, Lock, Clock, Search, 
   ChevronLeft, ChevronRight, HelpCircle, Maximize, Minimize, 
-  Plus, RotateCcw, Check, X 
+  Plus, Check, X 
 } from 'lucide-react';
 import { Task, Meta } from '../types';
 
@@ -15,35 +15,36 @@ import {
 } from "./utils";
 
 import Header from "./components/Header/Header";
-
 import Decisions from "./components/Decisions/Decisions";
-
 import Grid from "./components/Grid/Grid";
-
 import Sidebar from "./components/Sidebar/Sidebar";
 
 interface MatrixProps {
   tasks: Task[];
   meta: Meta;
-  addTask: (name: string, group: string) => void;
-  deleteTask: (id: string) => void;
-  toggleTask: (id: string, date: string) => void;
-  lockToday: () => void;
-  setMonthYear: (value: string) => void;
+  addTask: (name: string, group: string) => void | Promise<void>;
+  deleteTask: (id: string) => void | Promise<void>;
+  toggleTask: (id: string, date: string) => void | Promise<void>;
+  renameTask?: (id: string, newName: string) => void | Promise<void>; 
+  renameGroup?: (oldGroup: string, newGroup: string) => void | Promise<void>; 
+  lockToday: () => void | Promise<void>;
+  setMonthYear: (value: string) => void | Promise<void>;
   isLoaded?: boolean;
 }
 
 type ErrorType = 'lock' | 'future' | 'system' | '';
 
 export default function MatrixView({ 
-  tasks, meta, addTask, deleteTask, toggleTask, lockToday, setMonthYear, isLoaded = true 
+  tasks, meta, addTask, deleteTask, toggleTask, 
+  renameTask = () => console.warn("renameTask missing in parent"), 
+  renameGroup = () => console.warn("renameGroup missing in parent"), 
+  lockToday, setMonthYear, isLoaded = true 
 }: MatrixProps) {
   
   const actualToday = getLocalDate(new Date()); 
   
   const [isMobile, setIsMobile] = useState(false);
   const [showScrollHint, setShowScrollHint] = useState(false);
-  const [showMobileAdd, setShowMobileAdd] = useState(false);
 
   useEffect(() => {
     const checkScreen = () => {
@@ -76,18 +77,16 @@ export default function MatrixView({
   
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  
+  // Safe Delete States
   const [pendingDelete, setPendingDelete] = useState<{id: string, name: string} | null>(null);
+  const [confirmText, setConfirmText] = useState("");
   
   const todayRef = useRef<HTMLTableCellElement | null>(null);
-  const pendingTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => { scrollToToday(); }, 100);
     return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    return () => { if (pendingTimeout.current) clearTimeout(pendingTimeout.current); };
   }, []);
 
   useEffect(() => {
@@ -107,26 +106,15 @@ export default function MatrixView({
     setTimeout(() => setErrors(prev => prev.filter(e => e.id !== id)), 3000); 
   }, []);
 
+  // Trigger Safe Delete Modal
   const requestDelete = useCallback((id: string) => {
     const taskToDelete = tasks.find(t => t.id === id);
     if (!taskToDelete) return;
-
-    if (pendingDelete) deleteTask(pendingDelete.id);
-    if (pendingTimeout.current) clearTimeout(pendingTimeout.current);
-    
     setPendingDelete({ id, name: taskToDelete.name });
-    pendingTimeout.current = setTimeout(() => {
-      deleteTask(id);
-      setPendingDelete(null);
-    }, 5000);
-  }, [tasks, pendingDelete, deleteTask]);
+    setConfirmText("");
+  }, [tasks]);
 
-  const undoDelete = useCallback(() => {
-    if (pendingTimeout.current) clearTimeout(pendingTimeout.current);
-    setPendingDelete(null);
-  }, []);
-
-  const activeTasks = useMemo(() => tasks.filter(t => t.id !== pendingDelete?.id), [tasks, pendingDelete]);
+  const activeTasks = useMemo(() => tasks, [tasks]);
 
   const completionMap = useMemo(() => {
     const map: Record<string, number> = {};
@@ -342,9 +330,9 @@ export default function MatrixView({
   const scrollToToday = () => todayRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 
   return (
-    // Fixed Background and Text bindings
     <div className={`flex-1 flex flex-col min-h-screen bg-[var(--background)] text-[var(--foreground)] pb-24 relative pt-0 overscroll-y-contain transition-colors duration-500`}>
       
+      {/* Help Modal */}
       {showHelp && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-in fade-in" onClick={() => setShowHelp(false)}>
           <div className="bg-[var(--surface)] rounded-2xl p-8 max-w-md w-full space-y-6 shadow-2xl animate-in zoom-in-95 duration-200 border border-[var(--border)]" onClick={(e) => e.stopPropagation()}>
@@ -366,15 +354,49 @@ export default function MatrixView({
         </div>
       )}
 
+      {/* Safe Delete Modal */}
       {pendingDelete && (
-        <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-[var(--foreground)] text-[var(--background)] px-5 py-3 rounded-2xl shadow-xl z-[150] text-sm flex items-center gap-4 animate-in slide-in-from-bottom-5">
-          <span>Deleted <strong>{pendingDelete.name}</strong></span>
-          <button title="Undo delete" onClick={undoDelete} className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-bold bg-[var(--surface-alt)] px-3 py-1.5 rounded-lg active:scale-95 transition-all duration-200">
-            <RotateCcw size={14}/> Undo
-          </button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-in fade-in" onClick={() => { setPendingDelete(null); setConfirmText(""); }}>
+          <div className="bg-[var(--surface)] rounded-2xl p-8 max-w-md w-full space-y-6 shadow-2xl animate-in zoom-in-95 duration-200 border border-[var(--border)]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 text-red-500 mb-2">
+              <div className="p-2 bg-red-500/10 rounded-xl"><AlertTriangle size={24} /></div>
+              <h2 className="font-bold text-2xl text-[var(--foreground)]">Delete Task?</h2>
+            </div>
+            <p className="text-sm text-[var(--muted)] leading-relaxed">
+              This action cannot be undone. To confirm deletion, type <strong>{pendingDelete.name}</strong> below:
+            </p>
+            <input
+              autoFocus
+              type="text"
+              placeholder={`Type "${pendingDelete.name}"`}
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              className="w-full pl-4 pr-4 py-3 border border-[var(--border)] bg-[var(--surface-alt)] rounded-xl text-sm outline-none focus:border-red-500 focus:bg-[var(--surface)] text-[var(--foreground)] transition-all duration-200"
+            />
+            <div className="flex gap-3 pt-2">
+              <button 
+                onClick={() => { setPendingDelete(null); setConfirmText(""); }} 
+                className="flex-1 py-3 bg-[var(--surface-alt)] text-[var(--foreground)] rounded-xl font-bold hover:bg-[var(--border)] active:scale-95 transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={confirmText.trim() !== pendingDelete.name}
+                onClick={() => {
+                  deleteTask(pendingDelete.id);
+                  setPendingDelete(null);
+                  setConfirmText("");
+                }}
+                className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all duration-200"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
+      {/* Errors */}
       <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 flex flex-col gap-2 z-[100] pointer-events-none">
         {errors.map((err) => (
           <div key={err.id} className={`bg-[var(--surface)] border border-[var(--border)] px-6 py-3 rounded-[20px] shadow-xl text-sm font-bold flex items-center gap-3 transition-all duration-300
@@ -497,7 +519,6 @@ export default function MatrixView({
                 </div>
               </div>
 
-              {/* Explicit horizontal scroll wrapper to fix the white edge overflow bleed */}
               <div className="overflow-x-auto bg-[var(--background)]">
                 <Grid 
                   tasks={filteredTasks}
@@ -510,6 +531,8 @@ export default function MatrixView({
                   todayRef={todayRef}
                   handleToggleSafe={handleToggleSafe}
                   deleteTask={requestDelete} 
+                  renameTask={renameTask}
+                  renameGroup={renameGroup}
                   activeWeekIndex={activeWeekIndex}
                   showScrollHint={showScrollHint}
                   dismissScrollHint={dismissScrollHint}

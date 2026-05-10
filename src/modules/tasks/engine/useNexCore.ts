@@ -456,6 +456,72 @@ export function useNexCore() {
     }
   };
 
+  const renameTask = async (id: string, newName: string) => {
+    if (!newName.trim()) return;
+
+    const user = userRef.current;
+    if (!user) return;
+
+    setState(prev => {
+      const updatedTasks = prev.tasks.map(t => t.id === id ? { ...t, name: newName.trim() } : t);
+      const newState = {
+        ...prev,
+        tasks: updatedTasks,
+        logs: logAction("UPDATE", newName.trim(), `Renamed objective`, prev)
+      };
+      debouncedSave(KEY, newState);
+      return newState;
+    });
+
+    const supabase = getSupabaseClient();
+    if (!navigator.onLine || !supabase) {
+      addToQueue({ type: "UPDATE", id, payload: { name: newName.trim() } });
+      return;
+    }
+
+    const { error } = await ((supabase as any).from("tasks")).update({ name: newName.trim() }).eq("id", id);
+    if (error) {
+      addToQueue({ type: "UPDATE", id, payload: { name: newName.trim() } });
+    }
+  };
+
+  const renameGroup = async (oldGroup: string, newGroup: string) => {
+    if (!newGroup.trim() || oldGroup === newGroup.trim()) return;
+
+    const user = userRef.current;
+    if (!user) return;
+
+    setState(prev => {
+      const updatedTasks = prev.tasks.map(t => t.group === oldGroup ? { ...t, group: newGroup.trim() } : t);
+      const newState = {
+        ...prev,
+        tasks: updatedTasks,
+        logs: logAction("UPDATE", newGroup.trim(), `Renamed group from ${oldGroup}`, prev)
+      };
+      debouncedSave(KEY, newState);
+      return newState;
+    });
+
+    const supabase = getSupabaseClient();
+    if (!navigator.onLine || !supabase) {
+      state.tasks.filter(t => t.group === oldGroup).forEach(t => {
+        addToQueue({ type: "UPDATE", id: t.id, payload: { group_name: newGroup.trim() } });
+      });
+      return;
+    }
+
+    const { error } = await ((supabase as any).from("tasks"))
+      .update({ group_name: newGroup.trim() })
+      .eq("user_id", user.id)
+      .eq("group_name", oldGroup);
+
+    if (error) {
+      state.tasks.filter(t => t.group === oldGroup).forEach(t => {
+        addToQueue({ type: "UPDATE", id: t.id, payload: { group_name: newGroup.trim() } });
+      });
+    }
+  };
+
   const toggleTask = async (id: string, dateStr: string) => {
     if (state.meta.lockedDates.includes(dateStr)) {
       addNotification('system', 'Access Denied', 'Cannot modify finalized logs.', 'high');
@@ -502,8 +568,6 @@ export function useNexCore() {
   };
 
   const deleteTask = async (id: string) => {
-    if (!window.confirm("Delete objective?")) return;
-    
     const user = userRef.current;
     if (!user) return;
 
@@ -615,6 +679,8 @@ export function useNexCore() {
     loading,
     isSyncing, 
     addTask,
+    renameTask,
+    renameGroup,
     deleteTask,
     toggleTask,
     lockToday,

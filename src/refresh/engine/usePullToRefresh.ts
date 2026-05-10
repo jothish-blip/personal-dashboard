@@ -1,34 +1,43 @@
 import { useEffect, useState, useRef } from "react";
 
-export function usePullToRefresh(onRefresh: () => void) {
+export function usePullToRefresh(onRefresh: () => Promise<void> | void) {
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [readyToRefresh, setReadyToRefresh] = useState(false);
 
   const startY = useRef(0);
   const startX = useRef(0);
+
   const isPulling = useRef(false);
+  const isTracking = useRef(false);
 
   const THRESHOLD = 70;
+  const ACTIVATION_DISTANCE = 12;
 
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
-      // ✅ Only start if at top of page
       if (window.scrollY > 0) return;
 
-      // 🔥 CRITICAL FIX: Ignore touches on the toolbar, menus, or editor
       const target = e.target as HTMLElement;
-      if (target && target.closest('.prevent-pull-refresh')) {
-        return; // Abort pull-to-refresh
+
+      // Ignore floating sidebar / menus
+      if (target && target.closest(".prevent-pull-refresh")) {
+        return;
       }
+
+      // Ignore horizontal scrollers
+      const scrollableParent = target && target.closest('[data-horizontal-scroll="true"]');
+      if (scrollableParent) return;
 
       startY.current = e.touches[0].clientY;
       startX.current = e.touches[0].clientX;
-      isPulling.current = true;
+
+      isTracking.current = true;
+      isPulling.current = false;
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (!isPulling.current) return;
+      if (!isTracking.current) return;
 
       const currentY = e.touches[0].clientY;
       const currentX = e.touches[0].clientX;
@@ -36,40 +45,60 @@ export function usePullToRefresh(onRefresh: () => void) {
       const diffY = currentY - startY.current;
       const diffX = currentX - startX.current;
 
-      // Ignore horizontal scroll
+      // Horizontal swipe → cancel
       if (Math.abs(diffX) > Math.abs(diffY)) {
+        isTracking.current = false;
         isPulling.current = false;
         return;
       }
 
-      // Only allow downward pull
+      // only downward gesture
       if (diffY <= 0) return;
 
-      setPullDistance(diffY);
-
-      if (diffY > THRESHOLD) {
-        setReadyToRefresh(true);
-      } else {
-        setReadyToRefresh(false);
+      // don't activate instantly
+      if (diffY > ACTIVATION_DISTANCE) {
+        isPulling.current = true;
       }
+
+      if (!isPulling.current) return;
+
+      const limitedPull = Math.min(diffY * 0.5, 100);
+
+      setPullDistance(limitedPull);
+      setReadyToRefresh(limitedPull >= THRESHOLD);
     };
 
     const handleTouchEnd = async () => {
-      if (!isPulling.current) return;
-
-      if (readyToRefresh) {
-        setIsRefreshing(true);
-        await onRefresh();
-        setIsRefreshing(false);
+      if (!isPulling.current) {
+        reset();
+        return;
       }
 
-      // reset
-      setPullDistance(0);
-      setReadyToRefresh(false);
-      isPulling.current = false;
+      if (readyToRefresh && !isRefreshing) {
+        try {
+          setIsRefreshing(true);
+          
+          if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(15);
+          }
+
+          await onRefresh();
+        } finally {
+          setIsRefreshing(false);
+        }
+      }
+
+      reset();
     };
 
-    // Use passive: false so we have precise control if needed in the future
+    const reset = () => {
+      setPullDistance(0);
+      setReadyToRefresh(false);
+
+      isPulling.current = false;
+      isTracking.current = false;
+    };
+
     window.addEventListener("touchstart", handleTouchStart, { passive: true });
     window.addEventListener("touchmove", handleTouchMove, { passive: true });
     window.addEventListener("touchend", handleTouchEnd, { passive: true });
@@ -79,7 +108,7 @@ export function usePullToRefresh(onRefresh: () => void) {
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [readyToRefresh, onRefresh]);
+  }, [readyToRefresh, isRefreshing, onRefresh]);
 
   return {
     pullDistance,

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Flame, Zap, Star, ChevronDown, ChevronRight, Check, Trash2, ArrowRightLeft } from 'lucide-react';
+import { Flame, Zap, Star, ChevronDown, ChevronRight, Check, Trash2, ArrowRightLeft, Edit2 } from 'lucide-react';
 import { Task } from "../../../types/index";
 
 import {
@@ -9,7 +9,6 @@ import {
   calculateCurrentStreak,
   getLocalDate,
 } from "../../utils";
-// 🔥 IMPORT ThemeProvider (Update path if needed, matching TaskSelector)
 import { useTheme } from "@/theme/ThemeProvider";
 
 interface GridProps {
@@ -21,8 +20,10 @@ interface GridProps {
   visibleDays: (string | null)[];
   actualToday: string;
   todayRef: React.RefObject<HTMLTableCellElement | null>; 
-  handleToggleSafe: (task: Task, dateStr: string) => void;
-  deleteTask: (id: string) => void;
+  handleToggleSafe: (task: Task, dateStr: string) => void | Promise<void>;
+  deleteTask: (id: string) => void | Promise<void>;
+  renameTask?: (id: string, newName: string) => void | Promise<void>; 
+  renameGroup?: (oldGroup: string, newGroup: string) => void | Promise<void>; 
   activeWeekIndex: number;
   showScrollHint?: boolean;
   dismissScrollHint?: () => void;
@@ -30,16 +31,26 @@ interface GridProps {
 
 const Grid = ({
   tasks, meta, groupedTasks, groups, weeksInMonth, visibleDays, actualToday, 
-  todayRef, handleToggleSafe, deleteTask, activeWeekIndex, showScrollHint, dismissScrollHint
+  todayRef, handleToggleSafe, deleteTask, renameTask, renameGroup, activeWeekIndex, showScrollHint, dismissScrollHint
 }: GridProps) => {
   
-  // 🔥 Get current theme state
   const { isDarkMode } = useTheme();
 
   const [selectedWeek, setSelectedWeek] = useState<number>(0);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [hasSwiped, setHasSwiped] = useState(false);
   
+  // Edit states
+  const [editingGroup, setEditingGroup] = useState<string | null>(null);
+  const [editedGroupName, setEditedGroupName] = useState("");
+
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editedTaskName, setEditedTaskName] = useState("");
+
+  // Mobile Selection States for UX
+  const [mobileSelectedTask, setMobileSelectedTask] = useState<string | null>(null);
+  const [mobileSelectedGroup, setMobileSelectedGroup] = useState<string | null>(null);
+
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
@@ -127,6 +138,7 @@ const Grid = ({
     touchStartX.current = null; touchStartY.current = null; touchEndX.current = null; isSwiping.current = false;
   }, [selectedWeek, weeksInMonth.length, hasSwiped]);
 
+  // DESKTOP ROWS
   const desktopRows = useMemo(() => {
     return groups.map(group => {
       const groupTasks = groupedTasks[group];
@@ -135,10 +147,47 @@ const Grid = ({
 
       return (
         <React.Fragment key={group}>
-          <tr className="bg-gray-50/50 cursor-pointer hover:bg-gray-100 transition-colors border-b border-gray-200" onClick={() => toggleGroup(group)}>
+          <tr className="group bg-gray-50/50 cursor-pointer hover:bg-gray-100 transition-colors border-b border-gray-200" onClick={() => toggleGroup(group)}>
             <td className="sticky left-0 z-[40] px-6 py-3 bg-gray-100 font-bold text-[10px] text-gray-600 uppercase tracking-widest shadow-[4px_0_12px_rgba(0,0,0,0.08)] flex items-center gap-2 border-r border-gray-200">
               {isCollapsed ? <ChevronRight size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
-              {group} <span className="ml-2 px-1.5 py-0.5 bg-gray-200 text-gray-500 rounded-full text-[8px]">{groupTasks.length}</span>
+              
+              {editingGroup === group ? (
+                <input
+                  autoFocus
+                  value={editedGroupName}
+                  onChange={(e) => setEditedGroupName(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onBlur={() => {
+                    if (renameGroup && editedGroupName.trim() && editedGroupName.trim() !== group) renameGroup(group, editedGroupName.trim());
+                    setEditingGroup(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      if (renameGroup && editedGroupName.trim() && editedGroupName.trim() !== group) renameGroup(group, editedGroupName.trim());
+                      setEditingGroup(null);
+                    } else if (e.key === "Escape") {
+                      setEditingGroup(null);
+                    }
+                  }}
+                  className="bg-white border border-gray-300 rounded px-2 py-0.5 text-[10px] text-gray-800 outline-none w-32 font-bold normal-case tracking-normal shadow-sm"
+                />
+              ) : (
+                <>
+                  <span>{group}</span> 
+                  <span className="ml-2 px-1.5 py-0.5 bg-gray-200 text-gray-500 rounded-full text-[8px]">{groupTasks.length}</span>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingGroup(group);
+                      setEditedGroupName(group);
+                    }} 
+                    className="ml-1 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-500 transition-all duration-200 p-1"
+                    title="Rename Group"
+                  >
+                    <Edit2 size={12} />
+                  </button>
+                </>
+              )}
             </td>
             <td colSpan={visibleDays.length}></td>
           </tr>
@@ -162,7 +211,46 @@ const Grid = ({
                   <div className="flex justify-between items-start gap-4">
                     <div className="flex flex-col gap-1.5 w-full">
                       <div className="flex items-center gap-3 flex-wrap">
-                        <span className="font-semibold text-sm text-gray-800 transition-colors group-hover:text-black">{task.name}</span>
+                        
+                        {editingTaskId === task.id ? (
+                          <input
+                            autoFocus
+                            value={editedTaskName}
+                            onChange={(e) => setEditedTaskName(e.target.value)}
+                            onBlur={() => {
+                              if (renameTask && editedTaskName.trim() && editedTaskName.trim() !== task.name) renameTask(task.id, editedTaskName.trim());
+                              setEditingTaskId(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                if (renameTask && editedTaskName.trim() && editedTaskName.trim() !== task.name) renameTask(task.id, editedTaskName.trim());
+                                setEditingTaskId(null);
+                              } else if (e.key === "Escape") {
+                                setEditingTaskId(null);
+                              }
+                            }}
+                            className="bg-gray-50 border border-gray-300 rounded px-2 py-1 text-sm font-semibold text-gray-800 outline-none w-full max-w-[180px] shadow-sm"
+                          />
+                        ) : (
+                          <div className="flex items-center gap-1.5 group/title">
+                            <span 
+                              className="font-semibold text-sm text-gray-800 transition-colors group-hover:text-black"
+                            >
+                              {task.name}
+                            </span>
+                            <button 
+                              onClick={() => {
+                                setEditingTaskId(task.id);
+                                setEditedTaskName(task.name);
+                              }} 
+                              className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-blue-500 transition-all duration-200 p-1"
+                              title="Rename Task"
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                          </div>
+                        )}
+
                         <div className="flex items-center gap-1.5">
                           {streakStyle && (
                             <div title="Current streak" className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${streakStyle.bg} ${streakStyle.text} ${streakStyle.shadow} transition-all duration-300 cursor-help`}>
@@ -226,8 +314,9 @@ const Grid = ({
         </React.Fragment>
       );
     });
-  }, [groups, groupedTasks, visibleDays, historyMap, meta.currentMonth, meta.lockedDates, actualToday, yesterdayStr, deleteTask, handleToggleSafe, collapsedGroups, validDaysCount]);
+  }, [groups, groupedTasks, visibleDays, historyMap, meta.currentMonth, meta.lockedDates, actualToday, yesterdayStr, deleteTask, renameTask, renameGroup, handleToggleSafe, collapsedGroups, validDaysCount, editingGroup, editedGroupName, editingTaskId, editedTaskName]);
 
+  // MOBILE ROWS
   const mobileGroups = useMemo(() => {
     return groups.map(group => {
       const groupTasks = groupedTasks[group];
@@ -236,8 +325,53 @@ const Grid = ({
 
       return (
         <div key={group} className="space-y-4 mb-6">
-          <button onClick={() => toggleGroup(group)} className="w-full flex items-center gap-2 text-[11px] font-bold text-gray-600 uppercase tracking-widest px-2 active:opacity-70 transition-opacity">
-            {isCollapsed ? <ChevronRight size={14}/> : <ChevronDown size={14}/>} {group}
+          <button 
+            onClick={() => {
+              toggleGroup(group);
+              setMobileSelectedGroup(prev => prev === group ? null : group);
+              if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+            }} 
+            className="w-full flex items-center gap-2 text-[11px] font-bold text-gray-600 uppercase tracking-widest px-2 active:opacity-70 transition-opacity"
+          >
+            {isCollapsed ? <ChevronRight size={14}/> : <ChevronDown size={14}/>} 
+            {editingGroup === group ? (
+              <input
+                autoFocus
+                value={editedGroupName}
+                onChange={(e) => setEditedGroupName(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                onBlur={() => {
+                  if (renameGroup && editedGroupName.trim() && editedGroupName.trim() !== group) renameGroup(group, editedGroupName.trim());
+                  setEditingGroup(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    if (renameGroup && editedGroupName.trim() && editedGroupName.trim() !== group) renameGroup(group, editedGroupName.trim());
+                    setEditingGroup(null);
+                  } else if (e.key === "Escape") {
+                    setEditingGroup(null);
+                  }
+                }}
+                className="bg-white border border-gray-300 rounded px-2 py-0.5 text-[10px] text-gray-800 outline-none w-28 font-bold normal-case tracking-normal shadow-sm"
+              />
+            ) : (
+              <>
+                <span>{group}</span>
+                {mobileSelectedGroup === group && (
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingGroup(group);
+                      setEditedGroupName(group);
+                      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(15);
+                    }}
+                    className="p-1 text-gray-400 hover:text-blue-500 animate-in fade-in zoom-in duration-200"
+                  >
+                    <Edit2 size={12} />
+                  </div>
+                )}
+              </>
+            )}
           </button>
           
           {!isCollapsed && weeksInMonth.map((week, wIndex) => {
@@ -272,19 +406,85 @@ const Grid = ({
                   const monthBarColor = getProgressColor(monthProgressPct);
 
                   return (
-                    <div key={task.id} className="space-y-4 pb-5 border-b border-gray-100 last:border-0 last:pb-0">
+                    <div 
+                      key={task.id} 
+                      onClick={() => {
+                        setMobileSelectedTask(prev => prev === task.id ? null : task.id);
+                        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+                      }}
+                      className="space-y-4 pb-5 border-b border-gray-100 last:border-0 last:pb-0 transition-colors"
+                    >
                       <div className="flex justify-between items-start gap-2">
                         <div className="flex flex-col gap-1 w-full">
-                          <div className="text-sm font-semibold text-gray-800 leading-tight">{task.name}</div>
+                          
+                          {editingTaskId === task.id ? (
+                            <input
+                              autoFocus
+                              value={editedTaskName}
+                              onChange={(e) => setEditedTaskName(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              onBlur={() => {
+                                if (renameTask && editedTaskName.trim() && editedTaskName.trim() !== task.name) renameTask(task.id, editedTaskName.trim());
+                                setEditingTaskId(null);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  if (renameTask && editedTaskName.trim() && editedTaskName.trim() !== task.name) renameTask(task.id, editedTaskName.trim());
+                                  setEditingTaskId(null);
+                                } else if (e.key === "Escape") {
+                                  setEditingTaskId(null);
+                                }
+                              }}
+                              className="bg-gray-50 border border-gray-300 rounded px-2 py-1 text-sm font-semibold text-gray-800 outline-none w-full max-w-[150px]"
+                            />
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <div className="text-sm font-semibold text-gray-800 leading-tight">
+                                {task.name}
+                              </div>
+                              {mobileSelectedTask === task.id && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingTaskId(task.id);
+                                    setEditedTaskName(task.name);
+                                    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(15);
+                                  }} 
+                                  className="text-gray-400 hover:text-blue-500 p-1.5 animate-in fade-in zoom-in duration-200"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          )}
+
                           <div className="flex items-center gap-2 w-full max-w-[120px] mt-1">
-                             <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden"><div className={`h-full ${monthBarColor}`} style={{ width: `${monthProgressPct}%` }} /></div>
-                             <span className="text-[9px] text-gray-500 font-bold shrink-0">{Math.round(monthProgressPct)}%</span>
+                              <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden"><div className={`h-full ${monthBarColor}`} style={{ width: `${monthProgressPct}%` }} /></div>
+                              <span className="text-[9px] text-gray-500 font-bold shrink-0">{Math.round(monthProgressPct)}%</span>
                           </div>
                         </div>
-                        <button title="Delete task" onClick={() => deleteTask(task.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors shrink-0"><Trash2 size={14}/></button>
+
+                        {mobileSelectedTask === task.id && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteTask(task.id);
+                              if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(20);
+                            }} 
+                            title="Delete task" 
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors shrink-0 animate-in fade-in zoom-in duration-200"
+                          >
+                            <Trash2 size={16}/>
+                          </button>
+                        )}
+
                       </div>
 
-                      <div className="grid grid-cols-7 gap-3 px-1 relative">
+                      {/* Explicitly stop propagation so clicking the grid doesn't close the tap-to-reveal menu */}
+                      <div 
+                        className="grid grid-cols-7 gap-3 px-1 relative"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {week.days.map((day, i) => {
                           if (!day) return <div key={i} className="flex-shrink-0" />;
                           const dateStr = `${meta.currentMonth}-${day}`;
@@ -326,13 +526,12 @@ const Grid = ({
         </div>
       );
     });
-  }, [groups, groupedTasks, weeksInMonth, selectedWeek, historyMap, meta.currentMonth, meta.lockedDates, actualToday, yesterdayStr, deleteTask, handleToggleSafe, collapsedGroups, validDaysCount]);
+  }, [groups, groupedTasks, weeksInMonth, selectedWeek, historyMap, meta.currentMonth, meta.lockedDates, actualToday, yesterdayStr, deleteTask, renameTask, renameGroup, handleToggleSafe, collapsedGroups, validDaysCount, editingGroup, editedGroupName, editingTaskId, editedTaskName, mobileSelectedGroup, mobileSelectedTask]);
 
   return (
     <>
       <div className="bg-white rounded-[24px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-gray-200 overflow-hidden relative z-10 min-h-[400px] hidden md:flex flex-col">
         
-        {/* 🔥 FIX: Dynamically swap the edge scroll-gradient based on light/dark mode */}
         <div className={`absolute top-0 right-0 bottom-0 w-12 pointer-events-none z-30 ${
           isDarkMode 
             ? "bg-gradient-to-l from-black via-black/80 to-transparent" 
