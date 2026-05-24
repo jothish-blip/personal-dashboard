@@ -26,8 +26,12 @@ function StatCard({ title, value, subtitle }: { title: string, value: React.Reac
   const { isDarkMode } = useTheme();
   
   return (
-    <div className={`p-5 rounded-[1.5rem] border ${isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-slate-200"}`}>
-      <h3 className={`text-[10px] font-bold uppercase tracking-widest mb-2 ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
+    <div className={`p-4 md:p-5 rounded-[1.5rem] border ${
+      isDarkMode 
+        ? "bg-[#121212] border-white/[0.06] shadow-[0_8px_30px_rgba(0,0,0,0.18)]" 
+        : "bg-white border-slate-200 shadow-[0_8px_30px_rgba(15,23,42,0.06)]"
+    }`}>
+      <h3 className={`text-[10px] font-bold uppercase tracking-[0.18em] mb-2 ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
         {title}
       </h3>
       <p className={`text-base font-semibold ${isDarkMode ? "text-white" : "text-slate-900"}`}>
@@ -58,18 +62,22 @@ export default function AnalyticsSidebar({ analytics, rescheduleTask, reschedule
   const pendingToday = today.total - today.done - today.missed;
 
   return (
-    <div className="w-full space-y-8 flex flex-col pb-10">
+    <div className="w-full space-y-6 flex flex-col pb-10">
       
       {/* TODAY OVERVIEW (Hero) */}
       <section className="space-y-4">
-        <h3 className={`text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
+        <h3 className={`text-xs font-bold uppercase tracking-[0.18em] ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
           Today
         </h3>
         
-        <div className={`p-6 rounded-[1.5rem] border ${isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-slate-200"}`}>
+        <div className={`p-5 md:p-6 rounded-[1.5rem] border ${
+          isDarkMode 
+            ? "bg-[#121212] border-white/[0.06] shadow-[0_8px_30px_rgba(0,0,0,0.18)]" 
+            : "bg-white border-slate-200 shadow-[0_8px_30px_rgba(15,23,42,0.06)]"
+        }`}>
           <div className="flex justify-between items-end mb-6">
             <div>
-              <h2 className={`text-4xl font-semibold tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+              <h2 className={`text-4xl font-bold tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>
                 {today.done} <span className={isDarkMode ? "text-gray-600" : "text-slate-400"}>/ {today.total}</span>
               </h2>
               <p className={`text-xs font-medium mt-1.5 ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
@@ -77,24 +85,24 @@ export default function AnalyticsSidebar({ analytics, rescheduleTask, reschedule
               </p>
             </div>
             <div className="text-right">
-              <p className={`text-xl font-semibold ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+              <p className={`text-xl font-bold tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>
                 {analytics.rate}%
               </p>
-              <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-[0.18em] mt-1 ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
                 Rate
               </p>
             </div>
           </div>
 
-          {/* Minimal Progress Bar */}
+          {/* Premium Nextask Progress Bar */}
           <div className={`h-1.5 w-full rounded-full overflow-hidden ${isDarkMode ? "bg-gray-800" : "bg-slate-100"}`}>
             <div 
-              className={`h-full rounded-full transition-all duration-700 ease-out ${isDarkMode ? "bg-white" : "bg-slate-900"}`} 
+              className="h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r from-orange-400 to-orange-500" 
               style={{ width: `${analytics.rate}%` }} 
             />
           </div>
 
-          <div className={`mt-5 pt-5 flex items-center justify-between border-t ${isDarkMode ? "border-gray-800" : "border-slate-100"}`}>
+          <div className={`mt-5 pt-5 flex items-center justify-between border-t ${isDarkMode ? "border-white/[0.06]" : "border-slate-100"}`}>
             <div className="flex gap-4">
               <p className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
                 {pendingToday} pending
@@ -150,13 +158,13 @@ export default function AnalyticsSidebar({ analytics, rescheduleTask, reschedule
       {missedTasks.length > 0 && (
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className={`text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
+            <h3 className={`text-xs font-bold uppercase tracking-[0.18em] ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
               Recovery Queue
             </h3>
             {missedTasks.length > 1 && (
               <button 
                 onClick={rescheduleAllMissed}
-                className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                className={`text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
                   isDarkMode ? "text-gray-400 hover:text-white" : "text-slate-500 hover:text-slate-900"
                 }`}
               >
@@ -166,15 +174,17 @@ export default function AnalyticsSidebar({ analytics, rescheduleTask, reschedule
           </div>
 
           <div className={`rounded-[1.5rem] border divide-y overflow-hidden ${
-            isDarkMode ? "bg-[#111111] border-gray-800 divide-gray-800" : "bg-white border-slate-200 divide-slate-100"
+            isDarkMode 
+              ? "bg-[#121212] border-white/[0.06] divide-white/[0.06] shadow-[0_8px_30px_rgba(0,0,0,0.18)]" 
+              : "bg-white border-slate-200 divide-slate-100 shadow-[0_8px_30px_rgba(15,23,42,0.06)]"
           }`}>
             {missedTasks.map(task => (
-              <div key={task.id} className="p-4 flex items-center justify-between">
+              <div key={task.id} className="p-4 md:p-5 flex items-center justify-between">
                 <div className="min-w-0 pr-4">
                   <p className={`text-sm font-semibold truncate ${isDarkMode ? "text-gray-200" : "text-slate-800"}`}>
                     {task.title}
                   </p>
-                  <p className={`text-[10px] font-medium mt-1.5 uppercase tracking-wider ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
+                  <p className={`text-[10px] font-medium mt-1.5 uppercase tracking-[0.18em] ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
                     {task.time} — {task.type}
                   </p>
                 </div>
@@ -182,9 +192,9 @@ export default function AnalyticsSidebar({ analytics, rescheduleTask, reschedule
                   onClick={() => rescheduleTask(task.id)}
                   className={`shrink-0 p-2.5 rounded-xl transition-colors border ${
                     isDarkMode 
-                      ? "bg-[#0a0a0a] text-gray-400 border-gray-800 hover:bg-white hover:text-black hover:border-white" 
-                      : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-900 hover:text-white hover:border-slate-900"
-                  }`}
+                      ? "bg-white/[0.02] text-gray-400 border-white/[0.06]" 
+                      : "bg-orange-50/40 text-slate-500 border-slate-200"
+                  } hover:bg-orange-500 hover:text-white hover:border-orange-500`}
                   title="Reschedule Task"
                 >
                   <CalendarClock size={14} />
@@ -197,28 +207,41 @@ export default function AnalyticsSidebar({ analytics, rescheduleTask, reschedule
 
       {/* GLOBAL BREAKDOWN */}
       <section className="space-y-4">
-        <h3 className={`text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
+        <h3 className={`text-xs font-bold uppercase tracking-[0.18em] ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
           Global Breakdown
         </h3>
         <div className="grid grid-cols-3 gap-3">
+          
+          {/* Completed - Orange Accent */}
           <div className={`p-4 rounded-[1.5rem] border flex flex-col justify-between ${
-            isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-slate-50 border-slate-200"
+            isDarkMode 
+              ? "bg-orange-900/20 border-orange-500/20" 
+              : "bg-orange-50/50 border-orange-200 shadow-[0_8px_30px_rgba(15,23,42,0.06)]"
           }`}>
-            <p className={`text-2xl font-semibold tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>{statusCounts.completed}</p>
-            <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Done</p>
+            <p className={`text-2xl font-bold tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>{statusCounts.completed}</p>
+            <p className={`text-[10px] font-bold uppercase tracking-[0.18em] mt-1 ${isDarkMode ? "text-orange-500/70" : "text-orange-500"}`}>Done</p>
           </div>
+          
+          {/* Pending - Neutral Accent */}
           <div className={`p-4 rounded-[1.5rem] border flex flex-col justify-between ${
-            isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-slate-50 border-slate-200"
+            isDarkMode 
+              ? "bg-white/[0.02] border-white/[0.06]" 
+              : "bg-orange-50/40 border-slate-200 shadow-[0_8px_30px_rgba(15,23,42,0.06)]"
           }`}>
-            <p className={`text-2xl font-semibold tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>{statusCounts.pending}</p>
-            <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Pending</p>
+            <p className={`text-2xl font-bold tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>{statusCounts.pending}</p>
+            <p className={`text-[10px] font-bold uppercase tracking-[0.18em] mt-1 ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Pending</p>
           </div>
+          
+          {/* Missed - Red Accent */}
           <div className={`p-4 rounded-[1.5rem] border flex flex-col justify-between ${
-            isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-slate-50 border-slate-200"
+            isDarkMode 
+              ? "bg-red-900/10 border-red-500/20" 
+              : "bg-red-50/50 border-red-200 shadow-[0_8px_30px_rgba(15,23,42,0.06)]"
           }`}>
-            <p className={`text-2xl font-semibold tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>{statusCounts.missed}</p>
-            <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Missed</p>
+            <p className={`text-2xl font-bold tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>{statusCounts.missed}</p>
+            <p className={`text-[10px] font-bold uppercase tracking-[0.18em] mt-1 ${isDarkMode ? "text-red-400/70" : "text-red-500"}`}>Missed</p>
           </div>
+
         </div>
       </section>
 

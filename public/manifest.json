@@ -1,6 +1,6 @@
 {
-  "name": "NexTask Focus Engine",
-  "short_name": "NexTask",
+  "name": "Nextask",
+  "short_name": "Nextask",
   "description": "Execution system for focus, tasks and planning",
   "start_url": "/",
   "display": "standalone",

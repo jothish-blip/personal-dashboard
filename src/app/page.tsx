@@ -138,27 +138,48 @@ export default function Home() {
     setIsStateLoaded(true);
   }, []);
 
+  // SESSION MEMORY GATE
+  useEffect(() => {
+    if (mounted && isStateLoaded && isFocusLoaded && isAuthenticated) {
+      sessionStorage.setItem("nextask_session_loaded", "true");
+    }
+  }, [mounted, isStateLoaded, isFocusLoaded, isAuthenticated]);
+
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     sessionStorage.setItem("nexengine_active_tab", tab);
   };
 
-  if (
+  const hasSessionLoaded =
+    typeof window !== "undefined"
+      ? sessionStorage.getItem("nextask_session_loaded") === "true"
+      : false;
+
+  const shouldBlockRender =
     isAuthenticated === null ||
     isAuthenticated === false ||
     !mounted ||
     !isStateLoaded ||
-    !isFocusLoaded
-  ) {
-    return (
-      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${
-        isDarkMode ? "bg-[#050505] text-gray-400" : "bg-[#F9FAFB] text-gray-500"
-      }`}>
-        <div className="flex flex-col items-center gap-3 animate-pulse">
-          <span className="text-sm font-bold uppercase tracking-widest text-orange-500">Initializing Workspace...</span>
+    !isFocusLoaded;
+
+  if (shouldBlockRender) {
+    // Only show the loading spinner ONCE per session
+    if (!hasSessionLoaded) {
+      return (
+        <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${
+          isDarkMode ? "bg-[#050505] text-gray-400" : "bg-[#F9FAFB] text-gray-500"
+        }`}>
+          <div className="flex flex-col items-center gap-3 animate-pulse">
+            <span className="text-sm font-bold uppercase tracking-widest text-orange-500">
+              Initializing Workspace...
+            </span>
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
+
+    // After the first load, don't show the spinner again to prevent flashes
+    return null;
   }
 
   return (
