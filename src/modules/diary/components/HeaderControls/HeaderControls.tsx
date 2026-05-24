@@ -1,144 +1,101 @@
-import React, { useMemo } from 'react';
-import { BookOpen } from 'lucide-react';
+"use client";
+
+import React from 'react';
+import { BookOpen, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { useTheme } from "@/theme/ThemeProvider";
 
 export default function HeaderControls({ system }: any) {
-  const e = system.currentEntry || {};
+  const { selectedDate, actualToday, setSelectedDate, changeDate } = system;
+  const { isDarkMode } = useTheme();
 
-  // --- Formatting ---
-  const formattedEnergy = e.energy 
-    ? e.energy.charAt(0).toUpperCase() + e.energy.slice(1)
-    : '—';
-
-  const todayLabel = new Date().toLocaleDateString('en-GB', {
-    timeZone: 'Asia/Kolkata',
+  // --- Safe Local Date Parsing ---
+  const [year, month, day] = (selectedDate || actualToday || '').split('-').map(Number);
+  const dateObj = new Date(year, month - 1, day);
+  
+  const formattedDate = dateObj.toLocaleDateString('en-GB', {
+    weekday: 'long',
     day: 'numeric',
-    month: 'short',
-    year: 'numeric'
+    month: 'long'
   });
 
-  // --- Core Calculations ---
-  const dayScore = useMemo(() => {
-    const consistencyCalc = (system.consistency || 0) * 0.4;
-    const alignCalc = (e.goalAlignment || 50) * 0.4;
-    const distractCalc = ((100 - (e.distractionLevel || 0)) * 0.2);
-    return Math.round(consistencyCalc + alignCalc + distractCalc);
-  }, [system.consistency, e.goalAlignment, e.distractionLevel]);
+  const isToday = selectedDate === actualToday;
 
-  const trend = useMemo(() => {
-    if (!system.allEntries) return 'same';
-    
-    // Calculate previous day securely
-    const prevDateObj = new Date(system.selectedDate || new Date());
-    prevDateObj.setDate(prevDateObj.getDate() - 1);
-    const offset = prevDateObj.getTimezoneOffset();
-    const localPrevDate = new Date(prevDateObj.getTime() - offset * 60000);
-    const prevDateStr = localPrevDate.toISOString().split('T')[0];
-
-    const prevEntry = system.allEntries[prevDateStr];
-    const prevAlign = prevEntry?.goalAlignment || 50;
-    const currAlign = e.goalAlignment || 50;
-
-    if (currAlign > prevAlign) return 'up';
-    if (currAlign < prevAlign) return 'down';
-    return 'same';
-  }, [system.selectedDate, system.allEntries, e.goalAlignment]);
-
-  // --- Integrity Logic ---
-  const hasData = e.goalAlignment !== undefined || system.consistency !== undefined;
+  // --- Styling ---
+  const btnClass = `flex items-center justify-center p-2 border rounded-xl text-sm font-bold transition-all shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+    isDarkMode 
+      ? "bg-[#111111] border-gray-800 text-gray-300 hover:bg-[#1a1a1a]" 
+      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+  }`;
 
   return (
-    <header className="flex flex-col gap-5 pb-6 border-b border-gray-100 text-left">
+    <header className={`flex flex-col sm:flex-row sm:items-end justify-between gap-5 pb-6 border-b text-left ${
+      isDarkMode ? "border-gray-800" : "border-gray-100"
+    }`}>
       
-      {/* --- TOP ROW: IDENTITY --- */}
-      <div className="flex items-center gap-3">
-        <div className="bg-orange-500 p-2.5 rounded-xl text-white shadow-sm shrink-0">
-          <BookOpen size={20} />
+      {/* --- LEFT: IDENTITY & CONTEXT --- */}
+      <div className="flex items-center gap-4">
+        <div className={`p-2.5 rounded-xl shadow-sm shrink-0 ${
+          isDarkMode ? "bg-orange-950/30 text-orange-400" : "bg-orange-500/10 text-orange-600"
+        }`}>
+          <BookOpen size={22} />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-            Nextask Life Engine
+          <h1 className={`text-xl font-bold tracking-tight ${
+            isDarkMode ? "text-gray-100" : "text-gray-900"
+          }`}>
+            Diary
           </h1>
-          <p className="text-sm font-semibold text-gray-600 mt-1">
-            {todayLabel}
-          </p>
+          <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+            <p className={`text-sm font-semibold ${
+              isDarkMode ? "text-gray-300" : "text-gray-700"
+            }`}>
+              {formattedDate}
+            </p>
+            <span className={`hidden sm:inline ${
+              isDarkMode ? "text-gray-700" : "text-gray-300"
+            }`}>
+              •
+            </span>
+            <p className={`text-sm font-medium ${
+              isDarkMode ? "text-gray-500" : "text-gray-500"
+            }`}>
+              Reflect on your day honestly.
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* --- SECOND ROW: CLEAN METRICS BAR --- */}
-      <div className="flex flex-wrap items-center gap-4 sm:gap-6 bg-white border border-gray-200 rounded-2xl px-5 py-3.5 shadow-sm">
+      {/* --- RIGHT: DATE NAVIGATION --- */}
+      <div className="flex items-center gap-2">
+        <button 
+          onClick={() => changeDate(-1)} 
+          className={btnClass}
+          title="Previous Day"
+        >
+          <ChevronLeft size={16} />
+        </button>
         
-        {/* Day Score */}
-        <div className="flex items-center gap-2">
-          <div className="text-lg font-bold text-gray-900">
-            {dayScore}
-          </div>
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-            Score
-          </span>
-        </div>
-
-        <div className="h-4 w-[1px] bg-gray-200 hidden sm:block" />
-
-        {/* Streak */}
-        <div className="text-sm text-orange-600 font-semibold">
-          🔥 {system.currentStreak || 0}d
-        </div>
-
-        <div className="h-4 w-[1px] bg-gray-200 hidden sm:block" />
-
-        {/* Consistency */}
-        <div className="text-sm font-semibold">
-          ✅ {hasData ? (
-            <span className="text-blue-600">{system.consistency || 0}%</span>
-          ) : (
-            <span className="text-gray-400">—</span>
-          )}
-        </div>
-
-        <div className="h-4 w-[1px] bg-gray-200 hidden sm:block" />
-
-        {/* Energy */}
-        <div className="text-sm text-amber-600 font-semibold uppercase">
-          ⚡ {formattedEnergy}
-        </div>
-
-        <div className="h-4 w-[1px] bg-gray-200 hidden sm:block" />
-
-        {/* Trend Indicator */}
-        <span 
-          title="Alignment trend vs yesterday"
-          className={`text-base font-bold ${
-            trend === 'up' ? 'text-emerald-500' : 
-            trend === 'down' ? 'text-red-500' : 
-            'text-gray-400'
+        <button 
+          onClick={() => setSelectedDate(actualToday)} 
+          disabled={isToday}
+          className={`flex items-center gap-2 px-4 py-2 border rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+            isToday 
+              ? (isDarkMode ? "bg-orange-950/20 text-orange-500/50 border-orange-900/30" : "bg-orange-50 text-orange-400 border-orange-100") 
+              : (isDarkMode ? "bg-[#111111] text-gray-300 border-gray-800 hover:text-orange-400" : "bg-white text-gray-700 border-gray-200 hover:text-orange-600")
           }`}
         >
-          {trend === 'up' ? '↑' : trend === 'down' ? '↓' : '—'}
-        </span>
-
-      </div>
-
-      {/* --- THIRD ROW: MATRIX ENGINE STATUS --- */}
-      <div className="flex flex-col gap-2 mt-1 px-1">
-        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-          System Readiness
-        </h3>
-        <div className="flex items-center gap-2.5">
-          {/* Status Indicator Dot */}
-          <div className="relative flex h-2.5 w-2.5">
-            {e.energy !== 'low' && (
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            )}
-            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${e.energy === 'low' ? 'bg-orange-500' : 'bg-emerald-500'}`}></span>
-          </div>
-          
-          {/* Dynamic Status Text */}
-          <p className="text-sm text-gray-700 font-medium">
-            {e.energy === 'low' || e.distractionLevel > 70
-              ? "Burnout risk detected. Scale back operations and prioritize recovery." 
-              : "Matrix Engine online. Discipline and alignment tracking operating normally."}
-          </p>
-        </div>
+          <Calendar size={14} />
+          Today
+        </button>
+        
+        <button 
+          onClick={() => changeDate(1)} 
+          disabled={isToday}
+          className={btnClass}
+          title="Next Day"
+        >
+          <ChevronRight size={16} />
+        </button>
       </div>
       
     </header>

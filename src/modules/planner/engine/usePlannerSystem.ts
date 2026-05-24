@@ -17,7 +17,13 @@ const SYSTEM_VERSION = 1.2;
 const STORAGE_KEY = "taskflow_planner_v1";
 
 // NEW UNIFIED TAB TYPE
-export type TabType = "today" | "yesterday" | "tomorrow" | "range" | "logs";
+export type TabType =
+  | "today"
+  | "yesterday"
+  | "tomorrow"
+  | "objectives"
+  | "range"
+  | "logs";
 
 // --- STRICT DB TYPES ---
 type DBPlannerEvent = {
@@ -31,12 +37,6 @@ type DBPlannerEvent = {
   status: EventStatus;
   history: Record<string, EventStatus>;
   created_at: number;
-};
-
-// Optimized time-sorting helper
-const timeToMinutes = (t: string) => {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
 };
 
 // --- TIMEZONE SAFE HELPERS ---
@@ -105,7 +105,6 @@ export function usePlannerSystem() {
 
   const saveRef = useRef<NodeJS.Timeout | null>(null); 
 
-  // --- NOTIFICATION SPAM FIX ---
   const safeNotify = useCallback((key: string, fn: () => void) => {
     if (!localStorage.getItem(key)) {
       localStorage.setItem(key, "1");
@@ -113,13 +112,12 @@ export function usePlannerSystem() {
     }
   }, []);
 
-  // --- THROTTLE SEARCH EFFECT ---
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
-  // --- DB SYNC HELPERS (BATCHED) ---
+  // --- DB SYNC HELPERS ---
   const syncEventsToDB = async (eventsToSync: PlannerEvent[]) => {
     try {
       const user = userRef.current;
@@ -138,14 +136,12 @@ export function usePlannerSystem() {
         created_at: e.createdAt
       }));
 
-      // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type error
       await (supabase as any).from('planner_events').upsert(payloads, { onConflict: 'id' });
     } catch (e) { console.error("Event Sync Exception", e); }
   };
 
   const deleteEventFromDB = async (id: string) => {
     if (!supabase) return;
-    // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type error
     await (supabase as any).from('planner_events').delete().eq('id', id);
   };
 
@@ -153,17 +149,14 @@ export function usePlannerSystem() {
     try {
       const user = userRef.current;
       if (!user || !supabase) return;
-      // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type error
       await (supabase as any).from('planner_logs').insert({
         id: log.id, user_id: user.id, action: log.action, details: log.details, timestamp: log.timestamp
       });
     } catch (e) { console.error("Log Sync Error", e); }
   };
 
-  // --- AUTH RE-SYNC ---
   useEffect(() => {
     if (!supabase) return;
-
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (_event: AuthChangeEvent, session: Session | null) => {
         const user = session?.user ?? null;
@@ -171,7 +164,6 @@ export function usePlannerSystem() {
         setCurrentUser(user);
       }
     );
-
     return () => listener.subscription.unsubscribe();
   }, [supabase]);
 
@@ -190,7 +182,6 @@ export function usePlannerSystem() {
         const user = userRef.current; 
 
         if (user && supabase) {
-          // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type error
           const [eventsRes, logsRes] = await Promise.all([
             (supabase as any).from('planner_events').select('*').eq('user_id', user.id).order('event_date', { ascending: false }),
             (supabase as any).from('planner_logs').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }).limit(50)
@@ -199,7 +190,6 @@ export function usePlannerSystem() {
           if (eventsRes.data) {
             loadedEvents = (eventsRes.data as DBPlannerEvent[]).map(mapRow);
           }
-
           if (logsRes.data) {
             loadedLogs = (logsRes.data as any[]).map((row) => ({
               id: row.id, action: row.action, details: row.details, timestamp: row.timestamp
@@ -219,21 +209,8 @@ export function usePlannerSystem() {
         setEvents(loadedEvents);
         setLogs(loadedLogs);
         setIsReady(true); 
-
-        if (!sessionStorage.getItem("planner_behavior_scanned") && loadedEvents.length > 0) {
-          sessionStorage.setItem("planner_behavior_scanned", "true");
-          const todayStr = getLocalDate();
-          const todayEvents = loadedEvents.filter(e => e.date === todayStr);
-
-          if (todayEvents.length === 0) {
-            setTimeout(() => addNotification('planner', 'No Plan Today', 'Your schedule is empty.', 'high', '/Planner'), 4000);
-          } else if (todayEvents.length > 8) {
-            setTimeout(() => addNotification('planner', 'Overload Warning', `You have ${todayEvents.length} events scheduled today.`, 'high', '/Planner'), 4000);
-          }
-        }
       }
     };
-
     initPlanner();
   }, [currentUser, addNotification, supabase]); 
 
@@ -245,61 +222,40 @@ export function usePlannerSystem() {
       .channel(`planner-${currentUser.id}`)
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "planner_events",
-          filter: `user_id=eq.${currentUser.id}`
-        },
+        { event: "*", schema: "public", table: "planner_events", filter: `user_id=eq.${currentUser.id}` },
         (payload: any) => {
           if (payload.eventType === "INSERT") {
             setEvents(prev => [mapRow(payload.new), ...prev]);
           } else if (payload.eventType === "UPDATE") {
-            setEvents(prev =>
-              prev.map(e => e.id === payload.new.id ? mapRow(payload.new) : e)
-            );
+            setEvents(prev => prev.map(e => e.id === payload.new.id ? mapRow(payload.new) : e));
           } else if (payload.eventType === "DELETE") {
-            setEvents(prev =>
-              prev.filter(e => e.id !== payload.old.id)
-            );
+            setEvents(prev => prev.filter(e => e.id !== payload.old.id));
           }
         }
       )
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "planner_logs",
-          filter: `user_id=eq.${currentUser.id}`
-        },
+        { event: "*", schema: "public", table: "planner_logs", filter: `user_id=eq.${currentUser.id}` },
         (payload: any) => {
           if (payload.eventType === "INSERT") {
             setLogs(prev => [{
-              id: payload.new.id, 
-              action: payload.new.action, 
-              details: payload.new.details, 
-              timestamp: payload.new.timestamp 
+              id: payload.new.id, action: payload.new.action, details: payload.new.details, timestamp: payload.new.timestamp 
             }, ...prev]);
           }
         }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [supabase, currentUser]);
 
   // --- RECOVERY SYNC ---
   useEffect(() => {
     const interval = setInterval(() => {
       if (!navigator.onLine) return;
-
       const user = userRef.current;
       if (!user || !supabase) return;
 
-      // 🔥 FIX: Cast supabase to any FIRST to bypass strict 'never' table type error
       (supabase as any).from('planner_events')
         .select('*')
         .eq('user_id', user.id)
@@ -360,7 +316,6 @@ export function usePlannerSystem() {
   useEffect(() => {
     if (!isReady) return;
     if (saveRef.current) clearTimeout(saveRef.current);
-
     saveRef.current = setTimeout(() => {
       const payload: SystemPayload = { events, logs: logs.slice(0, 50), version: SYSTEM_VERSION, lastSync: Date.now() };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -519,80 +474,111 @@ export function usePlannerSystem() {
         createLog("RESCHEDULE", `Auto-recovered ${count} tasks`);
         addNotification('planner', 'Tasks Recovered', `${count} missed tasks have been auto-rescheduled.`, 'medium', '/Planner');
       }
-      
       return updatedEvents;
     });
   };
 
-  // --- FILTER & SORT OPTIMIZATION ---
-  // NOTE: Tab filtering is now handled natively inside EventList! We only filter by Search and sort here.
   const filteredEvents = useMemo(() => {
     return events.filter(e => {
       return e.title.toLowerCase().includes(debouncedSearch.toLowerCase());
     }).sort((a, b) => {
-      // 1. Missed first
       if (a.status === "missed" && b.status !== "missed") return -1;
       if (b.status === "missed" && a.status !== "missed") return 1;
-    
-      // 2. High priority first
       const priorityOrder = { high: 0, medium: 1, low: 2 };
       if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
         return priorityOrder[a.priority] - priorityOrder[b.priority];
       }
-    
-      // 3. Date + Time
-      const dateTimeA = new Date(`${a.date}T${a.time}`).getTime();
-      const dateTimeB = new Date(`${b.date}T${b.time}`).getTime();
-    
-      return dateTimeA - dateTimeB;
+      return new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime();
     });
   }, [events, debouncedSearch]);
 
+  // --- REAL VALUABLE ANALYTICS ---
   const analytics = useMemo(() => {
     const todayStr = getLocalDate();
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = toLocalDateString(yesterday);
-
-    const todayEvents = events.filter(e => e.date === todayStr);
-    const yesterdayEvents = events.filter(e => e.date === yesterdayStr);
     
-    const statusCounts = {
-      completed: events.filter(e => e.status === "completed").length,
-      pending: events.filter(e => e.status === "pending").length,
-      missed: events.filter(e => e.status === "missed").length
+    const todayEvents = events.filter(e => e.date === todayStr);
+    const completedEvents = events.filter(e => e.status === "completed");
+
+    // Execution Pattern Logic
+    let morning = 0, afternoon = 0, evening = 0, night = 0;
+    completedEvents.forEach(e => {
+      const h = parseInt(e.time.split(":")[0], 10);
+      if (h >= 5 && h < 12) morning++;
+      else if (h >= 12 && h < 17) afternoon++;
+      else if (h >= 17 && h < 21) evening++;
+      else night++;
+    });
+
+    const maxTime = Math.max(morning, afternoon, evening, night);
+    let patternName = "No pattern yet";
+    let patternWindow = "--";
+    
+    if (maxTime > 0) {
+      if (maxTime === morning) { patternName = "Morning focused"; patternWindow = "9 AM – 12 PM"; }
+      else if (maxTime === afternoon) { patternName = "Afternoon focused"; patternWindow = "12 PM – 5 PM"; }
+      else if (maxTime === evening) { patternName = "Evening focused"; patternWindow = "5 PM – 9 PM"; }
+      else { patternName = "Night focused"; patternWindow = "9 PM – 5 AM"; }
+    }
+
+    // Date Range Helpers
+    const getDaysAgoStr = (days: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() - days);
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().split("T")[0];
     };
+    const sevenDaysAgoStr = getDaysAgoStr(7);
+    const fourteenDaysAgoStr = getDaysAgoStr(14);
 
-    const missedTasks = events
-      .filter(e => e.status === "missed")
-      .sort((a, b) => new Date(`${b.date}T${b.time}`).getTime() - new Date(`${a.date}T${a.time}`).getTime())
-      .slice(0, 5);
+    // Weekly Trend Logic
+    const thisWeekCompleted = completedEvents.filter(e => e.date > sevenDaysAgoStr && e.date <= todayStr).length;
+    const lastWeekCompleted = completedEvents.filter(e => e.date > fourteenDaysAgoStr && e.date <= sevenDaysAgoStr).length;
+    const trendDiff = thisWeekCompleted - lastWeekCompleted;
 
+    // Consistency Logic (Unique active days in last 7)
+    const uniqueActiveDays = new Set(
+      completedEvents.filter(e => e.date > sevenDaysAgoStr && e.date <= todayStr).map(e => e.date)
+    ).size;
+
+    // Workload Balance Logic
+    let workloadLabel = "Balanced";
+    if (todayEvents.length < 4) workloadLabel = "Light day";
+    else if (todayEvents.length > 8) workloadLabel = "Heavy day";
+
+    // Delayed Category Logic
     const missedByType: Record<string, number> = {};
     events.forEach(e => {
       if (e.status === "missed") {
         missedByType[e.type] = (missedByType[e.type] || 0) + 1;
       }
     });
-    
-    const sortedMissedByType = Object.fromEntries(
-      Object.entries(missedByType).sort(([,a], [,b]) => b - a)
-    );
+    const sortedMissedByType = Object.fromEntries(Object.entries(missedByType).sort(([,a], [,b]) => b - a));
+    const mostDelayedCategory = Object.keys(sortedMissedByType)[0] || null;
+    const mostDelayedCount = mostDelayedCategory ? sortedMissedByType[mostDelayedCategory] : 0;
 
     return {
       rate: todayEvents.length ? Math.round((todayEvents.filter(e => e.status === "completed").length / todayEvents.length) * 100) : 0,
-      statusCounts,
+      statusCounts: {
+        completed: completedEvents.length,
+        pending: events.filter(e => e.status === "pending").length,
+        missed: events.filter(e => e.status === "missed").length
+      },
       today: { 
         done: todayEvents.filter(e => e.status === "completed").length, 
         total: todayEvents.length,
         missed: todayEvents.filter(e => e.status === "missed").length
       },
-      yesterday: {
-        done: yesterdayEvents.filter(e => e.status === "completed").length,
-        total: yesterdayEvents.length
-      },
-      missedTasks,
-      missedByType: sortedMissedByType
+      missedTasks: events
+        .filter(e => e.status === "missed")
+        .sort((a, b) => new Date(`${b.date}T${b.time}`).getTime() - new Date(`${a.date}T${a.time}`).getTime())
+        .slice(0, 5),
+      
+      // New Core Analytics
+      executionPattern: { name: patternName, window: patternWindow },
+      weeklyTrend: { completed: thisWeekCompleted, diff: trendDiff },
+      consistency: { activeDays: uniqueActiveDays },
+      workload: { label: workloadLabel, total: todayEvents.length },
+      mostDelayed: mostDelayedCategory ? { category: mostDelayedCategory, count: mostDelayedCount } : null
     };
   }, [events]);
 

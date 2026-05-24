@@ -14,7 +14,6 @@ import AnalyticsSidebar from "@/modules/planner/components/AnalyticsSidebar/Anal
 
 import AddEventModal from "@/modules/planner/components/AddEventModal/AddEventModal";
 
-import ProgressModal from "@/modules/planner/components/ProgressModal/ProgressModal";
 
 export default function MatrixIntelligenceSystem() {
 
@@ -97,12 +96,6 @@ export default function MatrixIntelligenceSystem() {
         </aside>
 
       </main>
-
-      {/* Modals */}
-      <ProgressModal
-        isOpen={system.isStatusModalOpen}
-        onClose={system.closeStatusModal}
-      />
 
       <AddEventModal
         isOpen={system.isAddModalOpen}
