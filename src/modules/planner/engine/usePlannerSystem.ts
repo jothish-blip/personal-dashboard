@@ -14,7 +14,8 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const SYSTEM_VERSION = 1.2;
-const STORAGE_KEY = "taskflow_planner_v1";
+// Use a dynamic storage key getter to prevent cross-account local cache bleeding
+const getStorageKey = (userId?: string) => `taskflow_planner_v1_${userId || "guest"}`;
 
 // NEW UNIFIED TAB TYPE
 export type TabType =
@@ -141,8 +142,10 @@ export function usePlannerSystem() {
   };
 
   const deleteEventFromDB = async (id: string) => {
-    if (!supabase) return;
-    await (supabase as any).from('planner_events').delete().eq('id', id);
+    const user = userRef.current;
+    if (!supabase || !user) return;
+    // Explicitly scope delete to the current user for absolute safety
+    await (supabase as any).from('planner_events').delete().eq('id', id).eq('user_id', user.id);
   };
 
   const syncLogToDB = async (log: SystemLog) => {
@@ -160,6 +163,14 @@ export function usePlannerSystem() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (_event: AuthChangeEvent, session: Session | null) => {
         const user = session?.user ?? null;
+        
+        // CRITICAL FIX: Flush state immediately on user swap to prevent cross-account leaks
+        if (userRef.current?.id !== user?.id) {
+          setEvents([]);
+          setLogs([]);
+          setIsReady(false);
+        }
+        
         userRef.current = user;
         setCurrentUser(user);
       }
@@ -196,7 +207,8 @@ export function usePlannerSystem() {
             }));
           }
         } else if (!user) {
-          const raw = localStorage.getItem(STORAGE_KEY);
+          // Use dynamic storage key to prevent reading another user's offline cache
+          const raw = localStorage.getItem(getStorageKey("guest"));
           if (raw) {
             const payload: SystemPayload = JSON.parse(raw);
             loadedEvents = payload.events || [];
@@ -318,9 +330,10 @@ export function usePlannerSystem() {
     if (saveRef.current) clearTimeout(saveRef.current);
     saveRef.current = setTimeout(() => {
       const payload: SystemPayload = { events, logs: logs.slice(0, 50), version: SYSTEM_VERSION, lastSync: Date.now() };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      // Scope storage key to current user to prevent cross-account cache issues
+      localStorage.setItem(getStorageKey(currentUser?.id), JSON.stringify(payload));
     }, 2000);
-  }, [events, logs, isReady]);
+  }, [events, logs, isReady, currentUser]);
 
   const closeStatusModal = () => {
     setIsStatusModalOpen(false);

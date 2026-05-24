@@ -16,8 +16,16 @@ interface AddEventModalProps {
 // 1. Helper to strictly get local present time for validation
 const getNowLocal = () => {
   const now = new Date();
+  
+  // Smart rounding: round up to the nearest 5 minutes for a cleaner default time
+  const mins = Math.ceil(now.getMinutes() / 5) * 5;
+  now.setMinutes(mins);
+
+  // Using local timezone offset to avoid UTC rollover bugs
+  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+
   return {
-    date: now.toISOString().split("T")[0],
+    date: localDate,
     time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
   };
 };
@@ -31,31 +39,21 @@ export default function AddEventModal({
 }: AddEventModalProps) {
   const { isDarkMode } = useTheme();
   const titleInputRef = useRef<HTMLInputElement>(null);
-
-  // Auto-focus & Auto-default Time when opened
+  
+  // Auto-focus & ALWAYS default to Present Time when opened
   useEffect(() => {
     if (isOpen) {
-      let updates: Partial<PlannerEvent> = {};
-      let needsUpdate = false;
       const now = getNowLocal();
-
-      if (!formData.time) {
-        updates.time = now.time;
-        needsUpdate = true;
-      }
-      
-      if (!formData.date) {
-        updates.date = now.date;
-        needsUpdate = true;
-      }
-
-      if (needsUpdate) {
-        setFormData({ ...formData, ...updates });
-      }
-
-      if (titleInputRef.current) {
-        setTimeout(() => titleInputRef.current?.focus(), 50);
-      }
+  
+      setFormData({
+        ...formData,
+        date: now.date,
+        time: now.time,
+      });
+  
+      setTimeout(() => {
+        titleInputRef.current?.focus();
+      }, 50);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -64,14 +62,23 @@ export default function AddEventModal({
 
   const isEdit = !!formData.id;
 
-  // Fixed Quick Time Logic
-  const setQuickTime = (addMinutes: number) => {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() + addMinutes);
+  // Streamlined Quick Time Logic
+  const setQuickPreset = (preset: "now" | "30m" | "1h" | "tomorrow") => {
+    const targetDate = new Date();
 
-    const newDate = now.toISOString().split("T")[0];
-    const hours = String(now.getHours()).padStart(2, "0");
-    const mins = String(now.getMinutes()).padStart(2, "0");
+    if (preset === "30m") {
+      targetDate.setMinutes(targetDate.getMinutes() + 30);
+    } else if (preset === "1h") {
+      targetDate.setHours(targetDate.getHours() + 1);
+    } else if (preset === "tomorrow") {
+      targetDate.setDate(targetDate.getDate() + 1);
+      targetDate.setHours(9, 0, 0, 0); // Defaults to 9:00 AM next day
+    }
+
+    // Adjust for timezone offset properly so quick preset days don't drift
+    const newDate = new Date(targetDate.getTime() - targetDate.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+    const hours = String(targetDate.getHours()).padStart(2, "0");
+    const mins = String(targetDate.getMinutes()).padStart(2, "0");
 
     setFormData({
       ...formData,
@@ -80,7 +87,24 @@ export default function AddEventModal({
     });
   };
 
-  // Smart Auto-Parsing logic (silently parses times like 5pm)
+  const checkQuickTimeMatch = (preset: string) => {
+    if (!formData.date || !formData.time) return false;
+    
+    const target = new Date();
+    if (preset === "30m") target.setMinutes(target.getMinutes() + 30);
+    else if (preset === "1h") target.setHours(target.getHours() + 1);
+    else if (preset === "tomorrow") {
+      target.setDate(target.getDate() + 1);
+      target.setHours(9, 0, 0, 0);
+    }
+    
+    const expDate = new Date(target.getTime() - target.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+    const expTime = `${String(target.getHours()).padStart(2, "0")}:${String(target.getMinutes()).padStart(2, "0")}`;
+
+    return formData.date === expDate && formData.time === expTime;
+  };
+
+  // Smart Auto-Parsing logic
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     let newTime = formData.time;
@@ -107,13 +131,11 @@ export default function AddEventModal({
   const handleValidatedSave = () => {
     if (!formData.date || !formData.time) return;
 
-    // Parse safely
     const [year, month, day] = formData.date.split('-').map(Number);
     const [hours, minutes] = formData.time.split(':').map(Number);
     const selectedDate = new Date(year, month - 1, day, hours, minutes);
     const now = new Date();
 
-    // Prevent past scheduling (giving a 1 minute grace period)
     if (selectedDate.getTime() < now.getTime() - 60000) {
       alert("Cannot schedule tasks in the past. Focus on the present and future.");
       return;
@@ -127,13 +149,6 @@ export default function AddEventModal({
       e.preventDefault();
       handleValidatedSave();
     }
-  };
-
-  const checkQuickTimeMatch = (addMinutes: number) => {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() + addMinutes);
-    const expectedTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    return formData.time === expectedTime;
   };
 
   return (
@@ -153,7 +168,7 @@ export default function AddEventModal({
 
         {/* HEADER */}
         <div className="flex justify-between items-start">
-          <div className="space-y-1">
+          <div className="space-y-1 w-full">
             <h3 className={`text-2xl md:text-3xl font-black tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>
               {isEdit ? "Edit Task" : "New Task"}
             </h3>
@@ -161,9 +176,10 @@ export default function AddEventModal({
               {isEdit ? "Update your plan." : "Plan something meaningful."}
             </p>
           </div>
+          
           <button 
             onClick={onClose} 
-            className={`p-2 rounded-full transition-colors ${
+            className={`p-2 rounded-full transition-colors ml-4 shrink-0 ${
               isDarkMode ? "bg-gray-900 text-gray-500 hover:text-white hover:bg-gray-800" : "bg-slate-50 text-slate-400 hover:text-slate-900 hover:bg-slate-100"
             }`}
           >
@@ -194,10 +210,10 @@ export default function AddEventModal({
           </div>
 
           {/* DATE & TIME SETTINGS */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <div className="flex justify-between items-center h-[18px]">
-                <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Date</label>
+                <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Complete By</label>
                 <button 
                   onClick={() => setFormData({ ...formData, date: getNowLocal().date })}
                   className="text-xs text-orange-500 font-semibold hover:text-orange-600 transition-colors"
@@ -210,7 +226,7 @@ export default function AddEventModal({
                 min={getNowLocal().date} 
                 value={formData.date || ""}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                className={`w-full p-3.5 border rounded-2xl outline-none font-bold text-sm focus:border-orange-500 transition-colors ${
+                className={`w-full p-4 border rounded-2xl outline-none font-bold text-base focus:border-orange-500 transition-colors ${
                   isDarkMode ? "bg-[#0a0a0a] border-gray-800 text-white color-scheme-dark" : "bg-slate-50 border-slate-200 text-slate-900"
                 }`}
               />
@@ -218,46 +234,108 @@ export default function AddEventModal({
 
             <div className="space-y-2">
               <div className="flex justify-between items-center h-[18px]">
-                <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Time</label>
+                <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Before Time</label>
               </div>
               <input
                 type="time"
+                min={formData.date === getNowLocal().date ? getNowLocal().time : undefined}
                 value={formData.time || ""}
                 onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                className={`w-full p-3.5 border rounded-2xl outline-none font-bold text-sm focus:border-orange-500 transition-colors ${
+                className={`w-full p-4 border rounded-2xl outline-none font-bold text-base focus:border-orange-500 transition-colors ${
                   isDarkMode ? "bg-[#0a0a0a] border-gray-800 text-white color-scheme-dark" : "bg-slate-50 border-slate-200 text-slate-900"
                 }`}
               />
             </div>
           </div>
 
+          {/* DEADLINE STATUS */}
+          {formData.date && formData.time && (
+            <div
+              className={`
+                flex items-center justify-between
+                px-4 py-3
+                rounded-2xl border
+                ${
+                  isDarkMode
+                    ? "bg-[#0f0f0f] border-white/[0.06]"
+                    : "bg-orange-50/50 border-orange-100"
+                }
+              `}
+            >
+              <div>
+                <p
+                  className={`
+                    text-[11px]
+                    uppercase
+                    tracking-[0.18em]
+                    font-black
+                    ${
+                      isDarkMode
+                        ? "text-gray-500"
+                        : "text-slate-400"
+                    }
+                  `}
+                >
+                  Deadline
+                </p>
+
+                <p
+                  className={`
+                    font-bold
+                    text-sm
+                    ${
+                      isDarkMode
+                        ? "text-white"
+                        : "text-slate-900"
+                    }
+                  `}
+                >
+                  Complete before{" "}
+                  {new Date(
+                    `${formData.date}T${formData.time}`
+                  ).toLocaleString([], {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
+
+              <span className="text-xs font-bold text-orange-500">
+                Due
+              </span>
+            </div>
+          )}
+
           {/* QUICK TIME BUTTONS */}
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
              <Clock size={14} className={`shrink-0 ${isDarkMode ? "text-gray-600" : "text-slate-300"}`} />
              
-             <button onClick={() => setQuickTime(0)} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-               checkQuickTimeMatch(0) 
+             <button onClick={() => setQuickPreset("now")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+               checkQuickTimeMatch("now") 
                  ? "bg-orange-500 text-white border-orange-500 shadow-sm" 
                  : (isDarkMode ? "bg-[#0a0a0a] hover:bg-[#1a1a1a] text-gray-400 border-gray-800" : "bg-slate-50 hover:bg-slate-100 text-slate-500 border-slate-200")
-             }`}>Now</button>
+             }`}>Due now</button>
              
-             <button onClick={() => setQuickTime(15)} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-               checkQuickTimeMatch(15) 
+             <button onClick={() => setQuickPreset("30m")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+               checkQuickTimeMatch("30m") 
                  ? "bg-orange-500 text-white border-orange-500 shadow-sm" 
                  : (isDarkMode ? "bg-[#0a0a0a] hover:bg-[#1a1a1a] text-gray-400 border-gray-800" : "bg-slate-50 hover:bg-slate-100 text-slate-500 border-slate-200")
-             }`}>+15m</button>
+             }`}>30m left</button>
              
-             <button onClick={() => setQuickTime(30)} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-               checkQuickTimeMatch(30) 
+             <button onClick={() => setQuickPreset("1h")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+               checkQuickTimeMatch("1h") 
                  ? "bg-orange-500 text-white border-orange-500 shadow-sm" 
                  : (isDarkMode ? "bg-[#0a0a0a] hover:bg-[#1a1a1a] text-gray-400 border-gray-800" : "bg-slate-50 hover:bg-slate-100 text-slate-500 border-slate-200")
-             }`}>+30m</button>
-             
-             <button onClick={() => setQuickTime(60)} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-               checkQuickTimeMatch(60) 
+             }`}>1h left</button>
+
+             <button onClick={() => setQuickPreset("tomorrow")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+               checkQuickTimeMatch("tomorrow") 
                  ? "bg-orange-500 text-white border-orange-500 shadow-sm" 
                  : (isDarkMode ? "bg-[#0a0a0a] hover:bg-[#1a1a1a] text-gray-400 border-gray-800" : "bg-slate-50 hover:bg-slate-100 text-slate-500 border-slate-200")
-             }`}>+1h</button>
+             }`}>Tomorrow</button>
           </div>
 
           <div className="space-y-5">
@@ -319,7 +397,7 @@ export default function AddEventModal({
                 ? "Select time"
                 : isEdit
                 ? "Save Changes"
-                : "Add Task"
+                : "Add Deadline"
               }
             </button>
           </div>

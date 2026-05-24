@@ -509,35 +509,22 @@ export default function MatrixView({
           )}
         </div>
         {!isFocusMode && (
-  <div
-    className="
-      w-full
-      xl:w-[320px]
-      shrink-0
-
-      order-2 xl:order-none
-
-      xl:sticky
-      xl:top-8
-      h-fit
-    "
-  >
-    <Sidebar
-      overallDiff={overallDiff}
-      consistencyScore={consistencyScore}
-      validDays={validDays}
-      chartMaxCount={chartMaxCount}
-      bestGlobalStreak={bestGlobalStreak}
-      globalWeekStats={globalWeekStats}
-      compareCurrentWeek={compareCurrentWeek}
-      comparePrevWeek={comparePrevWeek}
-      weekOffset={weekOffset}
-      setWeekOffset={setWeekOffset}
-      totalCurrent={totalCurrent}
-      actualToday={actualToday}
-    />
-  </div>
-)}
+          <div
+            className="
+              w-full
+              sm:w-full
+              xl:w-[320px]
+              max-w-full
+              shrink-0
+              order-2 xl:order-none
+              xl:sticky
+              xl:top-8
+              h-fit
+            "
+          >
+            <Sidebar/>
+          </div>
+        )}
       </div>
 
     </div>
