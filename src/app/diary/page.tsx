@@ -6,7 +6,6 @@ import Navbar from "@/navigation/Navbar";
 // Diary Module Imports
 import { useDiarySystem } from "@/modules/diary/engine/useDiarySystem";
 
-import { WipPopup } from "@/modules/diary/components/Modals/Modals";
 
 import HeaderControls from "@/modules/diary/components/HeaderControls/HeaderControls";
 
@@ -42,12 +41,6 @@ export default function DiaryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-24 relative selection:bg-orange-100 selection:text-orange-900">
-
-      {/* Modals */}
-      <WipPopup
-        showWipPopup={system.showWipPopup}
-        setShowWipPopup={system.setShowWipPopup}
-      />
 
       {/* Navbar */}
       <Navbar

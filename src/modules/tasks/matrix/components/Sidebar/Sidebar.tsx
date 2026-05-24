@@ -1,342 +1,488 @@
-"use client";
-
-import React, { useState, useMemo } from 'react';
-import { Activity, Flame, BarChart2, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, Minus, ChevronDown } from 'lucide-react';
-import { parseLocalDate } from "../../utils";
-import { useTheme } from "@/theme/ThemeProvider";
+import React, { useMemo, useState, useEffect } from 'react'
 
 interface SidebarProps {
-  overallDiff: number;
-  consistencyScore: number;
-  validDays: { date: string; label: string; count: number }[];
-  chartMaxCount: number;
-  bestGlobalStreak: number;
-  globalWeekStats: { best: any; worst: any };
-  compareCurrentWeek: { date: string; label: string; dayNum: string; count: number }[];
-  comparePrevWeek: { date: string; count: number }[];
-  weekOffset: number;
-  setWeekOffset: React.Dispatch<React.SetStateAction<number>>;
-  totalCurrent: number;
-  actualToday: string;
+  overallDiff: number
+  consistencyScore: number
+  validDays: {
+    date: string
+    label: string
+    count: number
+  }[]
+  chartMaxCount: number
+  bestGlobalStreak: number
+  globalWeekStats: {
+    best: any
+    worst: any
+  }
+  compareCurrentWeek: {
+    date: string
+    label: string
+    dayNum: string
+    count: number
+  }[]
+  comparePrevWeek: {
+    date: string
+    count: number
+  }[]
+  weekOffset: number
+  setWeekOffset: React.Dispatch<React.SetStateAction<number>>
+  totalCurrent: number
+  actualToday: string
 }
 
-const getConsistencyLabel = (score: number) => {
-  if (score >= 85) return "EXCELLENT";
-  if (score >= 70) return "STRONG";
-  if (score >= 50) return "MODERATE";
-  if (score >= 30) return "WEAK";
-  return "UNSTABLE";
-};
+const clamp = (v: number, a = 0, b = 1) => Math.max(a, Math.min(b, v))
 
-export default function Sidebar({
-  overallDiff, consistencyScore, validDays, chartMaxCount, bestGlobalStreak,
-  globalWeekStats, compareCurrentWeek, comparePrevWeek, weekOffset, setWeekOffset,
-  totalCurrent, actualToday
-}: SidebarProps) {
-  
-  const { isDarkMode } = useTheme();
-  const todayDateObj = useMemo(() => parseLocalDate(actualToday), [actualToday]);
+function buildLinePath(points: { x: number; y: number }[]) {
+  if (!points.length) return ''
+  let d = `M ${points[0].x} ${points[0].y}`
 
-  const [openSection, setOpenSection] = useState<string>('hud');
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1]
+    const cur = points[i]
+    const cx = (prev.x + cur.x) / 2
+    const cy = (prev.y + cur.y) / 2
+    d += ` Q ${prev.x} ${prev.y} ${cx} ${cy}`
+  }
 
-  // PERFORMANCE OPTIMIZATION: Best Day calculation
-  const bestDay = useMemo(() => {
-    if (!validDays || validDays.length === 0) return null;
-    return validDays.reduce((max, d) => d.count > max.count ? d : max, validDays[0]);
-  }, [validDays]);
+  const last = points[points.length - 1]
+  d += ` T ${last.x} ${last.y}`
+  return d
+}
 
-  // Ensure it's rounded for UI consistency
-  const roundedConsistency = Math.round(consistencyScore);
+function buildAreaPath(points: { x: number; y: number }[], baseline = 156) {
+  if (!points.length) return ''
+  const line = buildLinePath(points)
+  const first = points[0]
+  const last = points[points.length - 1]
+  return `${line} L ${last.x} ${baseline} L ${first.x} ${baseline} Z`
+}
+
+export default function Sidebar(props: SidebarProps) {
+  const {
+    validDays,
+    compareCurrentWeek,
+    comparePrevWeek,
+    totalCurrent,
+    actualToday,
+  } = props
+
+  const todayCompleted = useMemo(() => {
+    const found = compareCurrentWeek.find((d) => d.date === actualToday)
+    if (found) return found.count
+
+    const last =
+      validDays.find((d) => d.date === actualToday) ||
+      validDays[validDays.length - 1]
+
+    return last ? last.count : 0
+  }, [compareCurrentWeek, validDays, actualToday])
+
+  const totalTasks = Math.max(1, totalCurrent || 1)
+  const heroPct = clamp(todayCompleted / totalTasks)
+
+  const heroMessage = useMemo(() => {
+    const p = heroPct * 100
+
+    if (todayCompleted === 0) {
+      return {
+        title: 'Start with one meaningful task.',
+        subtitle: 'Momentum starts small.',
+      }
+    }
+
+    if (p > 0 && p <= 40) {
+      return {
+        title: 'You started moving today.',
+        subtitle: 'Keep building.',
+      }
+    }
+
+    if (p > 40 && p <= 70) {
+      return {
+        title: 'Good progress today.',
+        subtitle: "You're moving forward.",
+      }
+    }
+
+    if (p > 70 && p < 100) {
+      return {
+        title: 'Strong execution today.',
+        subtitle: 'Almost complete.',
+      }
+    }
+
+    return {
+      title: 'Everything completed.',
+      subtitle: 'Today was valuable.',
+    }
+  }, [heroPct, todayCompleted])
+
+  const { months, maxCount } = useMemo(() => {
+    const days = validDays || []
+    const max = Math.max(1, ...days.map((d) => d.count))
+    return { months: days, maxCount: max }
+  }, [validDays])
+
+  const weekSum = (arr: { date: string; count: number }[]) =>
+    arr.reduce((s, x) => s + (x.count || 0), 0)
+
+  const currentWeekTotal = weekSum(compareCurrentWeek)
+  const prevWeekTotal = weekSum(comparePrevWeek)
+  const weekDiff = currentWeekTotal - prevWeekTotal
+
+  const weekInsight = useMemo(() => {
+    if (weekDiff > 0) return 'Your spikes improved this week.'
+    if (weekDiff === 0) return "You're maintaining steady momentum."
+    return 'Slightly lower than last week.'
+  }, [weekDiff])
+
+  const heatmap = useMemo(() => {
+    const last = validDays.slice(-28)
+    const cells = Array.from({ length: 28 }, (_, i) => {
+      const item = last[i]
+      return {
+        date: item?.date || '',
+        count: item?.count || 0,
+      }
+    })
+
+    return cells
+  }, [validDays])
+
+  const [animatedPct, setAnimatedPct] = useState(0)
+
+  useEffect(() => {
+    const t = setTimeout(() => setAnimatedPct(heroPct), 80)
+    return () => clearTimeout(t)
+  }, [heroPct])
 
   return (
-    <div className="w-full xl:w-[340px] flex-shrink-0 flex flex-col gap-4 md:gap-7">
-      
-      {/* =========================================
-          SECTION 1: ANALYTICS HUD
-      ========================================= */}
-      <div className={`border rounded-[20px] p-6 flex flex-col gap-6 transition-all duration-300 ease-out hover:-translate-y-[2px] ${
-        isDarkMode ? "bg-[#111111] border-gray-800 shadow-none" : "bg-white border-gray-200 shadow-[0_8px_30px_rgba(0,0,0,0.05)]"
-      }`}>
-        
-        {/* Header & Mobile Toggle */}
-        <div 
-          className="flex justify-between items-start cursor-pointer md:cursor-default group"
-          onClick={() => setOpenSection(openSection === 'hud' ? '' : 'hud')}
-        >
-          <div className="flex flex-col gap-1.5 flex-1 pr-4">
-            <span className={`text-[10px] font-semibold uppercase tracking-widest flex items-center gap-1.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-              <Activity size={12} /> Performance HUD
-            </span>
-            
-            <span className={`text-sm font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}>
-              {overallDiff > 0 ? "Output volume expanding." : overallDiff < 0 ? "Output volume degrading." : "Output volume stable."}
-            </span>
+    <aside className="w-full md:w-96 p-4 md:p-6 space-y-5 text-[var(--foreground)]">
+      <div className="relative overflow-hidden rounded-[28px] bg-[var(--surface)] border border-[var(--border)] p-5 md:p-6 shadow-lg transition-all duration-300 hover:-translate-y-[2px]">
+        <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-orange-300/45 to-transparent" />
 
-            {/* ONE-LINE INSIGHT */}
-            <div className={`border rounded-xl px-3 py-2 text-xs font-semibold mt-2 ${
-              isDarkMode ? "bg-gray-900/50 border-gray-800 text-gray-300" : "bg-gray-100/60 border-gray-200 text-gray-700"
-            }`}>
-              {overallDiff > 0 
-                ? "Positive variance vs last week."
-                : overallDiff < 0 
-                  ? "Negative variance detected."
-                  : "No variance. Push for growth."}
+        <div className="flex items-start justify-between gap-5">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold tracking-[0.18em] text-orange-400">
+              TODAY IMPACT
+            </p>
+
+            <div className="mt-4">
+              <div className="text-3xl font-semibold leading-tight text-[var(--foreground)]">
+                {todayCompleted} meaningful actions
+              </div>
+              <div className="mt-1 text-sm text-[var(--muted-foreground)]">
+                {Math.round(animatedPct * 100)}% complete
+              </div>
             </div>
           </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="flex flex-col items-center">
-              <div 
-                className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm"
-                style={{ background: `conic-gradient(${isDarkMode ? '#10b981' : '#22c55e'} ${roundedConsistency}%, ${isDarkMode ? '#1f2937' : '#f3f4f6'} 0%)` }}
-              >
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDarkMode ? "bg-[#111111]" : "bg-white"}`}>
-                  <span className={`text-sm font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}>{roundedConsistency}%</span>
-                </div>
+
+          <div className="relative grid h-24 w-24 shrink-0 place-items-center">
+            <svg viewBox="0 0 120 120" className="h-24 w-24 -rotate-90">
+              <circle
+                cx="60"
+                cy="60"
+                r="48"
+                stroke="rgba(255,122,89,0.12)"
+                strokeWidth="11"
+                fill="none"
+              />
+              <circle
+                cx="60"
+                cy="60"
+                r="48"
+                stroke="url(#todayImpactGradient)"
+                strokeWidth="11"
+                fill="none"
+                strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 48}`}
+                strokeDashoffset={`${2 * Math.PI * 48 * (1 - animatedPct)}`}
+                className="transition-all duration-700 ease-out"
+              />
+              <defs>
+                <linearGradient id="todayImpactGradient" x1="0" x2="1">
+                  <stop offset="0%" stopColor="#ffb86b" />
+                  <stop offset="100%" stopColor="#ff7a59" />
+                </linearGradient>
+              </defs>
+            </svg>
+
+            <div className="absolute text-center">
+              <div className="text-lg font-semibold text-[var(--foreground)]">
+                {todayCompleted}
               </div>
-              <span className={`text-[8px] font-bold mt-1.5 uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Consistency</span>
-              <span className={`text-[9px] font-bold uppercase tracking-widest text-center mt-0.5 leading-tight w-16 ${
-                roundedConsistency >= 70 ? "text-green-500" : roundedConsistency >= 50 ? "text-orange-500" : "text-red-500"
-              }`}>
-                {getConsistencyLabel(roundedConsistency)}
-              </span>
-            </div>
-            {/* Mobile Indicator Bounce */}
-            <div className={`md:hidden ${openSection !== 'hud' ? 'animate-bounce' : ''}`}>
-              <ChevronDown size={16} className={`transition-transform duration-300 ${
-                isDarkMode ? "text-gray-500" : "text-gray-400"
-              } ${openSection === 'hud' ? 'rotate-180' : ''}`} />
+              <div className="text-[10px] text-[var(--muted-foreground)]">
+                / {totalTasks}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Collapsible Content */}
-        <div className={`${openSection === 'hud' ? 'flex' : 'hidden'} md:flex flex-col gap-7`}>
-          
-          {/* Empty State Handling */}
-          {validDays.length === 0 ? (
-            <div className={`text-xs text-center py-4 rounded-xl border border-dashed ${
-              isDarkMode ? "bg-[#1a1a1a] border-gray-800 text-gray-500" : "bg-gray-50 border-gray-200 text-gray-400"
-            }`}>
-              Start completing tasks to see analytics
-            </div>
-          ) : (
-            <>
-              {/* PERFORMANCE BAR CHART */}
-              <div className="w-full flex flex-col gap-1">
-                <div className={`flex items-end justify-between h-20 gap-1.5 rounded-xl p-2 border ${
-                  isDarkMode ? "bg-gray-900/30 border-gray-800" : "bg-gray-100/60 border-gray-200"
-                }`}>
-                  {validDays.slice(-7).map((d, i) => { 
-                    const heightPct = chartMaxCount === 0 ? 0 : (d.count / chartMaxCount) * 100;
-                    const isToday = d.date === actualToday;
-                    
-                    return (
-                      <div key={i} className="flex flex-col items-center flex-1 gap-2 group cursor-crosshair" title={`${d.count} tasks`}>
-                        <div className={`w-full relative flex-1 flex items-end rounded-sm overflow-hidden ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
-                          <div 
-                            className={`w-full rounded-sm transition-all duration-500 ease-out group-hover:scale-110 transform origin-bottom ${
-                              isToday ? 'bg-orange-500' : (isDarkMode ? 'bg-emerald-600 group-hover:bg-emerald-500' : 'bg-green-500 group-hover:bg-green-400')
-                            }`} 
-                            style={{ height: `${heightPct}%` }} 
-                          />
-                        </div>
-                        <span className={`text-[9px] font-bold uppercase ${
-                          isToday ? 'text-orange-500' : (isDarkMode ? 'text-gray-500' : 'text-gray-400')
-                        }`}>{d.label.charAt(0)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                
-                <div className="flex justify-between items-start mt-1 px-1">
-                  {bestDay ? (
-                    <div className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                      Best day: <span className={`font-bold ${isDarkMode ? "text-emerald-500" : "text-green-600"}`}>{bestDay.label}</span>
-                    </div>
-                  ) : <div />}
-                  <span className={`text-[9px] font-semibold text-right ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-                    Max: {chartMaxCount}
-                  </span>
-                </div>
-              </div>
-
-              {/* MONTHLY HEATMAP */}
-              <div>
-                <span className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Monthly Activity</span>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {validDays.map((d, i) => {
-                    const intensity =
-                      d.count === 0 ? (isDarkMode ? 'bg-gray-800/60' : 'bg-gray-100/60') :
-                      d.count < 2 ? (isDarkMode ? 'bg-emerald-900/40' : 'bg-green-200') :
-                      d.count < 4 ? (isDarkMode ? 'bg-emerald-700/60' : 'bg-green-400') :
-                      (isDarkMode ? 'bg-emerald-500' : 'bg-green-600');
-
-                    return (
-                      <div 
-                        key={i}
-                        className={`w-3.5 h-3.5 rounded-sm transition-colors hover:ring-1 ${
-                          isDarkMode ? "hover:ring-gray-600" : "hover:ring-gray-300"
-                        } ${intensity}`}
-                        title={`${d.date}: ${d.count} tasks`}
-                      />
-                    );
-                  })}
-                </div>
-                {/* Heatmap Legend */}
-                <div className={`flex items-center justify-end gap-2 text-[9px] mt-2.5 font-medium ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-                  <span>Low</span>
-                  <div className="flex gap-1">
-                    <div className={`w-3 h-3 rounded-sm border ${isDarkMode ? "bg-gray-800/60 border-gray-700" : "bg-gray-100/60 border-gray-200"}`}/>
-                    <div className={`w-3 h-3 rounded-sm ${isDarkMode ? "bg-emerald-900/40" : "bg-green-200"}`}/>
-                    <div className={`w-3 h-3 rounded-sm ${isDarkMode ? "bg-emerald-700/60" : "bg-green-400"}`}/>
-                    <div className={`w-3 h-3 rounded-sm ${isDarkMode ? "bg-emerald-500" : "bg-green-600"}`}/>
-                  </div>
-                  <span>High</span>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* STREAK & TREND FOOTER */}
-          <div className="flex flex-col gap-3">
-            {bestGlobalStreak > 1 && (
-              <div className={`rounded-xl p-3 border flex items-center justify-between transition-colors ${
-                isDarkMode ? "bg-[#1a1a1a] border-gray-800 hover:bg-gray-800" : "bg-white border-gray-200 hover:bg-gray-50"
-              }`}>
-                <span className={`text-xs font-bold ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>All-Time Peak Streak</span>
-                <div className={`flex items-center gap-1 text-xs font-bold rounded-md px-2 py-1 border ${
-                  isDarkMode ? "text-orange-400 bg-orange-950/30 border-orange-900/50 shadow-none" : "text-orange-500 bg-orange-50 border-orange-100 shadow-[0_0_8px_rgba(249,115,22,0.2)]"
-                }`}>
-                  <Flame size={14} /> {bestGlobalStreak} Days
-                </div>
-              </div>
-            )}
-            {globalWeekStats.worst && (
-              <div className={`rounded-xl p-3 border flex items-center justify-between transition-colors ${
-                isDarkMode ? "bg-[#1a1a1a] border-gray-800 hover:bg-gray-800" : "bg-white border-gray-200 hover:bg-gray-50"
-              }`}>
-                <span className={`text-[10px] font-bold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Weakest Window:</span>
-                <span className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-red-400" : "text-red-500"}`}>{globalWeekStats.worst.label}</span>
-              </div>
-            )}
-          </div>
-
+        <div className="mt-5">
+          <p className="text-sm font-medium text-[var(--foreground)]">
+            {heroMessage.title}
+          </p>
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+            {heroMessage.subtitle}
+          </p>
         </div>
       </div>
 
-      {/* =========================================
-          SECTION 2: WEEK COMPARISON ENGINE
-      ========================================= */}
-      <div className={`border rounded-[20px] p-6 transition-all duration-300 ease-out hover:-translate-y-[2px] ${
-        isDarkMode ? "bg-[#111111] border-gray-800 shadow-none" : "bg-white border-gray-200 shadow-[0_8px_30px_rgba(0,0,0,0.05)]"
-      }`}>
-        
-        {/* Header & Mobile Toggle */}
-        <div 
-          className="flex items-center justify-between cursor-pointer md:cursor-default mb-2"
-          onClick={() => setOpenSection(openSection === 'comparison' ? '' : 'comparison')}
-        >
-          <div className="flex items-center gap-2">
-            <h2 className={`text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-800"}`}>
-              <BarChart2 size={16} className={isDarkMode ? "text-gray-500" : "text-gray-500"} /> Comparison
-            </h2>
-          </div>
-          
-          {/* Mobile Indicator Bounce */}
-          <div className={`flex items-center gap-2 md:hidden ${openSection !== 'comparison' ? 'animate-bounce' : ''}`}>
-            <ChevronDown size={16} className={`transition-transform duration-300 ${
-              isDarkMode ? "text-gray-500" : "text-gray-400"
-            } ${openSection === 'comparison' ? 'rotate-180' : ''}`} />
+      <div className="rounded-[28px] bg-[var(--surface)] border border-[var(--border)] p-5 shadow-lg transition-all duration-300 hover:-translate-y-[2px]">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-semibold tracking-[0.18em] text-[var(--muted-foreground)]">
+            MONTHLY MOVEMENT
+          </h4>
+          <div className="text-xs text-[var(--muted-foreground)]">
+            {months.length} days
           </div>
         </div>
 
-        {/* Collapsible Content */}
-        <div className={`${openSection === 'comparison' ? 'block' : 'hidden'} md:block`}>
-          
-          <div className={`text-xs mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-            This week vs last week performance
-          </div>
+        <div className="mt-4 h-48 w-full overflow-hidden">
+          <svg viewBox="0 0 640 190" className="h-full w-full">
+            <defs>
+              <linearGradient id="barGrad" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#ffb86b" stopOpacity="0.9" />
+                <stop offset="100%" stopColor="#ff7a59" stopOpacity="0.35" />
+              </linearGradient>
 
-          <div className={`flex items-center justify-between mb-4 rounded-lg p-1 border ${
-            isDarkMode ? "bg-gray-900/50 border-gray-800" : "bg-gray-100/60 border-gray-200"
-          }`}>
-            <button onClick={() => setWeekOffset(o => Math.max(o - 1, -52))} className={`p-1.5 rounded transition-colors shadow-sm ${
-              isDarkMode ? "text-gray-400 hover:text-white hover:bg-[#1a1a1a]" : "text-gray-500 hover:text-gray-900 hover:bg-white"
-            }`}><ChevronLeft size={14}/></button>
-            <span className={`text-[10px] font-bold w-20 text-center ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              {weekOffset === 0 ? 'THIS WEEK' : weekOffset < 0 ? `${Math.abs(weekOffset)}W AGO` : `${weekOffset}W NEXT`}
-            </span>
-            <button onClick={() => setWeekOffset(o => Math.min(o + 1, 12))} className={`p-1.5 rounded transition-colors shadow-sm ${
-              isDarkMode ? "text-gray-400 hover:text-white hover:bg-[#1a1a1a]" : "text-gray-500 hover:text-gray-900 hover:bg-white"
-            }`}><ChevronRight size={14}/></button>
-          </div>
+              <linearGradient id="lineGrad" x1="0" x2="1">
+                <stop offset="0%" stopColor="#ffd29a" />
+                <stop offset="100%" stopColor="#ff7a59" />
+              </linearGradient>
 
-          <div className="space-y-3">
-            {compareCurrentWeek.map((day, i) => {
-              const prevCount = comparePrevWeek[i]?.count ?? 0;
-              const isFuture = parseLocalDate(day.date) > todayDateObj;
-              const diff = isFuture ? null : day.count - prevCount;
-              const isToday = day.date === actualToday;
-              
+              <linearGradient id="areaGrad" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#ff8a5c" stopOpacity="0.22" />
+                <stop offset="100%" stopColor="#ff8a5c" stopOpacity="0" />
+              </linearGradient>
+
+              <filter id="orangeGlow" x="-40%" y="-40%" width="180%" height="180%">
+                <feGaussianBlur stdDeviation="6" result="blur" />
+                <feColorMatrix
+                  in="blur"
+                  type="matrix"
+                  values="1 0 0 0 1  0 0.45 0 0 0.42  0 0 0.2 0 0.12  0 0 0 1 0"
+                />
+              </filter>
+            </defs>
+
+            {(() => {
+              const width = 600
+              const startX = 20
+              const baseline = 156
+              const available = Math.max(1, months.length - 1)
+              const step = width / available
+
+              const pts = months.map((d, i) => {
+                const x = startX + i * step
+                const h = (d.count / Math.max(1, maxCount)) * 112
+                const y = baseline - h
+                return { x, y }
+              })
+
+              const areaPath = buildAreaPath(pts, baseline)
+              const linePath = buildLinePath(pts)
+
               return (
-                <div key={day.date} className={`flex items-center justify-between p-3 rounded-[16px] border transition-colors hover:scale-[1.01] ${
-                  isToday 
-                    ? (isDarkMode ? 'bg-orange-950/20 border-orange-900/50' : 'bg-orange-50 border-orange-200') 
-                    : (isDarkMode ? 'bg-gray-900/30 border-transparent hover:bg-gray-800 hover:border-gray-700' : 'bg-gray-100/60 border-transparent hover:bg-gray-100 hover:border-gray-200')
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <div className="flex flex-col">
-                      <div className="flex items-center">
-                        <span className={`text-[10px] font-bold uppercase ${
-                          isToday ? 'text-orange-500' : (isDarkMode ? 'text-gray-500' : 'text-gray-400')
-                        }`}>{day.label}</span>
-                        {/* Today Highlight Text */}
-                        {isToday && <span className={`text-[9px] font-bold ml-1.5 px-1.5 py-0.5 rounded-sm leading-none ${
-                          isDarkMode ? "text-orange-400 bg-orange-900/50" : "text-orange-500 bg-orange-100"
-                        }`}>Today</span>}
-                      </div>
-                      <span className={`text-sm font-bold ${
-                        isToday ? (isDarkMode ? 'text-orange-400' : 'text-orange-700') : (isDarkMode ? 'text-gray-200' : 'text-gray-700')
-                      }`}>{day.dayNum}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className={`text-lg font-bold w-6 text-right ${
-                      isFuture ? (isDarkMode ? 'text-gray-700' : 'text-gray-300') : (isDarkMode ? 'text-white' : 'text-gray-800')
-                    }`}>{isFuture ? '-' : day.count}</span>
-                    <div className={`flex items-center justify-center w-14 py-1.5 rounded-md text-[10px] font-bold gap-1 border ${
-                      diff === null 
-                        ? (isDarkMode ? 'bg-transparent border-transparent text-gray-600' : 'bg-transparent border-transparent text-gray-300') 
-                        : diff > 0 
-                          ? (isDarkMode ? 'bg-emerald-950/30 text-emerald-400 border-emerald-900/50' : 'bg-green-50 text-green-700 border-green-200') 
-                          : diff < 0 
-                            ? (isDarkMode ? 'bg-red-950/30 text-red-400 border-red-900/50' : 'bg-red-50 text-red-700 border-red-200') 
-                            : (isDarkMode ? 'bg-gray-800 text-gray-400 border-gray-700' : 'bg-gray-100 text-gray-500 border-gray-200')
-                    }`}>
-                      {diff === null && <span>--</span>}
-                      {diff !== null && diff > 0 && <><ArrowUpRight size={12} strokeWidth={3} /> +{diff}</>}
-                      {diff !== null && diff < 0 && <><ArrowDownRight size={12} strokeWidth={3} /> {diff}</>}
-                      {diff !== null && diff === 0 && <><Minus size={12} strokeWidth={3} /> 0</>}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          
-          <div className={`mt-6 pt-4 border-t flex flex-col gap-1 text-xs ${isDarkMode ? "border-gray-800" : "border-gray-200"}`}>
-            <div className="flex justify-between items-center">
-              <span className={`font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Week Load Total:</span>
-              <span className={`font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}>{totalCurrent}</span>
+                <>
+                  <path d={areaPath} fill="url(#areaGrad)" />
+
+                  {months.map((d, i) => {
+                    const x = startX + i * step
+                    const isToday = d.date === actualToday
+                    const barWidth = isToday ? 9 : 6
+                    const h = Math.max(
+                      4,
+                      (d.count / Math.max(1, maxCount)) * 104
+                    )
+                    const y = baseline - h
+
+                    return (
+                      <rect
+                        key={d.date || i}
+                        x={x - barWidth / 2}
+                        y={y}
+                        width={barWidth}
+                        height={h}
+                        rx={barWidth / 2}
+                        fill={isToday ? '#ff7a59' : 'url(#barGrad)'}
+                        opacity={isToday ? 1 : 0.72}
+                        className="transition-all duration-300"
+                      />
+                    )
+                  })}
+
+                  <path
+                    d={linePath}
+                    fill="none"
+                    stroke="#ff7a59"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity="0.16"
+                    filter="url(#orangeGlow)"
+                  />
+
+                  <path
+                    d={linePath}
+                    fill="none"
+                    stroke="url(#lineGrad)"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+
+                  {pts.map((p, i) => {
+                    const isToday = months[i]?.date === actualToday
+
+                    if (!isToday) {
+                      return (
+                        <circle
+                          key={i}
+                          cx={p.x}
+                          cy={p.y}
+                          r="2.5"
+                          fill="#fff"
+                          opacity="0.55"
+                        />
+                      )
+                    }
+
+                    return (
+                      <g key={i}>
+                        <circle
+                          cx={p.x}
+                          cy={p.y}
+                          r="12"
+                          fill="#ff7a59"
+                          opacity="0.14"
+                        />
+                        <circle
+                          cx={p.x}
+                          cy={p.y}
+                          r="5"
+                          fill="#ff7a59"
+                          stroke="#fff"
+                          strokeWidth="2"
+                        />
+                        <text
+                          x={p.x + 12}
+                          y={p.y - 10}
+                          fontSize="11"
+                          fill="#ff7a59"
+                          fontWeight="600"
+                        >
+                          Today
+                        </text>
+                      </g>
+                    )
+                  })}
+                </>
+              )
+            })()}
+          </svg>
+        </div>
+
+        <p className="mt-3 text-sm text-[var(--muted-foreground)]">
+          {weekInsight}
+        </p>
+      </div>
+
+      <div className="rounded-[28px] bg-[var(--surface)] border border-[var(--border)] p-5 shadow-lg transition-all duration-300 hover:-translate-y-[2px]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h5 className="text-xs font-semibold tracking-[0.18em] text-[var(--muted-foreground)]">
+              THIS WEEK
+            </h5>
+            <div className="mt-3 text-3xl font-semibold text-[var(--foreground)]">
+              {currentWeekTotal}
             </div>
-            <div className={`mt-1 italic text-right font-medium ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
-              {totalCurrent > 20 ? "HIGH VOLUME" : totalCurrent > 0 ? "ACTIVE LOAD" : "CRITICAL DEFICIT"}
+            <div className="mt-1 text-sm text-[var(--muted-foreground)]">
+              completions
+            </div>
+          </div>
+
+          <div className="text-right">
+            <div
+              className={`text-sm font-semibold ${
+                weekDiff >= 0 ? 'text-emerald-500' : 'text-rose-500'
+              }`}
+            >
+              {weekDiff >= 0 ? `↑ +${weekDiff}` : `↓ ${weekDiff}`}
+            </div>
+            <div className="mt-1 text-xs text-[var(--muted-foreground)]">
+              vs last week
             </div>
           </div>
         </div>
+
+        <div className="mt-5 flex h-20 items-end gap-2">
+          {(compareCurrentWeek || []).map((d) => {
+            const weekMax = Math.max(
+              1,
+              ...compareCurrentWeek.map((x) => x.count || 0)
+            )
+            const h = clamp((d.count || 0) / weekMax, 0.12, 1)
+
+            return (
+              <div
+                key={d.date}
+                className="flex flex-1 flex-col items-center gap-2"
+              >
+                <div
+                  className="w-full rounded-full bg-gradient-to-t from-orange-500/45 to-orange-300/85 transition-all duration-300"
+                  style={{ height: `${h * 64}px` }}
+                  title={`${d.label}: ${d.count}`}
+                />
+                <span className="text-[10px] text-[var(--muted-foreground)]">
+                  {d.dayNum}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+
+        <p className="mt-4 text-sm text-[var(--muted-foreground)]">
+          {weekDiff >= 0
+            ? "You're building momentum."
+            : "You're still in motion."}
+        </p>
       </div>
 
-    </div>
-  );
+      <div className="rounded-[28px] bg-[var(--surface)] border border-[var(--border)] p-5 shadow-lg transition-all duration-300 hover:-translate-y-[2px]">
+        <div className="flex items-center justify-between">
+          <h6 className="text-xs font-semibold tracking-[0.18em] text-[var(--muted-foreground)]">
+            ACTIVITY
+          </h6>
+          <div className="text-xs text-[var(--muted-foreground)]">
+            Last 28 days
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-7 gap-1.5">
+          {heatmap.map((cell, i) => {
+            const v = clamp(cell.count / Math.max(1, maxCount))
+            const alpha = 0.08 + v * 0.72
+            const bg = `rgba(255,122,89,${alpha})`
+            const isToday = cell.date === actualToday
+
+            return (
+              <div
+                key={`${cell.date}-${i}`}
+                title={`${cell.date}: ${cell.count}`}
+                className={`h-3.5 w-3.5 rounded-[4px] ${
+                  isToday ? 'ring-1 ring-orange-400/50 ring-offset-1' : ''
+                }`}
+                style={{
+                  background: cell.count
+                    ? bg
+                    : 'color-mix(in srgb, var(--foreground) 6%, transparent)',
+                }}
+              />
+            )
+          })}
+        </div>
+      </div>
+    </aside>
+  )
 }

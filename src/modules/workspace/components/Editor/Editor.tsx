@@ -18,7 +18,7 @@ import TaskItem from '@tiptap/extension-task-item';
 import Typography from '@tiptap/extension-typography';
 import Link from '@tiptap/extension-link';
 import ListKeymap from '@tiptap/extension-list-keymap';
-import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Consuming theme state
+import { useTheme } from "@/theme/ThemeProvider"; 
 import {
   Bold, Italic, Strikethrough, Underline as UnderlineIcon, Highlighter, Undo, Redo,
   Heading1, Heading2, Heading3, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, AlignJustify, 
@@ -319,10 +319,10 @@ export default function Editor({ system }: any) {
         setShowSelectionMenu(false);
         setShowConvertMenu(false);
         
-        // Smart adjust toolbar
+        // Smart adjust toolbar to avoid taking up writing space
         if (window.innerWidth < 768) {
-          setToolbarPos(prev => ({ ...prev, y: 10, x: 10 }));
-          setToolbarSize({ width: window.innerWidth - 20 });
+          setToolbarPos(prev => ({ ...prev, y: 8, x: 16 }));
+          setToolbarSize({ width: window.innerWidth - 32 });
         }
       }
     };
@@ -364,6 +364,24 @@ export default function Editor({ system }: any) {
     },
     onUpdate: ({ editor }) => {
       setIsTyping(true);
+      
+      // Auto-scroll cursor into comfortable viewing zone when typing on mobile
+      if (window.innerWidth < 768) {
+        requestAnimationFrame(() => {
+          const selection = window.getSelection();
+          if (!selection?.rangeCount) return;
+          const rect = selection.getRangeAt(0).getBoundingClientRect();
+          const safeZone = window.innerHeight * 0.45;
+          
+          if (rect.bottom > safeZone) {
+            window.scrollBy({
+              top: rect.bottom - safeZone,
+              behavior: "smooth",
+            });
+          }
+        });
+      }
+
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 800);
 
@@ -568,9 +586,8 @@ export default function Editor({ system }: any) {
       zIndex: 9999,
        borderRadius: dock === 'left' ? '0 1rem 1rem 0' : dock === 'right' ? '1rem 0 0 1rem' : '1rem',
        }}
-    // 👇 ADD 'prevent-pull-refresh' RIGHT HERE
-     className={`prevent-pull-refresh shadow-2xl backdrop-blur-xl border flex flex-col max-h-[90vh] transition-[width,border-radius] duration-200 ease-out overflow-hidden ${
-     isDarkMode ? "bg-[#111111]/95 border-gray-800" : "bg-white/95 border-gray-200"
+      className={`prevent-pull-refresh shadow-2xl backdrop-blur-xl border flex flex-col max-h-[90vh] transition-[width,border-radius] duration-200 ease-out overflow-hidden ${
+      isDarkMode ? "bg-[#111111]/95 border-gray-800" : "bg-white/95 border-gray-200"
        }    `}
         >
         {/* DRAG HANDLE & HEADER */}
@@ -788,7 +805,7 @@ export default function Editor({ system }: any) {
 
       {/* TITLE SECTION */}
       <div className={`${maxWidthClass} mx-auto px-4 pt-6 md:pt-16 pb-4 transition-all duration-500`}>
-        <div className={`border rounded-[2.5rem] shadow-sm p-8 ${isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-200"}`}>
+        <div className={`border rounded-[2rem] md:rounded-[2.5rem] shadow-sm p-8 ${isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-200"}`}>
           <input
             type="text"
             value={activeDocument.title}
@@ -799,47 +816,51 @@ export default function Editor({ system }: any) {
             placeholder="Untitled Note"
           />
 
-          <div className={`flex items-center gap-4 mt-4 text-xs font-medium transition-all duration-300 ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
-            <button onClick={() => system.togglePin?.(activeDocument.id)} className={`flex items-center gap-1.5 transition-colors active:scale-95 ${
-              activeDocument.isPinned ? (isDarkMode ? 'text-emerald-500' : 'text-green-600') : (isDarkMode ? 'hover:text-gray-300' : 'hover:text-gray-900')
-            }`}>
-              <Pin size={14} className={activeDocument.isPinned ? (isDarkMode ? 'fill-emerald-500' : 'fill-green-600') : ''} /> {activeDocument.isPinned ? 'Pinned' : 'Pin'}
-            </button>
-            <button onClick={() => navigator.clipboard.writeText(editor.getText())} className={`flex items-center gap-1.5 transition-colors active:scale-95 ${isDarkMode ? "hover:text-gray-300" : "hover:text-gray-900"}`}>
-              <Copy size={14} /> Copy
-            </button>
-            <div className={`w-px h-3 mx-1 ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}></div>
-            
-            <div className="relative convert-menu-container">
-              <button onClick={() => setShowConvertMenu(!showConvertMenu)} className={`flex items-center gap-1.5 transition-colors active:scale-95 ${isDarkMode ? "hover:text-emerald-500" : "hover:text-green-600"}`}>
-                Convert
-              </button>
-              {showConvertMenu && (
-                <div className={`absolute top-full mt-2 left-0 border rounded-xl shadow-lg p-2 min-w-[140px] z-50 animate-in slide-in-from-top-2 ${
-                  isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"
+          {!keyboardOpen && (
+            <>
+              <div className={`flex items-center gap-4 mt-4 text-xs font-medium transition-all duration-300 ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+                <button onClick={() => system.togglePin?.(activeDocument.id)} className={`flex items-center gap-1.5 transition-colors active:scale-95 ${
+                  activeDocument.isPinned ? (isDarkMode ? 'text-emerald-500' : 'text-green-600') : (isDarkMode ? 'hover:text-gray-300' : 'hover:text-gray-900')
                 }`}>
-                  <button onClick={() => {
-                    const blob = new Blob([editor.getText()], { type: "text/plain" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url; a.download = `${activeDocument.title || 'note'}.txt`; a.click();
-                    URL.revokeObjectURL(url); setShowConvertMenu(false);
-                  }} className={`block w-full text-left px-3 py-2 text-sm rounded-lg transition-colors active:scale-95 ${
-                    isDarkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"
-                  }`}>
-                    Export as TXT
+                  <Pin size={14} className={activeDocument.isPinned ? (isDarkMode ? 'fill-emerald-500' : 'fill-green-600') : ''} /> {activeDocument.isPinned ? 'Pinned' : 'Pin'}
+                </button>
+                <button onClick={() => navigator.clipboard.writeText(editor.getText())} className={`flex items-center gap-1.5 transition-colors active:scale-95 ${isDarkMode ? "hover:text-gray-300" : "hover:text-gray-900"}`}>
+                  <Copy size={14} /> Copy
+                </button>
+                <div className={`w-px h-3 mx-1 ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}></div>
+                
+                <div className="relative convert-menu-container">
+                  <button onClick={() => setShowConvertMenu(!showConvertMenu)} className={`flex items-center gap-1.5 transition-colors active:scale-95 ${isDarkMode ? "hover:text-emerald-500" : "hover:text-green-600"}`}>
+                    Convert
                   </button>
-                  <button onClick={() => { window.print(); setShowConvertMenu(false); }} className={`block w-full text-left px-3 py-2 text-sm rounded-lg transition-colors mt-1 active:scale-95 ${
-                    isDarkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"
-                  }`}>
-                    Export as PDF
-                  </button>
+                  {showConvertMenu && (
+                    <div className={`absolute top-full mt-2 left-0 border rounded-xl shadow-lg p-2 min-w-[140px] z-50 animate-in slide-in-from-top-2 ${
+                      isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"
+                    }`}>
+                      <button onClick={() => {
+                        const blob = new Blob([editor.getText()], { type: "text/plain" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url; a.download = `${activeDocument.title || 'note'}.txt`; a.click();
+                        URL.revokeObjectURL(url); setShowConvertMenu(false);
+                      }} className={`block w-full text-left px-3 py-2 text-sm rounded-lg transition-colors active:scale-95 ${
+                        isDarkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"
+                      }`}>
+                        Export as TXT
+                      </button>
+                      <button onClick={() => { window.print(); setShowConvertMenu(false); }} className={`block w-full text-left px-3 py-2 text-sm rounded-lg transition-colors mt-1 active:scale-95 ${
+                        isDarkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-100"
+                      }`}>
+                        Export as PDF
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
-          
-          <div className={`text-xs mt-2 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Last edited: {lastSavedTime || "just now"}</div>
+              </div>
+              
+              <div className={`text-xs mt-2 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Last edited: {lastSavedTime || "just now"}</div>
+            </>
+          )}
         </div>
       </div>
 
@@ -847,9 +868,9 @@ export default function Editor({ system }: any) {
       <div 
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        className={`${maxWidthClass} mx-auto px-4 transition-all duration-300 ease-out pt-4 pb-32`}
+        className={`${maxWidthClass} mx-auto px-3 md:px-4 transition-all duration-300 ease-out pt-2 md:pt-4 pb-[10rem] ${keyboardOpen ? 'translate-y-[-16px]' : ''}`}
       >
-        <div className={`relative rounded-[3rem] shadow-sm transition-all duration-500 border ${
+        <div className={`relative rounded-[2rem] md:rounded-[3rem] shadow-sm transition-all duration-500 border ${
           isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-200"
         }`}>
           <style jsx global>{`
@@ -882,12 +903,16 @@ export default function Editor({ system }: any) {
             .ProseMirror a { color: #16a34a; text-decoration: underline; cursor: pointer; }
             .ProseMirror pre { background: ${isDarkMode ? '#111827' : '#f9fafb'}; border: 1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}; border-radius: 0.5rem; padding: 1rem; font-family: monospace; color: ${isDarkMode ? '#e5e7eb' : 'inherit'}; }
             .ProseMirror p.is-editor-empty:first-child::before { color: ${isDarkMode ? '#6b7280' : '#9ca3af'}; content: attr(data-placeholder); float: left; height: 0; pointer-events: none; }
+            
             @media (max-width: 768px) { 
               .ProseMirror { 
-                padding-top: 1.5rem; 
-                padding-bottom: 6rem;
-                padding-left: 1.25rem;
-                padding-right: 1.25rem; 
+                padding-top: 3rem; 
+                padding-bottom: 14rem;
+                padding-left: 1.2rem;
+                padding-right: 1.2rem; 
+                min-height: calc(var(--vh, 1vh) * 100);
+                max-width: 100%;
+                font-size: 18px;
               } 
             }
           `}</style>

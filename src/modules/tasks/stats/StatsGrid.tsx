@@ -11,7 +11,6 @@ import {
   calculateBestStreak,
 } from "./utils";
 
-import OnboardingFlow from "./components/OnboardingFlow/OnboardingFlow";
 import Metrics from "./components/Metrics/Metrics";
 import Heatmap from "./components/Heatmap/Heatmap";
 
@@ -313,8 +312,6 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
         paddingTop: "calc(var(--navbar-h, 64px) + var(--tabs-h, 0px) + 0.5rem)"
       }}
     >
-      
-      {showOnboarding && <OnboardingFlow onComplete={handleInitialize} />}
 
       {currentStreak === 0 && previousStreak >= 3 && zeroDays < 3 && (
         <div className={`border rounded-[20px] p-5 flex items-start gap-4 shadow-sm ${

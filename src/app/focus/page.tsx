@@ -7,7 +7,6 @@ import { FocusProvider, useFocusSystem } from "@/modules/focus/engine/useFocusSy
 import Navbar from "@/navigation/Navbar";
 
 // Focus Module Components
-import FocusModal from "@/modules/focus/components/FocusModal/FocusModal";
 import TopBar from "@/modules/focus/components/TopBar/TopBar";
 import SessionTimer from "@/modules/focus/components/SessionTimer/SessionTimer";
 import TaskSelector from "@/modules/focus/components/TaskSelector/TaskSelector";
@@ -53,8 +52,6 @@ function FocusPageContent() {
 
   return (
     <>
-      {/* ONBOARDING MODAL */}
-      <FocusModal />
 
       <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-24 md:pb-10">
 

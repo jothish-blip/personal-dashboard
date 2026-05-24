@@ -71,7 +71,6 @@ export default function MatrixView({
   const lastErrorTime = useRef(0);
 
   const [weekOffset, setWeekOffset] = useState(0); 
-  const [searchQuery, setSearchQuery] = useState("");
   const [quickAddName, setQuickAddName] = useState("");
   const [quickAddSuccess, setQuickAddSuccess] = useState(false); 
   
@@ -139,20 +138,14 @@ export default function MatrixView({
   const [year, month] = meta.currentMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
 
-  const filteredTasks = useMemo(() => {
-    if (!searchQuery.trim()) return activeTasks;
-    const lowerQuery = searchQuery.toLowerCase();
-    return activeTasks.filter(t => t.name.toLowerCase().includes(lowerQuery) || t.group.toLowerCase().includes(lowerQuery));
-  }, [activeTasks, searchQuery]);
-
   const groupedTasks = useMemo(() => {
     const map: Record<string, Task[]> = {};
-    filteredTasks.forEach(t => {
+    activeTasks.forEach(t => {
       if (!map[t.group]) map[t.group] = [];
       map[t.group].push(t);
     });
     return map;
-  }, [filteredTasks]);
+  }, [activeTasks]);
 
   const groups = Object.keys(groupedTasks).sort();
 
@@ -255,32 +248,36 @@ export default function MatrixView({
     return max;
   }, [activeTasks, isFocusMode]);
 
-  const patternInsight = useMemo(() => {
-    if (isFocusMode) return "";
-    if (activeTasks.length === 0) return "Add objectives to begin pattern analysis.";
-    const dayStats = Array.from({length: 7}, () => ({ possible: 0, done: 0 }));
-    for (let i = 1; i <= daysInMonth; i++) {
-      const dateStr = `${meta.currentMonth}-${String(i).padStart(2, '0')}`;
-      
-      if (dateStr > actualToday) break; 
-      
-      const isoDay = getISODay(new Date(year, month - 1, i)) - 1; 
-      dayStats[isoDay].possible += activeTasks.length;
-      dayStats[isoDay].done += completionMap[dateStr] || 0;
-    }
-    let worstDay = null, worstPct = 100;
-    dayStats.forEach((stat, i) => {
-      if (stat.possible > 0) {
-        const pct = stat.done / stat.possible;
-        if (pct < worstPct) { worstPct = pct; worstDay = i; }
+  const currentStreak = useMemo(() => {
+    if (activeTasks.length === 0) return 0;
+  
+    let streak = 0;
+    const d = parseLocalDate(actualToday);
+  
+    const isDayActive = (dateStr: string) =>
+      activeTasks.some(t => t.history?.[dateStr]);
+  
+    let currentDateStr = actualToday;
+  
+    // if today inactive → check yesterday
+    if (!isDayActive(currentDateStr)) {
+      d.setDate(d.getDate() - 1);
+      currentDateStr = getLocalDate(d);
+  
+      if (!isDayActive(currentDateStr)) {
+        return 0;
       }
-    });
-    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    if (worstDay !== null && worstPct < 0.4 && dayStats[worstDay].possible >= activeTasks.length * 3) {
-      return `Critical slip pattern on ${dayNames[worstDay]}s. Adjust routine.`;
     }
-    return "Momentum is stable across the board. Keep the chain.";
-  }, [activeTasks.length, completionMap, daysInMonth, actualToday, meta.currentMonth, year, month, isFocusMode]);
+  
+    while (isDayActive(currentDateStr)) {
+      streak++;
+  
+      d.setDate(d.getDate() - 1);
+      currentDateStr = getLocalDate(d);
+    }
+  
+    return streak;
+  }, [activeTasks, actualToday]);
 
   const globalWeekStats = useMemo(() => {
     if (isFocusMode || activeTasks.length === 0) return { best: null, worst: null };
@@ -425,41 +422,25 @@ export default function MatrixView({
         />
       )}
 
-      <div className={`flex-1 flex flex-col xl:flex-row mx-auto w-full gap-8 transition-all duration-500 ${isFocusMode ? 'max-w-[900px] p-2 md:p-4 justify-center' : 'max-w-[1500px] p-4 md:p-8'}`}>
-        <div className="flex-1 flex flex-col gap-8 overflow-hidden">
+      <div className={`flex-1 flex flex-col xl:flex-row mx-auto w-full gap-6 transition-all duration-500 ${isFocusMode ? 'max-w-[900px] p-2 md:p-4 justify-center' : 'max-w-[1400px] p-4 md:p-8'}`}>
+        <div className="flex-1 flex flex-col gap-6 overflow-hidden">
           
           {!isFocusMode && (
-            <Decisions 
-              todayDataLength={todayDataLength} weekAvg={weekAvg} tasksLength={activeTasks.length}
-              momentumScore={momentumScore} patternInsight={patternInsight}
+            <Decisions
+              tasks={activeTasks}
+              currentStreak={currentStreak}
+              lockedDates={meta.lockedDates || []}
+              isFocusMode={meta.isFocus}
             />
           )}
 
-          {/* Summary Cards */}
-          {!isFocusMode && activeTasks.length > 0 && (
-            <div className="grid grid-cols-3 gap-4 md:gap-6 w-full">
-              <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] transition-all duration-200">
-                <p className="text-sm text-[var(--muted)] mb-1">Today</p>
-                <p className="text-2xl font-bold text-[var(--foreground)]">{todayDataLength} Tasks</p>
-              </div>
-              <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] transition-all duration-200">
-                <p className="text-sm text-[var(--muted)] mb-1">Week Score</p>
-                <p className="text-2xl font-bold text-[var(--foreground)]">{consistencyScore}%</p>
-              </div>
-              <div className="bg-[var(--surface)] p-4 rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] transition-all duration-200">
-                <p className="text-sm text-[var(--muted)] mb-1">Peak Streak</p>
-                <p className="text-2xl font-bold text-[var(--foreground)]">{bestGlobalStreak} <span className="text-sm font-normal text-[var(--muted)]">Days</span></p>
-              </div>
-            </div>
-          )}
-
           {!isLoaded ? (
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 animate-pulse min-h-[400px] shadow-sm hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] transition-all duration-200">
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 animate-pulse min-h-[400px] shadow-sm hover:border-orange-400/30 transition-all duration-200">
               <div className="flex justify-between items-center mb-6"><div className="h-6 bg-[var(--surface-alt)] rounded w-48"></div><div className="h-8 bg-[var(--surface-alt)] rounded-full w-24"></div></div>
               <div className="space-y-4">{[1, 2, 3, 4].map(i => (<div key={i} className="flex gap-4 items-center"><div className="h-12 bg-[var(--surface-alt)] rounded-xl w-1/4"></div><div className="h-12 bg-[var(--surface-alt)] rounded-xl flex-1"></div></div>))}</div>
             </div>
           ) : activeTasks.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-12 bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-2xl text-[var(--muted)] min-h-[400px] shadow-sm hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] transition-all duration-200 hover:border-indigo-400">
+            <div className="flex-1 flex flex-col items-center justify-center p-12 bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-2xl text-[var(--muted)] min-h-[400px] shadow-sm transition-all duration-200 hover:border-orange-400/30">
               <div className="bg-indigo-500/10 p-4 rounded-full mb-4"><Target size={48} className="text-indigo-400" /></div>
               <p className="font-bold text-xl text-[var(--foreground)] mb-2">Start Tracking Your System</p>
               <p className="text-sm text-[var(--muted)] mb-4 text-center">Add your first performance objective to begin analyzing.</p>
@@ -472,56 +453,41 @@ export default function MatrixView({
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              <div className={`flex flex-wrap items-center justify-between bg-[var(--surface)] border border-[var(--border)] rounded-2xl px-5 py-3 shadow-sm hover:shadow-[0_0_0_1px_rgba(249,115,22,0.4)] transition-all duration-200 gap-4 ${isFocusMode ? 'sticky top-2 z-50 shadow-md opacity-100' : ''}`}>
+              <div className="flex flex-wrap items-center justify-between bg-[var(--surface)]/90 backdrop-blur-xl border border-[var(--border)] rounded-2xl px-5 py-3 shadow-sm hover:border-orange-400/30 transition-all duration-200 gap-4 sticky top-2 z-30">
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 text-xs font-semibold">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold">
                     {meta.lockedDates?.includes(actualToday) ? (
                       <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-md"><Lock size={12}/> Locked Mode</span>
                     ) : (
-                      <span className="text-green-600 dark:text-green-400 flex items-center gap-1.5 bg-green-500/10 px-2 py-1 rounded-md"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"/> Active Tracking</span>
+                      <span className="text-green-600 dark:text-green-400 flex items-center gap-1.5 bg-green-500/10 px-2 py-1 rounded-md"><div className="w-2 h-2 bg-green-500 rounded-full"/> Active Tracking</span>
                     )}
                     <span className="hidden sm:inline text-[var(--muted)] font-medium ml-1">Today • {actualToday}</span>
                   </div>
-                  {!isFocusMode && <div className="h-4 w-[1px] bg-[var(--border)] hidden md:block"></div>}
-                  {!isFocusMode && (
-                    <div className="hidden lg:flex items-center">
-                      {todayDataLength > yesterdayDataLength ? <span className="bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 drop-shadow-sm">🔥 Improved from yesterday</span> : 
-                        todayDataLength < yesterdayDataLength ? <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1">⚠️ Drop from yesterday</span> : 
-                        <span className="bg-[var(--surface-alt)] text-[var(--muted)] px-2 py-1 rounded text-[10px] font-bold">➡️ Consistent volume</span>}
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-3">
                   {!isFocusMode && (
-                    <>
-                      <div className="relative hidden md:block group">
-                        <input type="text" placeholder="Workout #Health (Press Enter)..." value={quickAddName} onChange={e => setQuickAddName(e.target.value)} onKeyDown={handleQuickAdd}
-                          className={`pl-3 pr-3 py-1.5 border rounded-lg text-xs outline-none transition-all duration-200 w-36 focus:w-56 text-[var(--foreground)] ${quickAddSuccess ? 'bg-green-500/10 border-green-500 animate-[scaleUp_0.2s_ease]' : 'bg-[var(--surface-alt)] border-[var(--border)] focus:border-indigo-400 focus:bg-[var(--surface)]'}`} />
-                      </div>
-                      <div className="relative hidden lg:block">
-                          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
-                          <input type="text" placeholder="Filter..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 pr-7 py-1.5 bg-[var(--surface-alt)] border border-[var(--border)] rounded-lg text-xs outline-none focus:border-indigo-400 focus:bg-[var(--surface)] transition-all duration-200 w-24 focus:w-32 text-[var(--foreground)]" />
-                          {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)]"><X size={12}/></button>}
-                      </div>
-                    </>
+                    <div className="relative hidden md:block group">
+                      <input type="text" placeholder="Workout #Health (Press Enter)..." value={quickAddName} onChange={e => setQuickAddName(e.target.value)} onKeyDown={handleQuickAdd}
+                        className={`pl-3 pr-3 py-1.5 border rounded-lg text-xs outline-none transition-all duration-200 w-44 text-[var(--foreground)] ${quickAddSuccess ? 'bg-green-500/10 border-green-500 animate-[scaleUp_0.2s_ease]' : 'bg-[var(--surface-alt)] border-[var(--border)] focus:border-indigo-400 focus:bg-[var(--surface)]'}`} />
+                    </div>
                   )}
+                  
                   <div className="flex items-center gap-1 bg-[var(--surface-alt)] border border-[var(--border)] rounded-lg p-1 shadow-sm">
                     <button onClick={() => setWeekOffset(prev => Math.max(prev - 1, -4))} className="p-1 hover:bg-[var(--surface)] text-[var(--muted)] rounded transition-colors active:scale-95"><ChevronLeft size={14}/></button>
-                    {!isFocusMode && <button onClick={() => { setWeekOffset(0); scrollToToday(); }} className="px-3 text-xs font-bold text-[var(--muted)] hover:text-[var(--foreground)] transition-colors active:scale-95">Week {activeWeekIndex + 1}</button>}
+                    {!isFocusMode && <button onClick={() => { setWeekOffset(0); scrollToToday(); }} className="px-3 text-[11px] font-bold text-[var(--muted)] hover:text-[var(--foreground)] transition-colors active:scale-95">Week {activeWeekIndex + 1}</button>}
                     <button onClick={() => setWeekOffset(prev => Math.min(prev + 1, 4))} className="p-1 hover:bg-[var(--surface)] text-[var(--muted)] rounded transition-colors active:scale-95"><ChevronRight size={14}/></button>
                   </div>
                   <div className="h-4 w-[1px] bg-[var(--border)]"></div>
                   <button onClick={() => setIsFocusMode(!isFocusMode)} title="Toggle Focus Mode" className={`p-1.5 rounded-lg transition-colors active:scale-95 ${isFocusMode ? 'bg-indigo-500/10 text-indigo-500' : 'hover:bg-[var(--surface-alt)] text-[var(--muted)]'}`}>
                     {isFocusMode ? <Minimize size={16}/> : <Maximize size={16}/>}
                   </button>
-                  <button onClick={() => setShowHelp(true)} className="p-1.5 text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-alt)] rounded-lg transition-colors active:scale-95"><HelpCircle size={16}/></button>
                 </div>
               </div>
 
               <div className="overflow-x-auto bg-[var(--background)]">
                 <Grid 
-                  tasks={filteredTasks}
+                  tasks={activeTasks}
                   meta={meta}
                   groupedTasks={groupedTasks}
                   groups={groups}
@@ -542,17 +508,36 @@ export default function MatrixView({
             </div>
           )}
         </div>
+        {!isFocusMode && (
+  <div
+    className="
+      w-full
+      xl:w-[320px]
+      shrink-0
 
-        {(!isFocusMode || (!isMobile && isFocusMode)) && !isFocusMode && (
-          <div className="hidden xl:block w-[320px] shrink-0 sticky top-8 h-fit">
-            <Sidebar 
-              overallDiff={overallDiff} consistencyScore={consistencyScore} validDays={validDays} chartMaxCount={chartMaxCount}
-              bestGlobalStreak={bestGlobalStreak} globalWeekStats={globalWeekStats} compareCurrentWeek={compareCurrentWeek}
-              comparePrevWeek={comparePrevWeek} weekOffset={weekOffset} setWeekOffset={setWeekOffset}
-              totalCurrent={totalCurrent} actualToday={actualToday}
-            />
-          </div>
-        )}
+      order-2 xl:order-none
+
+      xl:sticky
+      xl:top-8
+      h-fit
+    "
+  >
+    <Sidebar
+      overallDiff={overallDiff}
+      consistencyScore={consistencyScore}
+      validDays={validDays}
+      chartMaxCount={chartMaxCount}
+      bestGlobalStreak={bestGlobalStreak}
+      globalWeekStats={globalWeekStats}
+      compareCurrentWeek={compareCurrentWeek}
+      comparePrevWeek={comparePrevWeek}
+      weekOffset={weekOffset}
+      setWeekOffset={setWeekOffset}
+      totalCurrent={totalCurrent}
+      actualToday={actualToday}
+    />
+  </div>
+)}
       </div>
 
     </div>

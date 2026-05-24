@@ -16,7 +16,6 @@ import FeedbackPopup from "@/settings/components/FeedbackPopup/FeedbackPopup";
 
 // Tasks Module Components
 import Tabs from "@/modules/tasks/Tabs";
-import StatsGrid from "@/modules/tasks/stats/StatsGrid";
 import MatrixView from "@/modules/tasks/matrix/MatrixView";
 import AnalyticsView from "@/modules/tasks/analytics/AnalyticsView";
 import AuditView from "@/modules/tasks/audit/AuditView";
@@ -177,15 +176,14 @@ export default function Home() {
 
       {!isMini ? (
         <>
-          <StatsGrid
-            tasks={state.tasks}
-            meta={state.meta}
-          />
-          <Tabs
-            activeTab={activeTab}
-            setActiveTab={handleTabChange}
-          />
           <main className="flex-1">
+            <div className="max-w-[1600px] mx-auto px-4 pt-6">
+              <Tabs
+                activeTab={activeTab}
+                setActiveTab={handleTabChange}
+              />
+            </div>
+
             {activeTab === "matrix" && (
               <MatrixView
                 tasks={state.tasks}
@@ -199,12 +197,14 @@ export default function Home() {
                 setMonthYear={setMonthYear}
               />
             )}
+
             {activeTab === "analytics" && (
               <AnalyticsView
                 tasks={state.tasks}
                 meta={state.meta}
               />
             )}
+
             {activeTab === "audit" && (
               <AuditView
                 logs={state.logs}

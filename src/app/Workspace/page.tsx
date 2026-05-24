@@ -10,7 +10,6 @@ import { useWorkspaceSystem } from "@/modules/workspace/engine/useWorkspaceSyste
 import { Menu, FolderOpen, ChevronRight, Lock } from "lucide-react";
 
 // Workspace Module Components
-import { WipPopup } from "@/modules/workspace/components/Modals/Modals";
 
 import Sidebar from "@/modules/workspace/components/Sidebar/Sidebar";
 
@@ -163,11 +162,6 @@ export default function NexTaskWorkspace() {
 
   return (
     <div className="min-h-screen bg-white text-gray-700 flex flex-col relative pt-[var(--navbar-h)]">
-
-      <WipPopup
-        showWipPopup={system.showWipPopup}
-        setShowWipPopup={system.setShowWipPopup}
-      />
 
       {/* Primary Navbar */}
       <Navbar
