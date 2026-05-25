@@ -1,26 +1,31 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { 
-  Plus, 
+import {
+  Plus,
   CalendarDays,
   LayoutList,
   History,
   SkipBack,
-  AlertCircle
+  AlertCircle,
 } from "lucide-react";
 
 import { PlannerEvent } from "../../types/types";
 import { useTheme } from "@/theme/ThemeProvider";
 
-// --- TIMEZONE SAFE HELPER ---
 const getLocalDate = () => {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().split("T")[0];
 };
 
-export type TabType = "today" | "yesterday" | "tomorrow" | "objectives" | "range" | "logs";
+export type TabType =
+  | "today"
+  | "yesterday"
+  | "tomorrow"
+  | "objectives"
+  | "range"
+  | "logs";
 
 interface TopBarProps {
   onAddClick: () => void;
@@ -29,38 +34,50 @@ interface TopBarProps {
   setActiveTab?: (tab: TabType) => void;
 }
 
-export default function TopBar({ 
+export default function TopBar({
   onAddClick,
   events = [],
-  activeTab = 'today',
-  setActiveTab = () => {}
+  activeTab = "today",
+  setActiveTab = () => {},
 }: TopBarProps) {
-  
   const { isDarkMode } = useTheme();
+
   const [dateString, setDateString] = useState("");
   const [greeting, setGreeting] = useState("Good Day");
 
-  // Set date statically on mount to prevent hydration mismatch
   useEffect(() => {
     const now = new Date();
-    setDateString(now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase());
-    
-    const currentHour = now.getHours();
-    if (currentHour < 12) setGreeting("Good Morning");
-    else if (currentHour < 17) setGreeting("Good Afternoon");
+
+    const weekday = now
+      .toLocaleDateString("en-US", { weekday: "short" })
+      .toUpperCase();
+    const monthDay = now
+      .toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      .toUpperCase();
+
+    // Premium date formatting: MON • MAY 25
+    setDateString(`${weekday} • ${monthDay}`);
+
+    const hour = now.getHours();
+
+    if (hour < 12) setGreeting("Good Morning");
+    else if (hour < 17) setGreeting("Good Afternoon");
     else setGreeting("Good Evening");
   }, []);
 
-  // --- DERIVED CONTEXT DATA ---
   const todayStr = getLocalDate();
-  const todayEvents = events.filter(e => e.date === todayStr);
-  const pendingToday = todayEvents.filter(e => e.status === 'pending');
-  const missedTotal = events.filter(e => e.status === 'missed').length;
+
+  const todayEvents = events.filter((e) => e.date === todayStr);
+
+  const pendingToday = todayEvents.filter((e) => e.status === "pending");
+
+  const missedTotal = events.filter((e) => e.status === "missed").length;
 
   const nextTask = useMemo(() => {
     const now = new Date();
+
     return pendingToday
-      .filter(e => {
+      .filter((e) => {
         const eventTime = new Date(`${e.date}T${e.time}`);
         return eventTime.getTime() > now.getTime();
       })
@@ -73,143 +90,256 @@ export default function TopBar({
 
   return (
     <>
-      <nav 
-        style={{ marginTop: "calc(var(--navbar-h, 80px) + 1rem)" }}
-        className={`relative z-10 rounded-[2.5rem] border transition-all duration-300 ${
-          isDarkMode ? "bg-[#111111]/80 backdrop-blur-xl border-gray-800" : "bg-white/80 backdrop-blur-xl border-slate-200"
-        }`}
+      <nav
+        style={{
+          marginTop: "calc(var(--navbar-h, 80px) + 1rem)",
+        }}
+        className="relative z-20 px-4 md:px-6 font-sans"
       >
-        <div className="max-w-[1500px] mx-auto px-6 md:px-10 py-6 md:py-7 flex flex-col lg:flex-row justify-between gap-6 lg:gap-10">
+        <div className="max-w-[1450px] mx-auto">
+          <div
+            className={`
+              rounded-[2rem]
+              px-5 md:px-6
+              py-3 md:py-3.5
+              backdrop-blur-[28px]
+              transition-all duration-300
+              flex flex-col lg:flex-row
+              items-start lg:items-center
+              justify-between
+              gap-4
+              antialiased
+              ${
+                isDarkMode
+                  ? "bg-white/[0.03] hover:bg-white/[0.06]"
+                  : "bg-white/[0.55]"
+              }
+            `}
+          >
+            {/* LEFT */}
+            <div className="flex flex-col gap-2 min-w-0 flex-1">
+              <div className="space-y-1">
+                <h1
+                  className={`
+                    text-[1.4rem] md:text-[1.6rem]
+                    tracking-[-0.03em]
+                    leading-[1]
+                    antialiased
+                    ${isDarkMode ? "text-white" : "text-black"}
+                  `}
+                  style={{
+                    fontWeight: 540,
+                  }}
+                >
+                  {greeting}
+                </h1>
 
-          {/* SECTION 1 — CONTEXT HEADER */}
-          <div className="flex items-start justify-between gap-4 flex-1">
-            <div className="space-y-2 flex-1">
-              <h1 className={`text-3xl md:text-4xl font-black tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>
-                {greeting}
-              </h1>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-orange-500">
-                Today • {dateString}
-              </p>
-              
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 pt-2">
-                <p className={`text-sm font-semibold ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-                  {pendingToday.length === 0 
-                    ? "You're clear for today." 
-                    : `${pendingToday.length} objective${pendingToday.length > 1 ? 's' : ''} remaining today.`
-                  }
+                <p className="text-[10px] uppercase tracking-[0.18em] font-medium text-orange-500/90 mt-1">
+                  {dateString}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <p
+                  className={`
+                    text-[13px]
+                    font-medium
+                    tracking-[-0.01em]
+                    ${isDarkMode ? "text-white/60" : "text-black/60"}
+                  `}
+                >
+                  {pendingToday.length === 0
+                    ? "You're clear today."
+                    : `${pendingToday.length} objective${
+                        pendingToday.length > 1 ? "s" : ""
+                      } remaining today`}
                 </p>
 
-                {/* RECOVERY ALERT */}
                 {missedTotal > 0 && (
-                  <button 
-                    onClick={() => setActiveTab('objectives')} 
-                    className={`inline-flex w-fit items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors border ${
-                      isDarkMode 
-                        ? "bg-red-950/30 text-red-400 border-red-900/50 hover:bg-red-950/50" 
-                        : "bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
-                    }`}
+                  <button
+                    onClick={() => setActiveTab("objectives")}
+                    className={`
+                      flex items-center gap-1.5
+                      rounded-full
+                      px-2.5 py-1
+                      text-[10px]
+                      font-medium
+                      transition-all
+                      ${
+                        isDarkMode
+                          ? "bg-red-500/10 text-red-400 hover:bg-red-500/15"
+                          : "bg-red-500/10 text-red-600 hover:bg-red-500/15"
+                      }
+                    `}
                   >
                     <AlertCircle size={12} />
-                    {missedTotal} missed task{missedTotal > 1 ? 's' : ''}
+                    {missedTotal} missed
                   </button>
                 )}
               </div>
             </div>
 
-            {/* DESKTOP ADD TASK */}
-            <div className="hidden md:block shrink-0 mt-1">
+            {/* CENTER - NEXT OBJECTIVE */}
+            <div className="hidden md:flex flex-col shrink-0 min-w-[240px]">
+              <span
+                className={`
+                  text-[9px]
+                  uppercase
+                  tracking-[0.18em]
+                  font-medium
+                  mb-1
+                  ${isDarkMode ? "text-white/40" : "text-black/40"}
+                `}
+              >
+                Next Objective
+              </span>
+
+              {nextTask ? (
+                <>
+                  <h3
+                    className={`
+                      text-[13px]
+                      tracking-[-0.02em]
+                      truncate
+                      ${isDarkMode ? "text-white" : "text-black"}
+                    `}
+                    style={{
+                      fontWeight: 540,
+                    }}
+                  >
+                    {nextTask.title}
+                  </h3>
+
+                  <span className="text-[11px] font-medium text-orange-500 mt-0.5">
+                    {nextTask.time}
+                  </span>
+                </>
+              ) : (
+                <p
+                  className={`
+                    text-[12px]
+                    font-medium
+                    ${isDarkMode ? "text-white/50" : "text-black/50"}
+                  `}
+                >
+                  Nothing scheduled
+                </p>
+              )}
+            </div>
+
+            {/* RIGHT BUTTON */}
+            <div className="hidden md:block shrink-0">
               <button
                 onClick={onAddClick}
                 className="
-                  flex items-center gap-2
-                  bg-orange-500 hover:bg-orange-600
+                  h-10
+                  px-4.5
+                  rounded-[1rem]
+                  bg-orange-500
+                  hover:bg-orange-600
                   text-white
-                  px-5 py-3
-                  rounded-2xl
-                  font-semibold
-                  shadow-lg shadow-orange-500/15
+                  text-[12px]
+                  flex items-center gap-2
                   transition-all duration-200
                   active:scale-[0.98]
+                  shadow-[0_8px_22px_rgba(249,115,22,0.22)]
+                  hover:shadow-[0_10px_28px_rgba(249,115,22,0.30)]
                 "
+                style={{
+                  fontWeight: 540,
+                }}
               >
-                <Plus size={18} strokeWidth={2.5} />
+                <Plus size={16} strokeWidth={2.6} />
                 Add Task
               </button>
-            </div>
-          </div>
-
-          {/* SECTION 2 — NEXT OBJECTIVE */}
-          <div className="flex-1 lg:max-w-sm flex items-center">
-            <div className={`w-full p-5 rounded-[1.5rem] border ${
-              isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-slate-50 border-slate-200"
-            }`}>
-              <p className={`text-[10px] font-bold uppercase tracking-widest mb-1.5 ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
-                Next Objective
-              </p>
-              {nextTask ? (
-                <>
-                  <h3 className={`text-base font-bold truncate ${isDarkMode ? "text-white" : "text-slate-900"}`}>
-                    {nextTask.title}
-                  </h3>
-                  <p className={`text-xs font-semibold mt-1 ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}>
-                    {nextTask.time}
-                  </p>
-                </>
-              ) : (
-                <p className={`text-sm font-semibold mt-1 ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-                  Nothing scheduled next.
-                </p>
-              )}
             </div>
           </div>
         </div>
       </nav>
 
-      {/* MOBILE THUMB NAVIGATION (5-Tab Layout) */}
-      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-sm">
-        <div className={`rounded-[2rem] p-2 flex items-center justify-between px-5 shadow-2xl border backdrop-blur-xl ${
-          isDarkMode ? "bg-[#111111]/95 border-gray-800 shadow-black/50" : "bg-white/95 border-slate-200 shadow-slate-200/50"
-        }`}>
-          <button 
-            onClick={() => setActiveTab('yesterday')}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'yesterday' ? 'text-orange-500' : (isDarkMode ? 'text-gray-500 hover:text-orange-400' : 'text-slate-400 hover:text-orange-500')}`}
-          >
-            <SkipBack size={20} strokeWidth={2.5} />
-            <span className="text-[9px] font-bold">Yesterday</span>
-          </button>
-
-          <button 
-            onClick={() => setActiveTab('today')}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'today' ? 'text-orange-500' : (isDarkMode ? 'text-gray-500 hover:text-orange-400' : 'text-slate-400 hover:text-orange-500')}`}
-          >
-            <CalendarDays size={20} strokeWidth={2.5} />
-            <span className="text-[9px] font-bold">Today</span>
-          </button>
-
-          {/* Center Orange FAB */}
-          <button 
-            onClick={onAddClick}
-            className={`flex items-center justify-center h-12 w-12 rounded-full transition-transform active:scale-90 -mt-5 shadow-lg shadow-orange-500/30 border-4 bg-orange-500 text-white hover:bg-orange-600 ${
-              isDarkMode ? "border-[#111111]" : "border-white"
+      {/* MOBILE NAV */}
+      <div className="md:hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-sm font-sans">
+        <div
+          className={`
+            rounded-[2rem]
+            px-5 py-3
+            flex items-center justify-between
+            backdrop-blur-[30px]
+            shadow-lg
+            ${isDarkMode ? "bg-black/30" : "bg-white/65"}
+          `}
+        >
+          <button
+            onClick={() => setActiveTab("yesterday")}
+            className={`flex flex-col items-center gap-1 transition-all ${
+              activeTab === "yesterday"
+                ? "text-orange-500"
+                : isDarkMode
+                ? "text-white/45"
+                : "text-black/45"
             }`}
+          >
+            <SkipBack size={18} />
+            <span className="text-[9px] font-medium">Yesterday</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("today")}
+            className={`flex flex-col items-center gap-1 transition-all ${
+              activeTab === "today"
+                ? "text-orange-500"
+                : isDarkMode
+                ? "text-white/45"
+                : "text-black/45"
+            }`}
+          >
+            <CalendarDays size={18} />
+            <span className="text-[9px] font-medium">Today</span>
+          </button>
+
+          <button
+            onClick={onAddClick}
+            className="
+              h-14 w-14
+              rounded-full
+              bg-orange-500
+              text-white
+              flex items-center justify-center
+              -mt-8
+              active:scale-90
+              transition-transform
+              shadow-[0_8px_22px_rgba(249,115,22,0.25)]
+            "
           >
             <Plus size={24} strokeWidth={3} />
           </button>
 
-          <button 
-            onClick={() => setActiveTab('range')}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'range' ? 'text-orange-500' : (isDarkMode ? 'text-gray-500 hover:text-orange-400' : 'text-slate-400 hover:text-orange-500')}`}
+          <button
+            onClick={() => setActiveTab("range")}
+            className={`flex flex-col items-center gap-1 transition-all ${
+              activeTab === "range"
+                ? "text-orange-500"
+                : isDarkMode
+                ? "text-white/45"
+                : "text-black/45"
+            }`}
           >
-            <LayoutList size={20} strokeWidth={2.5} />
-            <span className="text-[9px] font-bold">Timeline</span>
+            <LayoutList size={18} />
+            <span className="text-[9px] font-medium">Timeline</span>
           </button>
 
-          <button 
-            onClick={() => setActiveTab('logs')}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'logs' ? 'text-orange-500' : (isDarkMode ? 'text-gray-500 hover:text-orange-400' : 'text-slate-400 hover:text-orange-500')}`}
+          <button
+            onClick={() => setActiveTab("logs")}
+            className={`flex flex-col items-center gap-1 transition-all ${
+              activeTab === "logs"
+                ? "text-orange-500"
+                : isDarkMode
+                ? "text-white/45"
+                : "text-black/45"
+            }`}
           >
-            <History size={20} strokeWidth={2.5} />
-            <span className="text-[9px] font-bold">History</span>
+            <History size={18} />
+            <span className="text-[9px] font-medium">History</span>
           </button>
         </div>
       </div>

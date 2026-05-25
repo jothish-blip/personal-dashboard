@@ -259,7 +259,6 @@ export default function MatrixView({
   
     let currentDateStr = actualToday;
   
-    // if today inactive → check yesterday
     if (!isDayActive(currentDateStr)) {
       d.setDate(d.getDate() - 1);
       currentDateStr = getLocalDate(d);
@@ -422,15 +421,13 @@ export default function MatrixView({
         />
       )}
 
-      <div className={`flex-1 flex flex-col xl:flex-row mx-auto w-full gap-6 transition-all duration-500 ${isFocusMode ? 'max-w-[900px] p-2 md:p-4 justify-center' : 'max-w-[1400px] p-4 md:p-8'}`}>
+      <div className={`flex-1 flex flex-col xl:flex-row mx-auto w-full gap-6 transition-all duration-500 ${isFocusMode ? 'max-w-[900px] p-2 md:p-4 justify-center' : 'max-w-[1700px] p-4 md:p-8'}`}>
         <div className="flex-1 flex flex-col gap-6 overflow-hidden">
           
           {!isFocusMode && (
             <Decisions
               tasks={activeTasks}
               currentStreak={currentStreak}
-              lockedDates={meta.lockedDates || []}
-              isFocusMode={meta.isFocus}
             />
           )}
 
@@ -511,18 +508,19 @@ export default function MatrixView({
         {!isFocusMode && (
           <div
             className="
+              flex
               w-full
-              sm:w-full
               xl:w-[320px]
-              max-w-full
               shrink-0
               order-2 xl:order-none
               xl:sticky
-              xl:top-8
-              h-fit
+              xl:top-3
+              xl:self-start
+              xl:h-[calc(100vh-90px)]
+              xl:overflow-hidden
             "
           >
-            <Sidebar/>
+            <Sidebar tasks={activeTasks} />
           </div>
         )}
       </div>

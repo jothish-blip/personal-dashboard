@@ -1,6 +1,6 @@
 {
-  "name": "Nextask",
-  "short_name": "Nextask",
+  "name": "NexTask",
+  "short_name": "NexTask",
   "description": "Execution system for focus, tasks and planning",
   "start_url": "/",
   "display": "standalone",

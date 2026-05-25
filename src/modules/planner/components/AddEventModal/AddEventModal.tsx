@@ -160,19 +160,21 @@ export default function AddEventModal({
     >
       <div 
         onClick={(e) => e.stopPropagation()} 
-        className={`w-full md:max-w-xl rounded-t-[2rem] md:rounded-[2.5rem] p-6 md:p-8 space-y-6 animate-in slide-in-from-bottom-8 md:zoom-in-95 max-h-[90vh] overflow-y-auto scrollbar-hide border ${
-          isDarkMode ? "bg-[#111111] shadow-[0_20px_60px_rgba(0,0,0,0.5)] border-gray-800" : "bg-white shadow-[0_20px_60px_rgba(0,0,0,0.15)] border-transparent"
+        className={`w-full md:max-w-xl rounded-t-[2.5rem] md:rounded-[2.5rem] p-6 md:p-7 space-y-6 animate-in slide-in-from-bottom-8 md:zoom-in-95 max-h-[90vh] overflow-y-auto scrollbar-hide font-sans ${
+          isDarkMode 
+            ? "bg-black/[0.72] backdrop-blur-[30px] shadow-[0_20px_80px_rgba(0,0,0,0.45)]" 
+            : "bg-white/[0.95] backdrop-blur-[30px] shadow-[0_20px_80px_rgba(0,0,0,0.15)]"
         }`}
       >
-        <div className={`w-10 h-1.5 rounded-full mx-auto mb-2 md:hidden ${isDarkMode ? "bg-gray-800" : "bg-slate-200"}`} />
+        <div className={`w-10 h-1.5 rounded-full mx-auto mb-2 md:hidden ${isDarkMode ? "bg-white/20" : "bg-black/10"}`} />
 
         {/* HEADER */}
         <div className="flex justify-between items-start">
           <div className="space-y-1 w-full">
-            <h3 className={`text-2xl md:text-3xl font-black tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+            <h3 className={`text-2xl md:text-3xl font-semibold tracking-[-0.03em] ${isDarkMode ? "text-white" : "text-slate-900"}`}>
               {isEdit ? "Edit Task" : "New Task"}
             </h3>
-            <p className={`text-sm font-semibold tracking-tight ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
+            <p className={`text-sm font-medium tracking-tight ${isDarkMode ? "text-white/50" : "text-slate-500"}`}>
               {isEdit ? "Update your plan." : "Plan something meaningful."}
             </p>
           </div>
@@ -180,7 +182,9 @@ export default function AddEventModal({
           <button 
             onClick={onClose} 
             className={`p-2 rounded-full transition-colors ml-4 shrink-0 ${
-              isDarkMode ? "bg-gray-900 text-gray-500 hover:text-white hover:bg-gray-800" : "bg-slate-50 text-slate-400 hover:text-slate-900 hover:bg-slate-100"
+              isDarkMode 
+                ? "bg-white/[0.04] text-white/50 hover:text-white hover:bg-white/[0.08]" 
+                : "bg-black/[0.03] text-slate-400 hover:text-slate-900 hover:bg-black/[0.06]"
             }`}
           >
             <X size={20} />
@@ -191,7 +195,9 @@ export default function AddEventModal({
           
           {/* TITLE INPUT */}
           <div>
-            <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Task Name</label>
+            <label className={`text-[11px] font-medium uppercase tracking-[0.16em] ${isDarkMode ? "text-white/40" : "text-black/40"}`}>
+              Task Name
+            </label>
             <div className="relative mt-2">
               <input
                 ref={titleInputRef}
@@ -200,10 +206,10 @@ export default function AddEventModal({
                 onChange={handleTitleChange}
                 onKeyDown={handleKeyDown}
                 placeholder="What needs to be done?"
-                className={`w-full p-4 border rounded-2xl outline-none font-bold text-base md:text-lg transition-all placeholder:font-medium ${
+                className={`w-full p-4 rounded-2xl outline-none font-medium text-base md:text-lg transition-all ${
                   isDarkMode 
-                    ? "bg-[#0a0a0a] border-gray-800 text-white placeholder-gray-600 focus:bg-[#111111] focus:border-orange-500 focus:ring-4 focus:ring-orange-900/20" 
-                    : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-300 focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10"
+                    ? "bg-white/[0.04] hover:bg-white/[0.06] focus:bg-white/[0.07] text-white placeholder-white/30" 
+                    : "bg-black/[0.03] hover:bg-black/[0.05] focus:bg-black/[0.06] text-slate-900 placeholder-slate-400"
                 }`}
               />
             </div>
@@ -213,10 +219,12 @@ export default function AddEventModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <div className="flex justify-between items-center h-[18px]">
-                <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Complete By</label>
+                <label className={`text-[11px] font-medium uppercase tracking-[0.16em] ${isDarkMode ? "text-white/40" : "text-black/40"}`}>
+                  Complete By
+                </label>
                 <button 
                   onClick={() => setFormData({ ...formData, date: getNowLocal().date })}
-                  className="text-xs text-orange-500 font-semibold hover:text-orange-600 transition-colors"
+                  className="text-xs text-orange-500 font-medium hover:text-orange-600 transition-colors"
                 >
                   Today
                 </button>
@@ -226,23 +234,29 @@ export default function AddEventModal({
                 min={getNowLocal().date} 
                 value={formData.date || ""}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                className={`w-full p-4 border rounded-2xl outline-none font-bold text-base focus:border-orange-500 transition-colors ${
-                  isDarkMode ? "bg-[#0a0a0a] border-gray-800 text-white color-scheme-dark" : "bg-slate-50 border-slate-200 text-slate-900"
+                className={`w-full p-4 rounded-2xl outline-none font-medium text-base transition-colors ${
+                  isDarkMode 
+                    ? "bg-white/[0.04] hover:bg-white/[0.06] focus:bg-white/[0.07] text-white color-scheme-dark" 
+                    : "bg-black/[0.03] hover:bg-black/[0.05] focus:bg-black/[0.06] text-slate-900"
                 }`}
               />
             </div>
 
             <div className="space-y-2">
               <div className="flex justify-between items-center h-[18px]">
-                <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Before Time</label>
+                <label className={`text-[11px] font-medium uppercase tracking-[0.16em] ${isDarkMode ? "text-white/40" : "text-black/40"}`}>
+                  Before Time
+                </label>
               </div>
               <input
                 type="time"
                 min={formData.date === getNowLocal().date ? getNowLocal().time : undefined}
                 value={formData.time || ""}
                 onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                className={`w-full p-4 border rounded-2xl outline-none font-bold text-base focus:border-orange-500 transition-colors ${
-                  isDarkMode ? "bg-[#0a0a0a] border-gray-800 text-white color-scheme-dark" : "bg-slate-50 border-slate-200 text-slate-900"
+                className={`w-full p-4 rounded-2xl outline-none font-medium text-base transition-colors ${
+                  isDarkMode 
+                    ? "bg-white/[0.04] hover:bg-white/[0.06] focus:bg-white/[0.07] text-white color-scheme-dark" 
+                    : "bg-black/[0.03] hover:bg-black/[0.05] focus:bg-black/[0.06] text-slate-900"
                 }`}
               />
             </div>
@@ -254,24 +268,24 @@ export default function AddEventModal({
               className={`
                 flex items-center justify-between
                 px-4 py-3
-                rounded-2xl border
+                rounded-2xl
                 ${
                   isDarkMode
-                    ? "bg-[#0f0f0f] border-white/[0.06]"
-                    : "bg-orange-50/50 border-orange-100"
+                    ? "bg-white/[0.04]"
+                    : "bg-orange-50/50"
                 }
               `}
             >
               <div>
                 <p
                   className={`
-                    text-[11px]
+                    text-[10px]
                     uppercase
                     tracking-[0.18em]
-                    font-black
+                    font-semibold
                     ${
                       isDarkMode
-                        ? "text-gray-500"
+                        ? "text-white/40"
                         : "text-slate-400"
                     }
                   `}
@@ -281,7 +295,7 @@ export default function AddEventModal({
 
                 <p
                   className={`
-                    font-bold
+                    font-semibold
                     text-sm
                     ${
                       isDarkMode
@@ -303,7 +317,7 @@ export default function AddEventModal({
                 </p>
               </div>
 
-              <span className="text-xs font-bold text-orange-500">
+              <span className="text-xs font-semibold text-orange-500">
                 Due
               </span>
             </div>
@@ -311,46 +325,48 @@ export default function AddEventModal({
 
           {/* QUICK TIME BUTTONS */}
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-             <Clock size={14} className={`shrink-0 ${isDarkMode ? "text-gray-600" : "text-slate-300"}`} />
+             <Clock size={14} className={`shrink-0 ${isDarkMode ? "text-white/40" : "text-slate-400"}`} />
              
-             <button onClick={() => setQuickPreset("now")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+             <button onClick={() => setQuickPreset("now")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-medium transition-all ${
                checkQuickTimeMatch("now") 
-                 ? "bg-orange-500 text-white border-orange-500 shadow-sm" 
-                 : (isDarkMode ? "bg-[#0a0a0a] hover:bg-[#1a1a1a] text-gray-400 border-gray-800" : "bg-slate-50 hover:bg-slate-100 text-slate-500 border-slate-200")
+                 ? "bg-orange-500 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)]" 
+                 : (isDarkMode ? "bg-white/[0.04] hover:bg-white/[0.06] text-white/60" : "bg-black/[0.03] hover:bg-black/[0.05] text-slate-600")
              }`}>Due now</button>
              
-             <button onClick={() => setQuickPreset("30m")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+             <button onClick={() => setQuickPreset("30m")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-medium transition-all ${
                checkQuickTimeMatch("30m") 
-                 ? "bg-orange-500 text-white border-orange-500 shadow-sm" 
-                 : (isDarkMode ? "bg-[#0a0a0a] hover:bg-[#1a1a1a] text-gray-400 border-gray-800" : "bg-slate-50 hover:bg-slate-100 text-slate-500 border-slate-200")
+                 ? "bg-orange-500 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)]" 
+                 : (isDarkMode ? "bg-white/[0.04] hover:bg-white/[0.06] text-white/60" : "bg-black/[0.03] hover:bg-black/[0.05] text-slate-600")
              }`}>30m left</button>
              
-             <button onClick={() => setQuickPreset("1h")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+             <button onClick={() => setQuickPreset("1h")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-medium transition-all ${
                checkQuickTimeMatch("1h") 
-                 ? "bg-orange-500 text-white border-orange-500 shadow-sm" 
-                 : (isDarkMode ? "bg-[#0a0a0a] hover:bg-[#1a1a1a] text-gray-400 border-gray-800" : "bg-slate-50 hover:bg-slate-100 text-slate-500 border-slate-200")
+                 ? "bg-orange-500 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)]" 
+                 : (isDarkMode ? "bg-white/[0.04] hover:bg-white/[0.06] text-white/60" : "bg-black/[0.03] hover:bg-black/[0.05] text-slate-600")
              }`}>1h left</button>
 
-             <button onClick={() => setQuickPreset("tomorrow")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+             <button onClick={() => setQuickPreset("tomorrow")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-medium transition-all ${
                checkQuickTimeMatch("tomorrow") 
-                 ? "bg-orange-500 text-white border-orange-500 shadow-sm" 
-                 : (isDarkMode ? "bg-[#0a0a0a] hover:bg-[#1a1a1a] text-gray-400 border-gray-800" : "bg-slate-50 hover:bg-slate-100 text-slate-500 border-slate-200")
+                 ? "bg-orange-500 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)]" 
+                 : (isDarkMode ? "bg-white/[0.04] hover:bg-white/[0.06] text-white/60" : "bg-black/[0.03] hover:bg-black/[0.05] text-slate-600")
              }`}>Tomorrow</button>
           </div>
 
           <div className="space-y-5">
             {/* CATEGORY */}
             <div>
-              <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Category</label>
+              <label className={`text-[11px] font-medium uppercase tracking-[0.16em] ${isDarkMode ? "text-white/40" : "text-black/40"}`}>
+                Category
+              </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
                 {["Work", "Study", "Health", "Finance", "Personal", "Deep Work", "Learning", "Meeting"].map((t) => (
                   <button
                     key={t}
                     onClick={() => setFormData({ ...formData, type: t as TaskType })}
-                    className={`p-2.5 rounded-xl text-xs font-semibold transition-all border ${
+                    className={`p-2.5 rounded-xl text-xs font-medium transition-all ${
                       formData.type === t
-                        ? (isDarkMode ? "bg-orange-900/30 text-orange-400 border-orange-800/50 shadow-sm" : "bg-orange-100 text-orange-600 border-orange-200 shadow-sm")
-                        : (isDarkMode ? "bg-[#0a0a0a] text-gray-400 hover:bg-[#1a1a1a] border-gray-800" : "bg-slate-50 text-slate-500 hover:bg-slate-100 border-transparent")
+                        ? (isDarkMode ? "bg-orange-500/14 text-orange-400" : "bg-orange-50 text-orange-600")
+                        : (isDarkMode ? "bg-white/[0.04] hover:bg-white/[0.06] text-white/70" : "bg-black/[0.03] hover:bg-black/[0.05] text-slate-600")
                     }`}
                   >
                     {t}
@@ -361,16 +377,18 @@ export default function AddEventModal({
 
             {/* PRIORITY */}
             <div>
-              <label className={`text-[11px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>Priority</label>
-              <div className={`flex p-1 rounded-2xl mt-2 border ${isDarkMode ? 'bg-[#0a0a0a] border-gray-800' : 'bg-slate-50 border-slate-200'}`}>
+              <label className={`text-[11px] font-medium uppercase tracking-[0.16em] ${isDarkMode ? "text-white/40" : "text-black/40"}`}>
+                Priority
+              </label>
+              <div className={`flex p-1 rounded-2xl mt-2 ${isDarkMode ? 'bg-white/[0.03]' : 'bg-black/[0.02]'}`}>
                 {["low", "medium", "high"].map((p) => (
                   <button
                     key={p}
                     onClick={() => setFormData({ ...formData, priority: p as Priority })}
-                    className={`flex-1 py-2.5 text-xs font-bold capitalize rounded-xl transition-all ${
+                    className={`flex-1 py-2.5 text-xs font-medium capitalize rounded-xl transition-all ${
                       formData.priority === p
-                        ? (isDarkMode ? "bg-[#222222] text-white shadow-sm" : "bg-white text-slate-900 shadow-sm")
-                        : (isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-slate-400 hover:text-slate-600")
+                        ? (isDarkMode ? "bg-white/[0.08] text-white shadow-sm" : "bg-black/[0.06] text-black shadow-sm")
+                        : (isDarkMode ? "bg-transparent text-white/45 hover:text-white/70" : "bg-transparent text-black/45 hover:text-black/70")
                     }`}
                   >
                     {p}
@@ -385,10 +403,10 @@ export default function AddEventModal({
             <button
               onClick={handleValidatedSave}
               disabled={!formData.title?.trim() || !formData.time}
-              className={`w-full py-4 text-white rounded-2xl text-sm md:text-base font-bold transition-all active:scale-[0.98] ${
+              className={`w-full py-4 rounded-[1.4rem] text-sm md:text-base font-semibold transition-all active:scale-[0.98] ${
                 !formData.title?.trim() || !formData.time 
-                  ? (isDarkMode ? "bg-gray-900 text-gray-600 shadow-none" : "bg-slate-100 text-slate-400 shadow-none") 
-                  : "bg-orange-500 hover:bg-orange-600 shadow-[0_8px_30px_rgba(249,115,22,0.3)]"
+                  ? (isDarkMode ? "bg-white/[0.06] text-white/30 shadow-none" : "bg-black/[0.04] text-black/30 shadow-none") 
+                  : "bg-orange-500 hover:bg-orange-600 text-white shadow-[0_12px_35px_rgba(249,115,22,0.28)]"
               }`}
             >
               {!formData.title?.trim()

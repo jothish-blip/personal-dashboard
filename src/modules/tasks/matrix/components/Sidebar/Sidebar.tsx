@@ -1,1029 +1,620 @@
 "use client";
 
-import React, {
-  useState,
-  useMemo,
-  useEffect,
-  useRef,
-  useTransition,
-  useDeferredValue,
-} from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import Link from "next/link";
 import {
-  ChevronRight,
-  TrendingUp,
-  Activity,
-  BarChart2,
-  Zap,
-  Flame,
-  Target,
-  Crosshair,
+  CalendarDays,
+  FolderOpen,
+  NotebookPen,
+  Target
 } from "lucide-react";
-import { useNexCore } from "../../../engine/useNexCore";
 import { useTheme } from "@/theme/ThemeProvider";
 
-const AnimatedNumber = ({ value }: { value: number }) => {
-  const [displayValue, setDisplayValue] = useState(0);
-  const valueRef = useRef(0);
-  const frameRef = useRef<number | null>(null);
+interface Task {
+  id?: string;
+  name?: string;
+  group?: string;
+  history?: Record<string, boolean>;
+}
 
-  useEffect(() => {
-    const from = valueRef.current;
-    const to = value;
-    const duration = 250;
-    let startTime: number;
+interface SidebarProps {
+  tasks: Task[];
+}
 
-    if (frameRef.current) cancelAnimationFrame(frameRef.current);
-
-    const animate = (time: number) => {
-      if (!startTime) startTime = time;
-
-      const progress = Math.min((time - startTime) / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 3);
-      const next = Math.round(from + (to - from) * ease);
-
-      setDisplayValue(next);
-
-      if (progress < 1) {
-        frameRef.current = requestAnimationFrame(animate);
-      } else {
-        valueRef.current = to;
-      }
-    };
-
-    frameRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (frameRef.current) cancelAnimationFrame(frameRef.current);
-    };
-  }, [value]);
-
-  return <>{displayValue}</>;
-};
-
-const MagneticCard = ({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) => {
-  const ref = useRef<HTMLDivElement>(null);
-
-  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    const el = ref.current;
-    if (!el) return;
-
-    const rect = el.getBoundingClientRect();
-    const x = ((event.clientX - rect.left - rect.width / 2) / rect.width) * 4;
-    const y = ((event.clientY - rect.top - rect.height / 2) / rect.height) * 4;
-
-    el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-  };
-
-  const handleMouseLeave = () => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.transform = "translate3d(0, 0, 0)";
-  };
-
-  return (
-    <div
-      ref={ref}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      className={`transform-gpu will-change-transform transition-transform duration-200 ${className}`}
-    >
-      {children}
-    </div>
-  );
-};
-
-const getLocalDate = () => {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().split("T")[0];
-};
-
-export default function Sidebar() {
-  const { state, loading } = useNexCore();
+export default function Sidebar({
+  tasks = [],
+}: SidebarProps) {
   const { isDarkMode } = useTheme();
+  const [activeTab, setActiveTab] = useState<"pending" | "completed" | "history">("pending");
+  const [timeOfDay, setTimeOfDay] = useState<"morning" | "afternoon" | "night">("morning");
 
-  const [showMobileDetails, setShowMobileDetails] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const [justCompleted, setJustCompleted] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isPending, startTransition] = useTransition();
-
-  useEffect(() => setMounted(true), []);
-
-  const today = useMemo(() => getLocalDate(), []);
-  const tasks = state.tasks ?? [];
-
-  const taskSignature = useMemo(
-    () =>
-      tasks
-        .map((task: any) => {
-          const history = task.history || {};
-          const completedDates = Object.keys(history)
-            .filter((date) => history[date])
-            .sort()
-            .join(",");
-
-          return `${task.id}-${completedDates}`;
-        })
-        .join("|"),
-    [tasks]
-  );
-
+  // Determine time of day on mount to avoid hydration mismatch
   useEffect(() => {
-    setIsSyncing(true);
-    const timer = setTimeout(() => setIsSyncing(false), 300);
-    return () => clearTimeout(timer);
-  }, [taskSignature]);
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) setTimeOfDay("morning");
+    else if (hour >= 12 && hour < 18) setTimeOfDay("afternoon");
+    else setTimeOfDay("night");
+  }, []);
 
-  const coreStats = useMemo(() => {
-    let todayCompleted = 0;
-    let bestStreak = 0;
-    const totalTasks = tasks.length;
+  const getToday = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split("T")[0];
+  };
 
-    tasks.forEach((task: any) => {
-      const history = task.history || {};
-      if (history[today]) todayCompleted++;
+  const today = getToday();
 
-      let localStreak = 0;
-      let localBest = 0;
-      const dates = Object.keys(history).sort();
-
-      dates.forEach((date) => {
-        if (history[date]) {
-          localStreak++;
-          localBest = Math.max(localBest, localStreak);
-        } else {
-          localStreak = 0;
-        }
-      });
-
-      bestStreak = Math.max(bestStreak, localBest);
-    });
-
-    const completionPct =
-      totalTasks === 0 ? 0 : Math.round((todayCompleted / totalTasks) * 100);
-
-    return {
-      todayCompleted,
-      totalTasks,
-      completionPct,
-      bestStreak,
-    };
-  }, [taskSignature, today]);
-
-  const trendStats = useMemo(() => {
-    const trendMap: Record<string, number> = {};
-
-    tasks.forEach((task: any) => {
-      Object.keys(task.history || {}).forEach((date) => {
-        if (task.history[date]) {
-          trendMap[date] = (trendMap[date] || 0) + 1;
-        }
-      });
-    });
-
-    const pulseData = [];
-    const velocityData = [];
-    let thisWeek = 0;
-    let lastWeek = 0;
-
-    for (let i = 29; i >= 0; i--) {
+  // Pre-compute last 7 days for the History tab
+  const last7Days = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().split("T")[0];
-      const val = trendMap[key] || 0;
-
-      pulseData.push({
-        date: key,
-        completed: val,
-      });
-
-      if (i < 7) {
-        thisWeek += val;
-        velocityData.push(val);
-      } else if (i < 14) {
-        lastWeek += val;
-      }
-    }
-
-    const trendImprovement =
-      lastWeek === 0
-        ? thisWeek > 0
-          ? 100
-          : 0
-        : Math.round(((thisWeek - lastWeek) / lastWeek) * 100);
-
-    const momentumScore = Math.min(
-      100,
-      Math.max(0, 50 + trendImprovement / 2)
-    );
-
-    return {
-      pulseData,
-      velocityData,
-      trendImprovement,
-      momentumScore,
-    };
-  }, [taskSignature]);
-
-  const groupStats = useMemo(() => {
-    const stats: Record<string, { possible: number; done: number }> = {};
-
-    tasks.forEach((task: any) => {
-      const groupName = task.group || "GENERAL";
-
-      if (!stats[groupName]) {
-        stats[groupName] = {
-          possible: 0,
-          done: 0,
-        };
-      }
-
-      for (let i = 0; i < 30; i++) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dStr = d.toISOString().split("T")[0];
-
-        stats[groupName].possible++;
-
-        if (task.history?.[dStr]) {
-          stats[groupName].done++;
-        }
-      }
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().split("T")[0];
     });
+  }, []);
 
-    const groupData = Object.entries(stats)
-      .map(([name, data]) => ({
-        name,
-        pct:
-          data.possible === 0
-            ? 0
-            : Math.round((data.done / data.possible) * 100),
-      }))
-      .filter((g) => g.pct > 0)
-      .sort((a, b) => b.pct - a.pct);
+  // Subtle inner accent line mood based on time of day
+  const getCardMood = () => {
+    if (timeOfDay === "morning") return { accent: "bg-emerald-500/60" };
+    if (timeOfDay === "afternoon") return { accent: "bg-orange-500/60" };
+    return { accent: "bg-rose-500/60" };
+  };
 
-    const topFive = groupData.slice(0, 5);
-    const strongestGroup = groupData.length > 0 ? groupData[0].name : "None";
+  const mood = getCardMood();
 
-    return {
-      groupData: topFive,
-      strongestGroup,
-      activeGroups: groupData.length,
-    };
-  }, [taskSignature]);
+  const pendingTasks = useMemo(() => {
+    return tasks.filter((task) => task.history?.[today] !== true);
+  }, [tasks, today]);
 
-  const heatmapStats = useMemo(() => {
-    const trendMap: Record<string, number> = {};
+  const completedTasks = useMemo(() => {
+    return tasks.filter((task) => task.history?.[today] === true);
+  }, [tasks, today]);
 
-    tasks.forEach((task: any) => {
-      Object.keys(task.history || {}).forEach((date) => {
-        if (task.history[date]) {
-          trendMap[date] = (trendMap[date] || 0) + 1;
-        }
-      });
-    });
+  const percentCompleted = tasks.length === 0 ? 0 : Math.round((completedTasks.length / tasks.length) * 100);
 
-    const heatmapData = [];
-    const totalTasks = tasks.length;
+  // Dynamic context message based on detailed progress thresholds
+  const getProgressMessage = (completed: number, total: number) => {
+    const ratio = total === 0 ? 0 : completed / total;
 
-    for (let i = 27; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().split("T")[0];
-      const count = trendMap[key] || 0;
-      const intensity = totalTasks > 0 ? count / totalTasks : 0;
+    if (total === 0) return "Let's plan your day.";
+    if (completed === 0) return "Let's start with one thing today.";
+    if (ratio < 0.3) return "Good start — keep momentum going.";
+    if (ratio < 0.6) return "You're building momentum.";
+    if (ratio < 0.9) return "You're almost there.";
+    
+    return "Great work today.";
+  };
 
-      heatmapData.push({
-        date: key,
-        intensity,
-        isToday: i === 0,
-      });
-    }
+  // Tiny success text builder for the stats row
+  const getTinyStatText = (completed: number, total: number) => {
+    if (total === 0) return null;
+    if (completed === 0) return "Ready to begin";
+    const ratio = completed / total;
+    if (ratio === 1) return "Everything complete";
+    if (ratio >= 0.6) return "Almost there";
+    if (ratio >= 0.25) return "Good pace";
+    return "Building momentum";
+  };
 
-    return { heatmapData };
-  }, [taskSignature]);
+  const surface = isDarkMode
+    ? "bg-white/[0.02] border-white/[0.06]"
+    : "bg-black/[0.000] border-black/[0.05]";
 
-  const prevCompleted = useRef(coreStats.todayCompleted);
+  const textPrimary = isDarkMode ? "text-slate-100" : "text-slate-900";
+  const textMuted = isDarkMode ? "text-slate-400/80" : "text-slate-500";
 
-  useEffect(() => {
-    if (coreStats.todayCompleted > prevCompleted.current) {
-      startTransition(() => {
-        setJustCompleted(true);
-      });
-
-      const timer = setTimeout(() => setJustCompleted(false), 500);
-      prevCompleted.current = coreStats.todayCompleted;
-      return () => clearTimeout(timer);
-    }
-
-    prevCompleted.current = coreStats.todayCompleted;
-  }, [coreStats.todayCompleted, startTransition]);
-
-  const deferredPulse = useDeferredValue(trendStats.pulseData);
-  const deferredGroups = useDeferredValue(groupStats.groupData);
-
-  const maxPulse = Math.max(1, ...deferredPulse.map((d) => d.completed));
-
-  const smoothFillPath = useMemo(() => {
-    if (deferredPulse.length === 0) return "";
-
-    const points = deferredPulse.map((d, i) => ({
-      x: (i / (deferredPulse.length - 1)) * 100,
-      y: 100 - (d.completed / maxPulse) * 100,
-    }));
-
-    let path = `M ${points[0].x},${points[0].y}`;
-
-    for (let i = 1; i < points.length - 2; i++) {
-      const xc = (points[i].x + points[i + 1].x) / 2;
-      const yc = (points[i].y + points[i + 1].y) / 2;
-      path += ` Q ${points[i].x},${points[i].y} ${xc},${yc}`;
-    }
-
-    if (points.length > 1) {
-      path += ` Q ${points[points.length - 2].x},${
-        points[points.length - 2].y
-      } ${points[points.length - 1].x},${points[points.length - 1].y}`;
-    }
-
-    return path + ` L 100,100 L 0,100 Z`;
-  }, [deferredPulse, maxPulse]);
-
-  const smoothLinePath = useMemo(() => {
-    if (deferredPulse.length === 0) return "";
-
-    const points = deferredPulse.map((d, i) => ({
-      x: (i / (deferredPulse.length - 1)) * 100,
-      y: 100 - (d.completed / maxPulse) * 100,
-    }));
-
-    let path = `M ${points[0].x},${points[0].y}`;
-
-    for (let i = 1; i < points.length - 2; i++) {
-      const xc = (points[i].x + points[i + 1].x) / 2;
-      const yc = (points[i].y + points[i + 1].y) / 2;
-      path += ` Q ${points[i].x},${points[i].y} ${xc},${yc}`;
-    }
-
-    if (points.length > 1) {
-      path += ` Q ${points[points.length - 2].x},${
-        points[points.length - 2].y
-      } ${points[points.length - 1].x},${points[points.length - 1].y}`;
-    }
-
-    return path;
-  }, [deferredPulse, maxPulse]);
-
-  const radarPath = useMemo(() => {
-    const data = deferredGroups;
-    if (data.length < 3) return "";
-
-    const paddedData = [...data];
-
-    while (paddedData.length < 5) {
-      paddedData.push({
-        name: "",
-        pct: 0,
-      });
-    }
-
-    const pointsToUse = paddedData.slice(0, 5);
-
-    const angles = [
-      -Math.PI / 2,
-      -Math.PI / 2 + (2 * Math.PI) / 5,
-      -Math.PI / 2 + (4 * Math.PI) / 5,
-      -Math.PI / 2 + (6 * Math.PI) / 5,
-      -Math.PI / 2 + (8 * Math.PI) / 5,
-    ];
-
-    const coords = pointsToUse.map((g, i) => {
-      const r = (g.pct / 100) * 45;
-      const cx = 50 + r * Math.cos(angles[i]);
-      const cy = 50 + r * Math.sin(angles[i]);
-      return `${cx},${cy}`;
-    });
-
-    return `M ${coords.join(" L ")} Z`;
-  }, [deferredGroups]);
-
-  const liquidY = 100 - coreStats.completionPct;
-
-  let liquidColor = "#3b82f6";
-  let glowClass = "";
-
-  if (coreStats.completionPct >= 100) {
-    liquidColor = "#22c55e";
-    glowClass =
-      "drop-shadow-[0_0_15px_rgba(34,197,94,0.6)] animate-pulse";
-  } else if (coreStats.completionPct >= 75) {
-    liquidColor = "#06b6d4";
-    glowClass = "drop-shadow-[0_0_10px_rgba(6,182,212,0.4)]";
-  } else if (coreStats.completionPct >= 50) {
-    glowClass = "drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]";
-  }
-
-  const panelClass = isDarkMode
-    ? "bg-[#0a0a0a] border-gray-800 shadow-none"
-    : "bg-white border-gray-200 shadow-sm";
-
-  const cardClass = isDarkMode
-    ? "bg-[#0a0a0a] border-gray-800 shadow-none"
-    : "bg-white border-gray-200 shadow-sm";
-
-  const textPrimary = isDarkMode ? "text-gray-100" : "text-gray-900";
-  const textSecondary = isDarkMode ? "text-gray-300" : "text-gray-700";
-  const textMuted = isDarkMode ? "text-gray-500" : "text-gray-400";
-  const softTrack = isDarkMode ? "bg-gray-900" : "bg-gray-100";
-
-  if (loading) {
-    return (
-      <aside className="w-full xl:w-[380px] 2xl:w-[420px] shrink-0 flex flex-col gap-4 max-xl:pb-4">
-        <div
-          className={`flex justify-center items-center min-h-[140px] xl:min-h-[160px] w-full border rounded-2xl animate-pulse ${panelClass}`}
-        />
-        <div
-          className={`flex justify-center items-center min-h-[140px] xl:min-h-[160px] w-full border rounded-2xl animate-pulse ${panelClass}`}
-        />
-      </aside>
-    );
-  }
+  // Dynamic Greetings
+  const greetings = {
+    morning: { title: "Good morning, Jothish", sub: "Let's build momentum today." },
+    afternoon: { title: "Good afternoon, Jothish", sub: "Keep the pace steady." },
+    night: { title: "Good evening, Jothish", sub: "Close the day strong." }
+  };
 
   return (
     <aside
-      className={`w-full xl:w-[380px] 2xl:w-[420px] shrink-0 flex flex-col gap-4 max-xl:pb-4 transition-opacity duration-[120ms] ${
-        mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-      }`}
+      className="
+        w-full
+        flex
+        flex-col
+        gap-5
+        pb-40
+        pr-1
+        h-full
+        min-h-0
+        overflow-y-auto
+        overflow-x-hidden
+        [scrollbar-width:none]
+        [-ms-overflow-style:none]
+        [&::-webkit-scrollbar]:hidden
+      "
     >
-      <style>{`
-        @keyframes liquid-drift {
-          0% { transform: translateX(0) translateY(var(--liquid-y)); }
-          100% { transform: translateX(-50%) translateY(var(--liquid-y)); }
-        }
-        .animate-liquid {
-          animation: liquid-drift 4s linear infinite;
-        }
-
-        @keyframes mesh-drift {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        .bg-mesh-light {
-          background: linear-gradient(120deg, #eff6ff 0%, #ffffff 25%, #f8fafc 50%, #eff6ff 75%, #ffffff 100%);
-          background-size: 200% 200%;
-          animation: mesh-drift 10s ease-in-out infinite;
-        }
-        .bg-mesh-dark {
-          background: linear-gradient(120deg, #050505 0%, #0a0a0a 25%, #111827 50%, #0a0a0a 75%, #050505 100%);
-          background-size: 200% 200%;
-          animation: mesh-drift 10s ease-in-out infinite;
-        }
-
-        @keyframes subtle-drift {
-          0%, 100% { transform: translateX(-1%) translateY(0); }
-          50% { transform: translateX(1%) translateY(1%); }
-        }
-        .animate-wave { animation: subtle-drift 6s ease-in-out infinite; }
-
-        @keyframes ripple {
-          0% { transform: scale(1); opacity: 0.45; }
-          100% { transform: scale(1.12); opacity: 0; }
-        }
-        .animate-ripple {
-          animation: ripple 220ms ease-out forwards;
-        }
-
-        @keyframes micro-bounce {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.025); }
-        }
-        .animate-bounce-trigger {
-          animation: micro-bounce 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-
-        @keyframes ring-burst {
-          0% {
-            transform: translate(-50%, -50%) rotate(var(--angle)) translateY(-58px) scale(0.9);
-            opacity: 0.95;
-          }
-          100% {
-            transform: translate(-50%, -50%) rotate(var(--angle)) translateY(-86px) scale(0.1);
-            opacity: 0;
-          }
-        }
-        .ring-burst-dot {
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          width: 5px;
-          height: 5px;
-          border-radius: 999px;
-          background: #f97316;
-          animation: ring-burst 420ms ease-out forwards;
-          box-shadow: 0 0 12px rgba(249,115,22,0.7);
-        }
-
-        @keyframes wave-glow {
-          0%, 100% {
-            filter: drop-shadow(0 4px 6px rgba(37,99,235,0.4));
-          }
-          50% {
-            filter: drop-shadow(0 0 18px rgba(37,99,235,0.85));
-          }
-        }
-        .execution-glow-pulse {
-          animation: wave-glow 500ms ease-out;
-        }
-      `}</style>
-
-      <div className="flex flex-col gap-3 mb-1">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className={`text-sm font-semibold flex items-center gap-2 ${textSecondary}`}>
-              <Activity size={16} className="text-blue-500" />
-              Performance Hub
-            </h2>
-            <div className={`text-[10px] font-semibold uppercase tracking-wider ${textMuted}`}>
-              Live sync • real-time updates
-            </div>
-          </div>
-
-          <span
-            className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border ${
-              isSyncing || isPending
-                ? isDarkMode
-                  ? "bg-blue-950/30 text-blue-400 border-blue-900/50"
-                  : "bg-blue-50 text-blue-600 border-blue-100"
-                : isDarkMode
-                ? "bg-[#111111] text-gray-500 border-gray-800"
-                : "bg-gray-50 text-gray-400 border-gray-100"
-            }`}
-          >
-            {isSyncing || isPending ? "syncing..." : "Updated just now"}
-          </span>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <span
-            className={`flex items-center gap-1.5 text-[9px] font-bold uppercase px-2.5 py-1 rounded-full border shadow-sm ${
+      
+      {/* PREMIUM APP TABS */}
+      <div>
+        <div
+          className={`
+            w-full
+            flex
+            gap-1
+            rounded-xl
+            p-1
+            border
+            backdrop-blur-xl
+            ${
               isDarkMode
-                ? "bg-green-950/30 border-green-900/50 text-green-400"
-                : "bg-green-50 border-green-100 text-green-600"
-            }`}
-          >
-            <TrendingUp size={10} />
-            {trendStats.trendImprovement >= 0 ? "+" : ""}
-            {trendStats.trendImprovement}% Momentum
-          </span>
-
-          <span
-            className={`flex items-center gap-1 text-[9px] font-bold uppercase px-2.5 py-1 rounded-full border shadow-sm ${
-              isDarkMode
-                ? "bg-orange-950/30 border-orange-900/50 text-orange-400"
-                : "bg-orange-50 border-orange-100 text-orange-600"
-            }`}
-          >
-            <Flame size={10} /> Peak: {groupStats.strongestGroup}
-          </span>
-
-          <span
-            className={`flex items-center gap-1 text-[9px] font-bold uppercase px-2.5 py-1 rounded-full border shadow-sm ${
-              isDarkMode
-                ? "bg-blue-950/30 border-blue-900/50 text-blue-400"
-                : "bg-blue-50 border-blue-100 text-blue-600"
-            }`}
-          >
-            <Zap size={10} /> {groupStats.activeGroups} Active Areas
-          </span>
-        </div>
-      </div>
-
-      <MagneticCard
-        className={`border rounded-2xl p-6 min-h-[320px] relative ${cardClass} ${
-          justCompleted ? "animate-bounce-trigger" : ""
-        }`}
-      >
-        {justCompleted && (
-          <div
-            className={`absolute inset-0 rounded-2xl animate-ripple pointer-events-none z-0 ${
-              isDarkMode ? "bg-blue-950/30" : "bg-blue-50/50"
-            }`}
-          />
-        )}
-
-        <div className="relative z-10 flex min-h-[268px] flex-col items-center justify-between">
-          <div className="w-full flex items-center justify-between mb-4">
-            <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${textMuted}`}>
-              <Target size={14} className="text-blue-500" /> Execution Quality
-            </div>
-
-            {coreStats.completionPct === 100 && (
-              <span className="text-[9px] font-bold text-green-500 uppercase tracking-wider">
-                Flawless
-              </span>
-            )}
-          </div>
-
-          <div className="relative w-40 h-40 flex items-center justify-center">
-            {justCompleted && (
-              <div className="absolute inset-0 pointer-events-none">
-                {Array.from({ length: 12 }).map((_, index) => (
-                  <span
-                    key={index}
-                    className="ring-burst-dot"
-                    style={
-                      {
-                        "--angle": `${index * 30}deg`,
-                      } as React.CSSProperties
-                    }
-                  />
-                ))}
-              </div>
-            )}
-
-            <div
-              className={`absolute inset-0 rounded-full border-4 shadow-inner ${
-                isDarkMode ? "border-gray-800" : "border-gray-100"
-              }`}
-            />
-
-            <svg
-              viewBox="0 0 100 100"
-              className={`absolute inset-0 w-full h-full rounded-full overflow-hidden ${glowClass} transition-all duration-[180ms]`}
-            >
-              <clipPath id="circleClip">
-                <circle cx="50" cy="50" r="50" />
-              </clipPath>
-
-              <g clipPath="url(#circleClip)">
-                <path
-                  className="animate-liquid transition-transform duration-[250ms] ease-out"
-                  style={
-                    {
-                      "--liquid-y": `${liquidY}%`,
-                    } as React.CSSProperties
-                  }
-                  fill={liquidColor}
-                  opacity="0.8"
-                  d="M 0 50 Q 25 35 50 50 T 100 50 T 150 50 T 200 50 L 200 150 L 0 150 Z"
-                />
-
-                <path
-                  className="animate-liquid transition-transform duration-[250ms] ease-out"
-                  style={
-                    {
-                      "--liquid-y": `${liquidY}%`,
-                      animationDirection: "reverse",
-                      animationDuration: "6s",
-                    } as React.CSSProperties
-                  }
-                  fill={liquidColor}
-                  opacity="0.4"
-                  d="M -50 50 Q -25 65 0 50 T 50 50 T 100 50 T 150 50 L 150 150 L -50 150 Z"
-                />
-              </g>
-            </svg>
-
-            <div className="z-10 flex flex-col items-center justify-center drop-shadow-md">
-              <span
-                className={`text-5xl font-extrabold tracking-tight leading-none ${
-                  coreStats.completionPct > 50
-                    ? "text-white"
+                ? "bg-[#0F1115]/80 border-white/[0.06]"
+                : "bg-slate-50/90 border-black/[0.05]"
+            }
+          `}
+        >
+          {(["pending", "completed", "history"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`
+                flex-1
+                h-[34px]
+                rounded-lg
+                text-[13px]
+                font-medium
+                capitalize
+                transition-all
+                hover:scale-[1.01]
+                ${
+                  activeTab === tab
+                    ? isDarkMode
+                      ? "bg-white/[0.12] border border-white/[0.08] shadow-sm text-white"
+                      : "bg-white border border-black/[0.06] shadow-sm text-slate-900"
                     : isDarkMode
-                    ? "text-gray-100"
-                    : "text-gray-900"
-                }`}
-              >
-                <AnimatedNumber value={coreStats.completionPct} />%
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center mt-6 w-full opacity-80">
-            <div className={`text-[8px] font-bold uppercase tracking-wider mb-1.5 ${textMuted}`}>
-              Last 7 Days Velocity
-            </div>
-
-            <div className="flex items-end justify-center gap-1.5 h-7 w-full">
-              {trendStats.velocityData.map((val, idx) => {
-                const maxV = Math.max(...trendStats.velocityData, 1);
-                const heightPct = (val / maxV) * 100;
-
-                return (
-                  <div
-                    key={idx}
-                    className={`w-2.5 rounded-t-[2px] transition-all duration-[120ms] ${
-                      idx === trendStats.velocityData.length - 1 && justCompleted
-                        ? "bg-blue-500 animate-pulse"
-                        : isDarkMode
-                        ? "bg-gray-700"
-                        : "bg-gray-300"
-                    }`}
-                    style={{
-                      height: `${Math.max(20, heightPct)}%`,
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </MagneticCard>
-
-      <MagneticCard
-        className={`${
-          isDarkMode ? "bg-mesh-dark border-gray-800" : "bg-mesh-light border-blue-50"
-        } rounded-2xl border p-5 min-h-[240px] shadow-sm relative overflow-hidden group`}
-      >
-        <div className="mb-6 flex items-center justify-between relative z-10">
-          <div
-            className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-              isDarkMode ? "text-blue-300" : "text-blue-800"
-            }`}
-          >
-            <TrendingUp size={14} className="text-blue-500" /> Execution Signal
-          </div>
-
-          <span
-            className={`text-[9px] font-bold uppercase tracking-wider ${
-              isDarkMode ? "text-blue-500" : "text-blue-400"
-            }`}
-          >
-            30 Days
-          </span>
+                    ? "text-slate-400 hover:text-slate-200 border border-transparent"
+                    : "text-slate-500 hover:text-slate-800 border border-transparent"
+                }
+              `}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
 
-        <div className="absolute inset-0 top-[52px] bottom-5 flex flex-col justify-between pointer-events-none px-5 opacity-40">
-          <div className={`border-b border-dashed w-full h-0 ${isDarkMode ? "border-blue-900" : "border-blue-200"}`} />
-          <div className={`border-b border-dashed w-full h-0 ${isDarkMode ? "border-blue-900" : "border-blue-200"}`} />
-        </div>
-
-        <div className="relative h-[160px] xl:h-[170px] w-[110%] -ml-[5%] z-10">
-          <svg
-            className="h-full w-full overflow-visible animate-wave"
-            preserveAspectRatio="none"
-            viewBox="0 0 100 100"
-          >
-            <defs>
-              <linearGradient id="waveGradient" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
-              </linearGradient>
-            </defs>
-
-            <path
-              d={smoothFillPath}
-              fill="url(#waveGradient)"
-              className="transition-all duration-[180ms]"
-            />
-
-            <path
-              d={smoothLinePath}
-              fill="none"
-              stroke="#2563eb"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={`drop-shadow-[0_4px_6px_rgba(37,99,235,0.4)] transition-all duration-[180ms] ${
-                justCompleted ? "execution-glow-pulse" : ""
-              }`}
-            />
-          </svg>
-        </div>
-      </MagneticCard>
-
-      <div className="grid grid-cols-4 gap-2">
-        {[
-          ["Done", coreStats.todayCompleted],
-          ["Peak", coreStats.bestStreak],
-          ["Rate", coreStats.completionPct, "%"],
-          ["Score", trendStats.momentumScore],
-        ].map(([label, value, suffix], index) => (
-          <div
-            key={label as string}
-            className={`border rounded-xl p-3 flex flex-col justify-between transform-gpu will-change-transform transition-transform duration-[120ms] ${
-              index === 0 && justCompleted
-                ? "scale-105 ring-1 ring-blue-300"
-                : "hover:-translate-y-[1px]"
-            } ${cardClass}`}
-          >
-            <span className={`text-[9px] font-bold uppercase tracking-wider ${textMuted}`}>
-              {label}
+        {/* STATS ROW WITH TINY PROGRESS BAR & SUCCESS TEXT */}
+        <div className="mt-3 px-2">
+          <div className={`flex items-center justify-between text-[12px] ${textMuted}`}>
+            <span>
+              Completed today 
+              {getTinyStatText(completedTasks.length, tasks.length) && (
+                <span className={`ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded-md ${isDarkMode ? 'bg-white/[0.08] text-slate-300' : 'bg-black/[0.00] text-slate-600'}`}>
+                  {getTinyStatText(completedTasks.length, tasks.length)}
+                </span>
+              )}
             </span>
-            <span className={`text-lg font-extrabold mt-1 ${textPrimary}`}>
-              <AnimatedNumber value={value as number} />
-              {suffix || ""}
+            <span className="font-medium">
+              {completedTasks.length} / {tasks.length}
             </span>
           </div>
-        ))}
+          <div className={`w-full h-1 mt-2.5 rounded-full overflow-hidden ${isDarkMode ? "bg-white/[0.06]" : "bg-black/[0.00]"}`}>
+            <div
+              className={`h-full rounded-full transition-all duration-700 ease-out ${isDarkMode ? "bg-slate-300" : "bg-slate-700"}`}
+              style={{ width: `${percentCompleted}%` }}
+            />
+          </div>
+        </div>
       </div>
 
-      <MagneticCard className={`border rounded-2xl p-5 ${cardClass}`}>
-        <div className="mb-5 flex items-center justify-between">
-          <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${textMuted}`}>
-            <BarChart2 size={14} className="text-blue-500" /> Category Velocity
+      {/* TASK FLOW SECTION */}
+      <section>
+        <div className="mb-4 px-1">
+          <h2 className={`text-[16px] font-semibold tracking-tight ${textPrimary}`}>
+            {greetings[timeOfDay].title}
+          </h2>
+          <p className={`text-[13px] ${textMuted} mt-0.5`}>
+            {greetings[timeOfDay].sub}
+          </p>
+          
+          <div className={`text-[12px] font-medium mt-3 ${isDarkMode ? "text-slate-300" : "text-slate-600"}`}>
+            {tasks.length > 0 && <span className="opacity-50 mr-1.5">{percentCompleted}% completed •</span>}
+            {getProgressMessage(completedTasks.length, tasks.length)}
           </div>
-
-          <span className={`text-[9px] font-bold uppercase tracking-wider ${textMuted}`}>
-            Live Race
-          </span>
         </div>
 
-        <div className="space-y-4">
-          {groupStats.groupData.length > 0 ? (
-            groupStats.groupData.map((g, i) => (
-              <div key={g.name} className="flex flex-col gap-1.5 group">
-                <div className={`flex justify-between text-[10px] font-bold uppercase tracking-wider ${textSecondary}`}>
-                  <span className="truncate pr-2">{g.name}</span>
-                  <span className="text-blue-500 group-hover:scale-110 transition-transform origin-right duration-[120ms]">
-                    <AnimatedNumber value={g.pct} />%
-                  </span>
-                </div>
+        <div className="flex md:flex-col gap-3.5 overflow-x-auto md:overflow-visible snap-x snap-mandatory pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          
+          {/* PENDING TASKS VIEW */}
+          {activeTab === "pending" && (
+            <>
+              {pendingTasks.length > 0 ? (
+                pendingTasks.map((task, index) => {
+                  const isHero = index === 0;
 
-                <div className={`w-full h-2 rounded-full overflow-hidden shadow-inner ${softTrack}`}>
+                  // Elevated visual weight (8%) for Hero Card ONLY
+                  let cardBgClass = isDarkMode
+                    ? "bg-gradient-to-b from-white/[0.04] to-white/[0.02] border-white/[0.08] hover:border-white/[0.12]"
+                    : "bg-white border-black/[0.06] hover:border-black/[0.1]";
+                  
+                  if (isHero) {
+                    if (timeOfDay === "morning") {
+                      cardBgClass = isDarkMode ? "bg-emerald-500/[0.08] border-emerald-500/[0.12] hover:border-emerald-500/[0.18]" : "bg-emerald-50 border-emerald-200/60 hover:border-emerald-300/80";
+                    } else if (timeOfDay === "afternoon") {
+                      cardBgClass = isDarkMode ? "bg-amber-500/[0.08] border-amber-500/[0.12] hover:border-amber-500/[0.18]" : "bg-amber-50 border-amber-200/60 hover:border-amber-300/80";
+                    } else {
+                      cardBgClass = isDarkMode ? "bg-rose-500/[0.08] border-rose-500/[0.12] hover:border-rose-500/[0.18]" : "bg-rose-50 border-rose-200/60 hover:border-rose-300/80";
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={task.id || index}
+                      className={`
+                        group
+                        relative
+                        flex
+                        flex-col
+                        justify-between
+                        border
+                        transition-all
+                        duration-300
+                        min-w-[290px]
+                        md:min-w-0
+                        md:w-full
+                        shrink-0
+                        snap-center
+                        active:scale-[0.99]
+                        hover:-translate-y-[1px]
+                        ${cardBgClass}
+                        ${isHero ? "rounded-[28px]" : "rounded-[22px]"}
+                        ${isDarkMode ? "shadow-[0_10px_30px_rgba(0,0,0,0.12)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.15)]" : "shadow-[0_6px_18px_rgba(0,0,0,0.03)] hover:shadow-[0_6px_14px_rgba(0,0,0,0.04)]"}
+                        ${isHero ? "p-5 min-h-[165px]" : "p-4.5 min-h-[130px]"}
+                      `}
+                    >
+                      {/* Subdued internal pill accent */}
+                      <div className={`
+                        absolute
+                        left-[1px]
+                        top-[10px]
+                        bottom-[10px]
+                        w-[2px]
+                        rounded-full
+                        ${mood.accent}
+                      `} />
+
+                      <div className="pl-3">
+                        {/* Dynamic Emotional Badge & Metadata for Hero */}
+                        {isHero && (
+                          <div className="mb-2.5">
+                            <div className="text-[11px] font-medium opacity-60 tracking-tight mb-2">
+                              Best next action
+                            </div>
+                            <span className={`inline-block text-[10px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-full ${
+                              timeOfDay === "morning" ? "text-emerald-700 bg-emerald-500/10 dark:text-emerald-300 dark:bg-emerald-500/20" :
+                              timeOfDay === "afternoon" ? "text-amber-700 bg-amber-500/10 dark:text-amber-300 dark:bg-amber-500/20" :
+                              "text-rose-700 bg-rose-500/10 dark:text-rose-300 dark:bg-rose-500/20"
+                            }`}>
+                              {timeOfDay === "morning" && "Start here"}
+                              {timeOfDay === "afternoon" && "Continue"}
+                              {timeOfDay === "night" && "Finish strong"}
+                            </span>
+                          </div>
+                        )}
+
+                        <h4 className={`font-semibold text-[15.5px] tracking-tight leading-snug ${textPrimary}`}>
+                          {task.name}
+                        </h4>
+
+                        <div className={`text-[12px] mt-1 ${textMuted}`}>
+                          {task.group || "General"}
+                        </div>
+
+                        {/* Empathic Subtext for Hero */}
+                        {isHero && (
+                          <div className="text-[11px] opacity-60 mt-1">
+                            {timeOfDay === "morning" && "Good task to start your day"}
+                            {timeOfDay === "afternoon" && "Keep momentum going"}
+                            {timeOfDay === "night" && "Good one to finish today"}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Clean Dock Controls */}
+                      <div className="pl-3 mt-4 flex gap-2.5">
+                        <Link href="/Planner" className={dockClass(isDarkMode, false)}>
+                          Plan
+                        </Link>
+                        <Link href="/focus" className={dockClass(isDarkMode, true)}>
+                          Focus
+                        </Link>
+                        <Link href="/Workspace" className={dockClass(isDarkMode, false)}>
+                          Workspace
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <EmptyState timeOfDay={timeOfDay} percentCompleted={percentCompleted} />
+              )}
+            </>
+          )}
+
+          {/* COMPLETED TASKS VIEW */}
+          {activeTab === "completed" && (
+            <div className="flex flex-col gap-2 w-full">
+              {completedTasks.length > 0 ? (
+                completedTasks.map((task, index) => (
                   <div
-                    className={`h-full rounded-full transition-all duration-[250ms] ease-out ${
-                      i === 0 ? "bg-orange-500" : "bg-blue-500"
-                    }`}
-                    style={{
-                      width: `${g.pct}%`,
-                    }}
-                  />
+                    key={task.id || index}
+                    className={`
+                      flex
+                      items-center
+                      gap-3
+                      rounded-[22px]
+                      border
+                      px-4
+                      py-3
+                      w-full
+                      transition-all
+                      ${
+                        isDarkMode
+                          ? "bg-white/[0.02] border-white/[0.05] hover:border-white/[0.1] hover:bg-emerald-500/[0.05]"
+                          : "bg-white border-black/[0.05] hover:border-black/[0.08] hover:bg-emerald-500/[0.03]"
+                      }
+                    `}
+                  >
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-[12px] text-emerald-600 dark:text-emerald-400 font-bold">
+                      ✓
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className={`text-[14px] font-medium tracking-tight truncate line-through opacity-60 ${textPrimary}`}>
+                        {task.name}
+                      </div>
+                      <div className={`text-[12px] mt-0.5 flex items-center gap-1.5 ${textMuted}`}>
+                        <span>{task.group || "General"}</span>
+                        <span className="opacity-40">•</span>
+                        <span className="opacity-80 font-medium">Completed today</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <EmptyState timeOfDay={timeOfDay} percentCompleted={percentCompleted} />
+              )}
+            </div>
+          )}
+
+          {/* REAL HISTORY VIEW (7-DAY PERFORMANCE) */}
+          {activeTab === "history" && (
+            <div className="flex flex-col gap-3.5 w-full">
+              {tasks.length > 0 ? (
+                tasks.map((task, index) => (
+                  <div
+                    key={task.id || index}
+                    className={`
+                      rounded-[22px]
+                      border
+                      p-4
+                      transition-all
+                      ${
+                        isDarkMode
+                          ? "bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.04]"
+                          : "bg-white border-black/[0.05] hover:bg-slate-50"
+                      }
+                    `}
+                  >
+                    <div className={`text-[14px] font-medium tracking-tight ${textPrimary}`}>
+                      {task.name}
+                    </div>
+
+                    <div className={`text-[11px] mt-1 ${textMuted}`}>
+                      {task.group || "General"}
+                    </div>
+
+                    <div className="flex gap-2 mt-4 justify-between md:justify-start md:gap-3">
+                      {last7Days.map((day, idx) => {
+                        const completed = task.history?.[day] === true;
+                        const isToday = day === today;
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`
+                              h-8
+                              w-8
+                              rounded-full
+                              flex
+                              items-center
+                              justify-center
+                              text-[11px]
+                              font-medium
+                              transition-all
+                              ${
+                                completed
+                                  ? "bg-emerald-500 text-white"
+                                  : isDarkMode
+                                  ? "bg-white/[0.06] text-slate-400"
+                                  : "bg-slate-100 text-slate-500"
+                              }
+                              ${
+                                isToday
+                                  ? isDarkMode
+                                    ? "ring-2 ring-white/20 ring-offset-2 ring-offset-[#0F1115]"
+                                    : "ring-2 ring-black/10 ring-offset-2 ring-offset-white"
+                                  : ""
+                              }
+                            `}
+                          >
+                            {new Date(day).toLocaleDateString("en-US", {
+                              weekday: "narrow",
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className={`rounded-[22px] border p-6 w-full text-center ${isDarkMode ? "bg-white/[0.02] border-white/[0.05]" : "bg-white border-black/[0.05]"}`}>
+                  <p className={`text-[13px] ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>
+                    No tasks to show history for.
+                  </p>
                 </div>
-              </div>
-            ))
-          ) : (
-            <div className={`text-xs italic ${textMuted}`}>
-              No category data racing yet.
+              )}
             </div>
           )}
         </div>
-      </MagneticCard>
+      </section>
 
-      <div className={`md:hidden ${showMobileDetails ? "hidden" : "block"}`}>
-        <button
-          className={`w-full text-center text-xs font-semibold py-3 border rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm ${
-            isDarkMode
-              ? "bg-[#0a0a0a] text-gray-400 border-gray-800 hover:bg-[#111111]"
-              : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-          }`}
-          onClick={() => setShowMobileDetails(true)}
-        >
-          View Deep Analytics <ChevronRight size={14} />
-        </button>
-      </div>
+      {/* QUICK ACTIONS */}
+      <section className={`rounded-[22px] border p-4 ${surface}`}>
+        <div className={`text-[11px] font-medium tracking-tight mb-3 ${textMuted}`}>
+          Quick Actions
+        </div>
 
-      <div
-        className={`flex flex-col gap-4 ${
-          showMobileDetails
-            ? "block animate-in fade-in slide-in-from-top-2 duration-200"
-            : "hidden md:flex"
-        }`}
-      >
-        {deferredGroups.length >= 3 && (
-          <MagneticCard className={`border rounded-2xl p-5 ${cardClass}`}>
-            <div className="mb-4 flex items-center justify-between">
-              <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${textMuted}`}>
-                <Crosshair size={14} className="text-blue-500" /> Focus Balance
-              </div>
-            </div>
-
-            <div className="relative w-full h-[160px] flex items-center justify-center">
-              <svg
-                viewBox="0 0 100 100"
-                className="w-full h-full max-w-[160px] overflow-visible drop-shadow-sm"
-              >
-                <polygon
-                  points="50,5 92.7,36 76.4,86 23.5,86 7.2,36"
-                  fill="none"
-                  stroke={isDarkMode ? "#1f2937" : "#f3f4f6"}
-                  strokeWidth="1"
-                />
-                <polygon
-                  points="50,16.25 82,39.5 69.8,77 30.2,77 18,39.5"
-                  fill="none"
-                  stroke={isDarkMode ? "#1f2937" : "#f3f4f6"}
-                  strokeWidth="1"
-                />
-                <polygon
-                  points="50,27.5 71.3,43 63.2,68 36.8,68 28.7,43"
-                  fill="none"
-                  stroke={isDarkMode ? "#1f2937" : "#f3f4f6"}
-                  strokeWidth="1"
-                />
-
-                <line x1="50" y1="50" x2="50" y2="5" stroke={isDarkMode ? "#374151" : "#e5e7eb"} strokeWidth="1" />
-                <line x1="50" y1="50" x2="92.7" y2="36" stroke={isDarkMode ? "#374151" : "#e5e7eb"} strokeWidth="1" />
-                <line x1="50" y1="50" x2="76.4" y2="86" stroke={isDarkMode ? "#374151" : "#e5e7eb"} strokeWidth="1" />
-                <line x1="50" y1="50" x2="23.5" y2="86" stroke={isDarkMode ? "#374151" : "#e5e7eb"} strokeWidth="1" />
-                <line x1="50" y1="50" x2="7.2" y2="36" stroke={isDarkMode ? "#374151" : "#e5e7eb"} strokeWidth="1" />
-
-                <polygon
-                  points={radarPath}
-                  fill="rgba(59, 130, 246, 0.2)"
-                  stroke="#3b82f6"
-                  strokeWidth="2"
-                  strokeLinejoin="round"
-                  className="transition-all duration-[250ms] ease-out hover:fill-[rgba(59,130,246,0.3)]"
-                />
-
-                {radarPath
-                  .split("M ")[1]
-                  ?.split(" Z")[0]
-                  .split(" L ")
-                  .map((point, i) => {
-                    if (!point) return null;
-
-                    const [cx, cy] = point.split(",");
-
-                    return (
-                      <circle
-                        key={i}
-                        cx={cx}
-                        cy={cy}
-                        r="2.5"
-                        fill={isDarkMode ? "#0a0a0a" : "#fff"}
-                        stroke="#3b82f6"
-                        strokeWidth="1.5"
-                        className="transition-all duration-[250ms]"
-                      />
-                    );
-                  })}
-              </svg>
-            </div>
-          </MagneticCard>
-        )}
-
-        <MagneticCard className={`border rounded-2xl p-5 ${cardClass}`}>
-          <div className={`mb-5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${textMuted}`}>
-            <Activity size={14} className="text-green-500" /> Intensity Matrix
-          </div>
-
-          <div className="grid grid-cols-7 sm:grid-cols-7 gap-1.5 sm:gap-2">
-            {heatmapStats.heatmapData.map((day, idx) => {
-              let colorClass = isDarkMode ? "bg-gray-900" : "bg-gray-100";
-
-              if (day.intensity > 0) colorClass = "bg-green-200";
-              if (day.intensity >= 0.33) colorClass = "bg-green-400";
-              if (day.intensity >= 0.66) colorClass = "bg-green-500";
-              if (day.intensity === 1) colorClass = "bg-green-600";
-
-              const todayStyles = day.isToday
-                ? `ring-2 ring-blue-400 relative z-10 ${
-                    justCompleted
-                      ? "bg-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.8)] scale-110"
-                      : "shadow-[0_0_6px_rgba(59,130,246,0.5)] scale-105"
-                  }`
-                : "";
-
-              return (
-                <div
-                  key={`${day.date}-${idx}`}
-                  title={
-                    day.date
-                      ? `${day.date}: ${Math.round(day.intensity * 100)}%`
-                      : ""
-                  }
-                  className={`aspect-square w-full rounded-md ${colorClass} ${todayStyles} hover:scale-110 hover:shadow-[0_0_8px_rgba(34,197,94,0.6)] transition-all cursor-help duration-[120ms]`}
-                />
-              );
-            })}
-          </div>
-
-          <div className={`mt-5 flex items-center justify-between text-[9px] font-bold uppercase tracking-wider ${textMuted}`}>
-            <span>28 Days Lookback</span>
-
-            <div className="flex items-center gap-1.5">
-              <span>Less</span>
-              <div className={`w-2.5 h-2.5 rounded-[2px] ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`} />
-              <div className="w-2.5 h-2.5 bg-green-200 rounded-[2px]" />
-              <div className="w-2.5 h-2.5 bg-green-600 rounded-[2px]" />
-              <span>More</span>
-            </div>
-          </div>
-        </MagneticCard>
-      </div>
-
-      {showMobileDetails && (
-        <button
-          className={`md:hidden w-full text-center text-xs font-semibold py-3 mt-2 border rounded-xl transition-colors shadow-sm ${
-            isDarkMode
-              ? "bg-[#0a0a0a] text-gray-400 border-gray-800 hover:bg-[#111111]"
-              : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-          }`}
-          onClick={() => setShowMobileDetails(false)}
-        >
-          Hide Deep Analytics
-        </button>
-      )}
+        <div className="flex flex-col gap-1.5">
+          <SidebarLink
+            href="/focus"
+            icon={<Target size={14} />}
+            title="Focus"
+            subtitle="Deep work session"
+            isDarkMode={isDarkMode}
+          />
+          <SidebarLink
+            href="/Planner"
+            icon={<CalendarDays size={14} />}
+            title="Planner"
+            subtitle="Plan tomorrow"
+            isDarkMode={isDarkMode}
+          />
+          <SidebarLink
+            href="/diary"
+            icon={<NotebookPen size={14} />}
+            title="Diary"
+            subtitle="Write thoughts"
+            isDarkMode={isDarkMode}
+          />
+          <SidebarLink
+            href="/Workspace"
+            icon={<FolderOpen size={14} />}
+            title="Workspace"
+            subtitle="Save ideas"
+            isDarkMode={isDarkMode}
+          />
+        </div>
+      </section>
     </aside>
+  );
+}
+
+// Sub-navigation Utilities
+function SidebarLink({
+  href,
+  icon,
+  title,
+  subtitle,
+  isDarkMode,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  isDarkMode: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`
+        flex
+        items-center
+        justify-between
+        rounded-xl
+        px-3.5
+        py-2.5
+        border
+        transition-all
+        active:scale-[0.99]
+        hover:-translate-y-[0.5px]
+        ${
+          isDarkMode
+            ? "bg-white/[0.01] border-white/[0.04] hover:bg-white/[0.04] hover:border-white/[0.08]"
+            : "bg-black/[0.008] border-black/[0.03] hover:bg-black/[0.00] hover:border-black/[0.06]"
+        }
+      `}
+    >
+      <div className="flex items-center gap-3">
+        <span className="opacity-50">{icon}</span>
+        <div>
+          <div className="text-[13px] font-medium tracking-tight">{title}</div>
+          <div className="text-[11px] opacity-50">{subtitle}</div>
+        </div>
+      </div>
+      <span className="text-[12px] opacity-30">&rarr;</span>
+    </Link>
+  );
+}
+
+// Soft pill app buttons (Subtly filled for Focus, neutral for others)
+function dockClass(isDarkMode: boolean, isPrimary: boolean = false) {
+  const base = "flex-1 flex items-center justify-center text-[13px] font-medium py-2 px-3 transition-all duration-200 rounded-full active:scale-[0.97]";
+
+  if (isPrimary) {
+    return `${base} ${
+      isDarkMode
+        ? "bg-white/[0.12] text-white hover:bg-white/[0.18]"
+        : "bg-slate-800 text-white hover:bg-slate-900"
+    }`;
+  }
+  
+  return `${base} border ${
+    isDarkMode
+      ? "border-white/[0.08] bg-transparent text-slate-300 hover:text-white hover:bg-white/[0.04]"
+      : "border-slate-200/80 bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+  }`;
+}
+
+// Empathic dynamic empty state based on time of day and completion progress
+function EmptyState({ timeOfDay, percentCompleted }: { timeOfDay: "morning" | "afternoon" | "night", percentCompleted: number }) {
+  const { isDarkMode } = useTheme();
+
+  let title = "";
+  let subtitle = "";
+
+  if (percentCompleted === 0) {
+    if (timeOfDay === "morning") title = "Start with one thing today";
+    else if (timeOfDay === "afternoon") title = "Still time to make progress";
+    else title = "One small win before rest";
+    
+    subtitle = "Momentum builds faster than motivation.";
+  } else if (percentCompleted < 30) {
+    title = "You're getting started";
+    subtitle = "Keep moving — one task at a time.";
+  } else if (percentCompleted < 70) {
+    title = "Good progress today";
+    subtitle = "Keep momentum going.";
+  } else if (percentCompleted < 100) {
+    title = "Almost there";
+    subtitle = "Finish strong today.";
+  } else {
+    title = "Great work today";
+    subtitle = "Everything for this filter is done.";
+  }
+
+  return (
+    <div className={`rounded-[22px] border p-6 w-full text-center ${isDarkMode ? "bg-white/[0.02] border-white/[0.05]" : "bg-white border-black/[0.05]"}`}>
+      <h4 className={`text-[15px] font-semibold tracking-tight ${isDarkMode ? "text-slate-200" : "text-slate-800"}`}>
+        {title}
+      </h4>
+      <p className={`mt-1.5 text-[13px] whitespace-pre-line leading-relaxed ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>
+        {subtitle}
+      </p>
+      
+      {percentCompleted < 100 && (
+        <div className="mt-5 flex flex-col gap-2.5 w-full">
+          <Link href="/focus" className={dockClass(isDarkMode, true)}>
+            Open Focus
+          </Link>
+          <Link href="/Planner" className={dockClass(isDarkMode, false)}>
+            Open Planner
+          </Link>
+        </div>
+      )}
+    </div>
   );
 }

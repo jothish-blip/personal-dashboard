@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { Clock, AlertTriangle, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Task, Meta } from "../types/index";
+import { useTheme } from "@/theme/ThemeProvider";
 
 import {
   FilterType,
@@ -11,7 +12,6 @@ import {
   FilteredData,
 } from "./utils";
 
-import FilterBar from "./components/FilterBar/FilterBar";
 import ChartsGrid from "./components/ChartsGrid/ChartsGrid";
 
 type ExtendedFilteredData = Omit<FilteredData, "stats"> & {
@@ -32,6 +32,7 @@ export default function AnalyticsView({
   tasks: Task[];
   meta: Meta;
 }) {
+  const { isDarkMode } = useTheme();
   const actualToday = getLocalDate(new Date());
 
   const [filterType, setFilterType] = useState<FilterType>("month");
@@ -104,18 +105,8 @@ export default function AnalyticsView({
     let volumeData: number[] = [];
 
     const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
 
     const weekdayMisses = Array(7).fill(0);
@@ -340,102 +331,166 @@ export default function AnalyticsView({
       filteredData.dailyDeltas.length >= 3 &&
       filteredData.dailyDeltas.slice(-3).every((delta) => delta < 0);
 
-    if (recentDrop) return "3-day performance drop detected.";
-    if (filteredData.stats.zeroDays >= 3) {
-      return "Multiple inactivity days detected.";
-    }
-    if (momentum < 0) return "Recent performance decline.";
+    if (recentDrop) return "3-day performance drop";
+    if (filteredData.stats.zeroDays >= 3) return "Multiple inactivity days";
+    if (momentum < 0) return "Recent performance decline";
 
     return null;
   }, [filteredData.dailyDeltas, filteredData.stats.zeroDays, momentum]);
 
   const statusConfig = {
-    Improving: {
-      label: "System Improving",
-      icon: TrendingUp,
-      dot: "bg-emerald-500",
-      text: "text-emerald-500",
-      badge:
-        "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-    },
-    Degrading: {
-      label: "System Dropping",
-      icon: TrendingDown,
-      dot: "bg-rose-500",
-      text: "text-rose-500",
-      badge: "bg-rose-500/10 text-rose-500 border-rose-500/20",
-    },
-    Stable: {
-      label: "System Stable",
-      icon: Minus,
-      dot: "bg-[var(--muted-foreground)]",
-      text: "text-[var(--muted-foreground)]",
-      badge:
-        "bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)] text-[var(--muted-foreground)] border-[var(--border)]",
-    },
+    Improving: { icon: TrendingUp, text: isDarkMode ? "text-emerald-400" : "text-emerald-500" },
+    Degrading: { icon: TrendingDown, text: isDarkMode ? "text-rose-400" : "text-rose-500" },
+    Stable: { icon: Minus, text: isDarkMode ? "text-white/55" : "text-slate-500" },
   }[systemStatus];
 
   const StatusIcon = statusConfig.icon;
+  const textPrimaryClass = isDarkMode ? "text-white" : "text-slate-900";
+  const textMutedClass = isDarkMode ? "text-white/55" : "text-slate-500";
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[var(--background)] text-[var(--foreground)] p-4 md:p-8 transition-colors duration-300">
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 pb-24">
-        <div className="rounded-[28px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm transition-all duration-300 hover:-translate-y-[2px]">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`h-3 w-3 rounded-full shadow-sm ${statusConfig.dot}`} />
-
-              <div>
-                <div className="flex items-center gap-2">
-                  <StatusIcon size={15} className={statusConfig.text} />
-                  <span className="text-sm font-semibold">
-                    {statusConfig.label}
-                  </span>
+    <div className="flex-1 overflow-y-auto bg-[var(--background)] text-[var(--foreground)] p-4 md:p-8 transition-colors duration-300 font-sans">
+      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-5 md:gap-6 pb-24">
+        
+        {/* Analytics Overview Hero */}
+        <div 
+          className={`rounded-[24px] border p-6 md:p-8 shadow-[0_14px_40px_rgba(0,0,0,0.06)] transition-all ${
+            isDarkMode 
+              ? "bg-black/[0.72] border-white/[0.04] backdrop-blur-[24px]" 
+              : "bg-white/[0.75] border-black/[0.04] backdrop-blur-[24px]"
+          }`}
+        >
+          <div className="flex flex-col gap-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <h1 className={`text-[2rem] font-semibold tracking-[-0.04em] ${textPrimaryClass}`}>
+                Analytics Overview
+              </h1>
+              {anomaly && (
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 border border-rose-500/10 backdrop-blur-[18px] px-3 py-1 text-xs font-medium text-rose-500">
+                  <AlertTriangle size={14} />
+                  <span>⚠ {anomaly}</span>
                 </div>
-
-                <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-                  Momentum is based on today compared with yesterday.
-                </p>
-              </div>
+              )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <div
-                className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] ${statusConfig.badge}`}
-              >
-                Net:{" "}
-                {filteredData.netPerformance > 0
-                  ? `+${filteredData.netPerformance}`
-                  : filteredData.netPerformance}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-5 md:gap-6">
+              <div className="flex flex-col gap-1.5">
+                <span className={`text-[2rem] font-semibold tracking-[-0.04em] leading-none ${textPrimaryClass}`}>
+                  {filteredData.netPerformance > 0 ? `+${filteredData.netPerformance}` : filteredData.netPerformance}
+                </span>
+                <span className={`text-sm font-medium ${textMutedClass}`}>Momentum</span>
               </div>
-
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
-                <Clock size={13} />
-                Updated just now
+              <div className="flex flex-col gap-1.5">
+                <span className={`text-[2rem] font-semibold tracking-[-0.04em] leading-none ${textPrimaryClass}`}>
+                  {filteredData.stats.consistencyPercent}%
+                </span>
+                <span className={`text-sm font-medium ${textMutedClass}`}>Consistency</span>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <span className={`text-[2rem] font-semibold tracking-[-0.04em] leading-none ${textPrimaryClass}`}>
+                  {filteredData.stats.activeDays}
+                </span>
+                <span className={`text-sm font-medium ${textMutedClass}`}>Active Days</span>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <span className={`text-[2rem] font-semibold tracking-[-0.04em] leading-none ${textPrimaryClass}`}>
+                  {filteredData.stats.avgPerDay}
+                </span>
+                <span className={`text-sm font-medium ${textMutedClass}`}>Avg/Day</span>
+              </div>
+              <div className="flex flex-col gap-1 md:items-end justify-center pt-2 md:pt-0">
+                <div className={`flex items-center gap-2 ${statusConfig.text}`}>
+                  <StatusIcon size={20} />
+                  <span className="text-sm font-semibold tracking-wide">{systemStatus}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {anomaly && (
-          <div className="rounded-[28px] border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-semibold text-rose-500 shadow-sm transition-all duration-300 hover:-translate-y-[2px]">
-            <div className="flex items-center gap-3">
-              <AlertTriangle size={18} />
-              <span>{anomaly}</span>
-            </div>
+        {/* Inline Segmented Filter Bar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div 
+            className={`flex items-center gap-1 overflow-x-auto p-1 rounded-xl border hide-scrollbar transition-all ${
+              isDarkMode 
+                ? "bg-black/[0.65] border-white/[0.04] backdrop-blur-[20px]" 
+                : "bg-white/[0.75] border-black/[0.04] backdrop-blur-[20px]"
+            }`}
+          >
+            {["month", "year", "custom"].map((type) => (
+              <button
+                key={type}
+                onClick={() => setFilterType(type as FilterType)}
+                className={`flex-1 md:flex-none whitespace-nowrap px-4 py-1.5 text-sm font-medium capitalize transition-all duration-200 ${
+                  filterType === type 
+                    ? "bg-orange-500 text-white shadow-[0_8px_24px_rgba(249,115,22,0.24)] rounded-[0.9rem]" 
+                    : (isDarkMode 
+                        ? "text-white/52 hover:text-white hover:bg-white/[0.04] rounded-[0.9rem]" 
+                        : "text-slate-500 hover:text-slate-900 hover:bg-black/[0.03] rounded-[0.9rem]"
+                      )
+                }`}
+              >
+                {type}
+              </button>
+            ))}
           </div>
-        )}
 
-        <FilterBar
-          filterType={filterType}
-          setFilterType={setFilterType}
-          selectedMonth={selectedMonth}
-          setSelectedMonth={setSelectedMonth}
-          selectedYear={selectedYear}
-          setSelectedYear={setSelectedYear}
-          customRange={customRange}
-          setCustomRange={setCustomRange}
-        />
+          <div className="flex items-center gap-2">
+            {filterType === "month" && (
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className={`rounded-lg border px-3 py-1.5 text-sm font-medium outline-none transition-all ${
+                  isDarkMode 
+                    ? "bg-white/[0.03] border-white/[0.04] text-white focus:bg-white/[0.05] focus:border-white/[0.1]" 
+                    : "bg-white/[0.72] border-black/[0.05] text-slate-900 focus:bg-white focus:border-black/[0.1]"
+                }`}
+              />
+            )}
+            {filterType === "year" && (
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className={`rounded-lg border px-3 py-1.5 text-sm font-medium outline-none transition-all ${
+                  isDarkMode 
+                    ? "bg-white/[0.03] border-white/[0.04] text-white focus:bg-white/[0.05] focus:border-white/[0.1]" 
+                    : "bg-white/[0.72] border-black/[0.05] text-slate-900 focus:bg-white focus:border-black/[0.1]"
+                }`}
+              >
+                {Array.from({ length: 5 }).map((_, i) => {
+                  const y = (new Date().getFullYear() - i).toString();
+                  return <option key={y} value={y}>{y}</option>;
+                })}
+              </select>
+            )}
+            {filterType === "custom" && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={customRange.start}
+                  onChange={(e) => setCustomRange((p) => ({ ...p, start: e.target.value }))}
+                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium outline-none transition-all ${
+                    isDarkMode 
+                      ? "bg-white/[0.03] border-white/[0.04] text-white focus:bg-white/[0.05] focus:border-white/[0.1]" 
+                      : "bg-white/[0.72] border-black/[0.05] text-slate-900 focus:bg-white focus:border-black/[0.1]"
+                  }`}
+                />
+                <span className={textMutedClass}>-</span>
+                <input
+                  type="date"
+                  value={customRange.end}
+                  onChange={(e) => setCustomRange((p) => ({ ...p, end: e.target.value }))}
+                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium outline-none transition-all ${
+                    isDarkMode 
+                      ? "bg-white/[0.03] border-white/[0.04] text-white focus:bg-white/[0.05] focus:border-white/[0.1]" 
+                      : "bg-white/[0.72] border-black/[0.05] text-slate-900 focus:bg-white focus:border-black/[0.1]"
+                  }`}
+                />
+              </div>
+            )}
+          </div>
+        </div>
 
         <ChartsGrid
           data={filteredData}

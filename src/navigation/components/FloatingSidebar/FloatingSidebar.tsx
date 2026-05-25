@@ -20,7 +20,8 @@ import {
   LogOut,
   Camera,
   Pencil,
-  ChevronLeft
+  ChevronLeft,
+  Palette
 } from "lucide-react";
 
 // =========================
@@ -100,13 +101,28 @@ export default function FloatingHub() {
   // 🔥 State for the living indicator system
   const [indicatorMode, setIndicatorMode] = useState<IndicatorMode>("smart");
   const [showStreakIndicator, setShowStreakIndicator] = useState(false);
-
   // 🔹 Refs
-  const rootRef = useRef<HTMLDivElement>(null);
-  const pressStart = useRef(0);
-  const dragging = useRef(false);
-  const offset = useRef({ x: 0, y: 0 });
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+const rootRef =
+  useRef<HTMLDivElement>(
+    null
+  );
+
+const pressStart =
+  useRef(0);
+
+const dragging =
+  useRef(false);
+
+const offset =
+  useRef({
+    x: 0,
+    y: 0,
+  });
+
+const longPressTimer =
+  useRef<
+    NodeJS.Timeout | null
+  >(null);
 
   // 🟢 PERSISTENCE
   useEffect(() => {
@@ -179,14 +195,40 @@ export default function FloatingHub() {
   }, [indicatorMode]);
 
   // 🟢 EVENTS (Fixed UX)
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (rootRef.current && rootRef.current.contains(e.target as Node)) return;
-      setOpen(false);
-    };
-    window.addEventListener("click", handleClick);
-    return () => window.removeEventListener("click", handleClick);
-  }, []);
+useEffect(() => {
+  const handleClick = (
+    e: MouseEvent
+  ) => {
+    const target =
+      e.target as Node;
+
+    // clicked inside hub
+    if (
+      rootRef.current?.contains(
+        target
+      )
+    ) {
+      return;
+    }
+
+    // outside click
+    setOpen(false);
+    setIsCustomizing(
+      false
+    );
+  };
+
+  window.addEventListener(
+    "mousedown",
+    handleClick
+  );
+
+  return () =>
+    window.removeEventListener(
+      "mousedown",
+      handleClick
+    );
+}, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -308,6 +350,9 @@ export default function FloatingHub() {
   const shouldShowStreak = (indicatorMode === "streak" || (indicatorMode === "smart" && showStreakIndicator)) && currentStreak > 0;
   const displayText = shouldShowStreak ? `🔥${currentStreak}` : "N";
 
+  // 🔥 DYNAMIC NAVIGATION TITLE
+  const navTitle = pathname === "/focus" ? "Focus Tools" : pathname === "/Planner" ? "Plan Faster" : "Quick Access";
+
   // 🔹 Helper Components for Clean UI Rendering
   const ThemeButton = ({ themeKey }: { themeKey: string }) => (
     <button
@@ -392,12 +437,12 @@ export default function FloatingHub() {
               if (open) setIsCustomizing(false); 
             }
           }}
-          className={`w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-full bg-gradient-to-br ${currentTheme.gradient} flex items-center justify-center text-white cursor-pointer touch-none select-none transition-all duration-300 ease-out ${isDragging ? "scale-105 opacity-90" : "hover:scale-105 active:scale-95"}`}
+          className={`w-[54px] h-[54px] rounded-full bg-gradient-to-br ${currentTheme.gradient} flex items-center justify-center text-white cursor-pointer touch-none select-none transition-all duration-300 ease-out ${isDragging ? "scale-105 opacity-90" : "hover:scale-105 active:scale-95"}`}
           style={{ 
             boxShadow: shouldShowStreak
               ? `0 0 30px rgba(249,115,22,0.45)` 
               : (open && !isDragging) || isDragging 
-              ? `0 0 25px ${currentTheme.glow}` 
+              ? `0 10px 30px rgba(0,0,0,0.35), 0 0 16px ${currentTheme.glow}` 
               : `0 8px 20px rgba(0,0,0,0.15), 0 0 10px ${currentTheme.glow.replace('0.5', '0.2')}` 
           }}
         >
@@ -420,7 +465,9 @@ export default function FloatingHub() {
         {open && (
           <div
             className={`absolute w-[340px] backdrop-blur-2xl border rounded-[28px] p-4 overflow-visible animate-in fade-in zoom-in-95 duration-200 ease-out transition-colors ${
-              isDarkMode ? "bg-zinc-900/85 border-zinc-800/60 shadow-[0_20px_60px_rgba(0,0,0,0.45)]" : "bg-white/90 border-zinc-200 shadow-[0_12px_40px_rgba(0,0,0,0.12)]"
+              isDarkMode 
+                ? "bg-[#050505]/95 border-white/[0.06] shadow-[0_24px_80px_rgba(0,0,0,0.65)]" 
+                : "bg-white/90 border-zinc-200 shadow-[0_12px_40px_rgba(0,0,0,0.12)]"
             }`}
             style={{
               maxHeight: "85vh",
@@ -437,11 +484,15 @@ export default function FloatingHub() {
             <div className="flex items-center justify-between mb-4 px-1">
               <span className={`uppercase flex items-center gap-1.5 ${UI_TEXT.label} ${isDarkMode ? "text-zinc-400" : "text-zinc-500"}`}>
                 {isCustomizing ? (
-                  <button onClick={() => setIsCustomizing(false)} className="flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors">
-                    <ChevronLeft size={14} /> Back
+                  <button
+                  onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCustomizing(false);
+                  }} className="flex items-center gap-1 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors">
+                    <ChevronLeft size={14} /> Hub
                   </button>
                 ) : (
-                  "Navigation"
+                  navTitle
                 )}
               </span>
 
@@ -454,24 +505,17 @@ export default function FloatingHub() {
                     <button onClick={() => go("/settings")} className={`p-1.5 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-600"}`}>
                       <Settings size={14} />
                     </button>
+                    <Tooltip text="Logout">
+                      <button onClick={async () => { setOpen(false); if (supabase) { await supabase.auth.signOut(); window.location.href = "/login"; } }} className={`p-1.5 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center ${isDarkMode ? "hover:bg-red-500/20 text-red-400" : "hover:bg-red-50 text-red-500"}`}>
+                        <LogOut size={14} />
+                      </button>
+                    </Tooltip>
                   </>
-                )}
-                <Tooltip text="Customize Hub">
-                  <button onClick={() => setIsCustomizing((prev) => !prev)} className={`p-1.5 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center ${isCustomizing ? `bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900 shadow-sm` : isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-600"}`}>
-                    <Pencil size={14} />
-                  </button>
-                </Tooltip>
-                {!isCustomizing && (
-                  <Tooltip text="Logout">
-                    <button onClick={async () => { setOpen(false); if (supabase) { await supabase.auth.signOut(); window.location.href = "/login"; } }} className={`p-1.5 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center ${isDarkMode ? "hover:bg-red-500/20 text-red-400" : "hover:bg-red-50 text-red-500"}`}>
-                      <LogOut size={14} />
-                    </button>
-                  </Tooltip>
                 )}
               </div>
             </div>
 
-            <div className={`h-px w-full mb-3 ${isDarkMode ? "bg-zinc-800/60" : "bg-zinc-200"}`} />
+            <div className={`h-px w-full mb-3 ${isDarkMode ? "bg-white/[0.05]" : "bg-zinc-200"}`} />
 
             {/* 2️⃣ DYNAMIC CONTENT AREA */}
             <div className="relative w-full overflow-hidden">
@@ -496,7 +540,27 @@ export default function FloatingHub() {
                       })}
                     </div>
 
-                    <div className={`mt-5 pt-5 border-t ${isDarkMode ? "border-zinc-800/60" : "border-zinc-200"}`}>
+                    {/* 🔥 SETTINGS / PROFILE AREA */}
+                    <div className={`mt-5 pt-5 border-t ${isDarkMode ? "border-white/[0.05]" : "border-zinc-200"}`}>
+                      
+                      {/* Customize Hub Button */}
+                    <button
+                   onClick={(e) => {
+                   e.stopPropagation();
+                   setIsCustomizing(true);
+                  }}
+                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl mb-3 transition-all duration-300 hover:translate-x-[2px] ${
+                          isDarkMode 
+                            ? "text-white/70 hover:bg-white/[0.04] hover:text-white" 
+                            : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                        }`}
+                      >
+                        <div className={`flex items-center justify-center ${isDarkMode ? "text-zinc-400" : "text-zinc-400"}`}>
+                          <Palette size={16} />
+                        </div>
+                        <span className={UI_TEXT.item}>Customize Hub</span>
+                      </button>
+
                       <div className="flex items-center gap-3 px-3 py-2 rounded-2xl cursor-default transition-colors">
                         
                         <Tooltip text="Change Avatar" position="right">
@@ -514,6 +578,7 @@ export default function FloatingHub() {
                         </Tooltip>
                         
                         <div className="flex flex-col flex-1 min-w-0">
+                          <span className="text-[10px] text-zinc-500 uppercase tracking-wider mb-0.5">Personal Space</span>
                           <span className={`truncate ${UI_TEXT.item} ${isDarkMode ? "text-zinc-100" : "text-zinc-900"}`}>{userProfile?.full_name || "User Profile"}</span>
                           <span className={`mt-0.5 truncate ${UI_TEXT.meta}`}>{userProfile?.email || "Personal workspace"}</span>
                         </div>
@@ -566,7 +631,7 @@ export default function FloatingHub() {
   );
 }
 
-// 🔹 ITEM COMPONENT (UPDATED FOR ACTIVE STATE & HOVER POLISH)
+// 🔹 ITEM COMPONENT (UPDATED FOR PURE DARK MODE & GLOW BAR)
 function Item({ 
   icon, 
   label, 
@@ -583,12 +648,15 @@ function Item({
   return (
     <div 
       onClick={onClick} 
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-300 hover:translate-x-[2px] ${
+      className={`relative flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all duration-300 hover:translate-x-[2px] border ${
         isActive 
-          ? (isDarkMode ? "bg-zinc-800 text-white shadow-sm" : "bg-zinc-100 text-zinc-900 font-semibold shadow-sm")
-          : (isDarkMode ? "text-zinc-400 hover:bg-zinc-800/50 hover:text-white" : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900")
+          ? (isDarkMode ? "bg-white/[0.06] text-white border-white/[0.06] shadow-sm" : "bg-zinc-100 text-zinc-900 font-semibold border-transparent shadow-sm")
+          : (isDarkMode ? "text-white/50 hover:bg-white/[0.04] hover:text-white border-transparent" : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border-transparent")
       }`}
     >
+      {isActive && isDarkMode && (
+        <div className="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-white/80" />
+      )}
       <div className={`flex items-center justify-center ${isActive ? (isDarkMode ? "text-zinc-200" : "text-zinc-800") : (isDarkMode ? "text-zinc-500" : "text-zinc-400")}`}>
         {icon}
       </div>

@@ -55,13 +55,11 @@ export function useNexCore() {
   
   const cleanupRef = useRef<(() => void) | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
-  const realtimeRef = useRef<NodeJS.Timeout | null>(null);
   const userRef = useRef<User | null>(null); 
 
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      if (realtimeRef.current) clearTimeout(realtimeRef.current);
       if (cleanupRef.current) cleanupRef.current();
     };
   }, []);
@@ -280,10 +278,8 @@ export function useNexCore() {
       "postgres_changes",
       { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` },
       () => {
-        if (realtimeRef.current) clearTimeout(realtimeRef.current);
-        realtimeRef.current = setTimeout(() => {
-          fetchTasksFromDB();
-        }, 100);
+        // Fix 3 applied: removed setTimeout delay for instant UI sync.
+        fetchTasksFromDB();
       }
     );
 
@@ -541,6 +537,7 @@ export function useNexCore() {
     const updatedHistory = { ...task.history, [dateStr]: status };
     const updatedTasksArray = state.tasks.map(t => t.id === id ? { ...t, history: updatedHistory } : t);
 
+    // Optimistic UI instantly sets state
     setState(prev => {
       const newState = { 
         ...prev, 
@@ -549,6 +546,10 @@ export function useNexCore() {
       };
       debouncedSave(KEY, newState);
       return newState;
+    });
+
+    queueMicrotask(() => {
+      window.dispatchEvent(new Event("nextask-live-update"));
     });
     
     if (status) handleTaskUpdate(addNotification, updatedTasksArray, dateStr); 

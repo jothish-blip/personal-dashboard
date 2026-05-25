@@ -82,18 +82,27 @@ export default function MatrixIntelligenceSystem() {
 
         </div>
 
-        {/* Desktop Sidebar */}
-        <aside className="hidden lg:block lg:col-span-4">
+{/* Mobile Sidebar */}
+<div className="block lg:hidden mt-6">
+  <AnalyticsSidebar
+    analytics={system.analytics}
+    rescheduleTask={system.rescheduleTask}
+    rescheduleAllMissed={
+      system.rescheduleAllMissed
+    }
+  />
+</div>
 
-          <AnalyticsSidebar
-            analytics={system.analytics}
-            rescheduleTask={system.rescheduleTask}
-            rescheduleAllMissed={
-              system.rescheduleAllMissed
-            }
-          />
-
-        </aside>
+{/* Desktop Sidebar */}
+<aside className="hidden lg:block lg:col-span-4 sticky top-24 self-start">
+  <AnalyticsSidebar
+    analytics={system.analytics}
+    rescheduleTask={system.rescheduleTask}
+    rescheduleAllMissed={
+      system.rescheduleAllMissed
+    }
+  />
+</aside>
 
       </main>
 

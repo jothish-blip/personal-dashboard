@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Import the Theme Provider
+import { useTheme } from "@/theme/ThemeProvider";
 
 interface TabsProps {
   activeTab: string;
@@ -12,7 +12,7 @@ export default function Tabs({
   activeTab,
   setActiveTab,
 }: TabsProps) {
-  const { isDarkMode } = useTheme(); // 🔥 Consume theme state
+  const { isDarkMode } = useTheme();
 
   const tabs = [
     { id: "matrix", label: "Tasks" },
@@ -21,39 +21,76 @@ export default function Tabs({
   ];
 
   return (
-    // mt-32 (128px) clears the fixed ~100px MobileNav perfectly on mobile.
-    // md:mt-12 keeps the original spacing on desktop.
-    <div className="relative z-10 w-full flex justify-center mt-32 md:mt-12 mb-6 md:mb-8 px-4">
-      <div className={`flex items-center gap-1 md:gap-2 p-1.5 rounded-2xl border max-w-full overflow-x-auto scrollbar-hide transition-colors duration-300 ${
-        isDarkMode 
-          ? "bg-[#0D0D0D] border-[#1E293B] shadow-[0_0_0_1px_rgba(255,255,255,0.03)]" 
-          : "bg-white border-gray-200 shadow-sm"
-      }`}>
-
+    <div className="relative z-10 w-full flex justify-center mt-32 md:mt-12 mb-5 md:mb-7 px-4">
+      <div
+        className={`
+          flex items-center gap-1
+          p-1.5
+          rounded-[1.5rem]
+          border
+          backdrop-blur-[24px]
+          transition-all duration-300
+          max-w-full overflow-x-auto
+          scrollbar-hide
+          ${
+            isDarkMode
+              ? `
+                bg-black/[0.72]
+                border-white/[0.04]
+              `
+              : `
+                bg-white/[0.75]
+                border-black/[0.04]
+                shadow-[0_10px_35px_rgba(15,23,42,0.05)]
+              `
+          }
+        `}
+      >
         {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
+          const isActive =
+            activeTab === tab.id;
 
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() =>
+                setActiveTab(tab.id)
+              }
               className={`
-                px-4 py-2 md:px-5 md:py-2.5 rounded-xl
-                text-xs md:text-sm font-semibold
-                transition-all duration-300
-                whitespace-nowrap shrink-0
+                relative
+                px-4 md:px-5
+                py-2 md:py-2.5
+                rounded-[1rem]
+                whitespace-nowrap
+                shrink-0
+                transition-all duration-200
+                text-[12px] md:text-[13px]
+                tracking-[-0.01em]
                 ${
                   isActive
                     ? `
                       bg-orange-500
                       text-white
-                      shadow-[0_8px_20px_rgba(249,115,22,0.25)]
+                      shadow-[0_8px_22px_rgba(249,115,22,0.24)]
                     `
-                    : (isDarkMode 
-                        ? `text-gray-400 hover:text-white hover:bg-[#171717]` 
-                        : `text-gray-500 hover:text-gray-900 hover:bg-gray-50`)
+                    : isDarkMode
+                    ? `
+                      text-white/52
+                      hover:text-white
+                      hover:bg-white/[0.04]
+                    `
+                    : `
+                      text-gray-500
+                      hover:text-gray-900
+                      hover:bg-black/[0.03]
+                    `
                 }
               `}
+              style={{
+                fontWeight: isActive
+                  ? 540
+                  : 500,
+              }}
             >
               {tab.label}
             </button>

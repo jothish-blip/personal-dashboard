@@ -223,25 +223,25 @@ export default function AuditView({
   return (
     <div
       className={`w-full min-h-screen flex flex-col p-4 md:p-8 font-sans pb-24 transition-colors duration-300 ${
-        isDarkMode ? "bg-[#050505] text-gray-200" : "bg-[#F9FAFB] text-gray-900"
+        isDarkMode ? "bg-black text-white" : "bg-[#fafafa] text-gray-900"
       }`}
     >
-      <div className="max-w-[1500px] mx-auto w-full flex flex-col gap-6">
+      <div className="max-w-[1500px] mx-auto w-full flex flex-col gap-5 md:gap-6">
         <div
-          className={`rounded-[28px] border p-6 transition-all duration-300 hover:-translate-y-[2px] ${
+          className={`rounded-[2rem] border p-6 transition-all duration-300 hover:translate-y-[-1px] ${
             isDarkMode
-              ? "bg-[#111111] border-[#1c1c1c]"
-              : "bg-white border-gray-200"
+              ? "bg-black/[0.72] border-white/[0.05] backdrop-blur-[24px] ring-1 ring-white/[0.03]"
+              : "bg-white/[0.78] border-black/[0.04] backdrop-blur-[24px]"
           }`}
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] font-semibold text-gray-500">
+              <p className="text-[10px] uppercase tracking-[0.16em] font-medium text-orange-500/90">
                 Activity History
               </p>
 
               <h2
-                className={`text-2xl font-semibold mt-2 ${
+                className={`text-[1.8rem] tracking-[-0.04em] font-semibold mt-2 ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
@@ -249,8 +249,8 @@ export default function AuditView({
               </h2>
 
               <p
-                className={`mt-2 text-sm max-w-[500px] ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                className={`mt-2 text-[13px] leading-relaxed max-w-[500px] ${
+                  isDarkMode ? "text-white/55" : "text-slate-500"
                 }`}
               >
                 {historyInsight.description}
@@ -259,38 +259,46 @@ export default function AuditView({
 
             <div className="flex gap-3 flex-wrap">
               <div
-                className={`rounded-2xl px-4 py-3 border ${
+                className={`rounded-[1.4rem] px-4 py-3.5 border transition-colors ${
                   isDarkMode
-                    ? "bg-[#0d0d0d] border-[#1c1c1c]"
-                    : "bg-gray-50 border-gray-200"
+                    ? "bg-white/[0.03] border-white/[0.04] hover:bg-white/[0.04]"
+                    : "bg-white/[0.72] border-black/[0.04] hover:bg-white"
                 }`}
               >
-                <p className="text-xs text-gray-500">Total Actions</p>
-                <p className="text-lg font-semibold">{filteredLogs.length}</p>
+                <p className={`text-[11px] font-medium ${isDarkMode ? "text-white/45" : "text-slate-500"}`}>
+                  Total Actions
+                </p>
+                <p className={`text-[1.3rem] tracking-[-0.03em] font-semibold ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+                  {filteredLogs.length}
+                </p>
               </div>
 
               <div
-                className={`rounded-2xl px-4 py-3 border ${
+                className={`rounded-[1.4rem] px-4 py-3.5 border transition-colors ${
                   isDarkMode
-                    ? "bg-[#0d0d0d] border-[#1c1c1c]"
-                    : "bg-gray-50 border-gray-200"
+                    ? "bg-white/[0.03] border-white/[0.04] hover:bg-white/[0.04]"
+                    : "bg-white/[0.72] border-black/[0.04] hover:bg-white"
                 }`}
               >
-                <p className="text-xs text-gray-500">Most Active Time</p>
-                <p className="text-lg font-semibold">
+                <p className={`text-[11px] font-medium ${isDarkMode ? "text-white/45" : "text-slate-500"}`}>
+                  Most Active Time
+                </p>
+                <p className={`text-[1.3rem] tracking-[-0.03em] font-semibold ${isDarkMode ? "text-white" : "text-slate-900"}`}>
                   {formatHourLabel(analytics.peakHour)}
                 </p>
               </div>
 
               <div
-                className={`rounded-2xl px-4 py-3 border ${
+                className={`rounded-[1.4rem] px-4 py-3.5 border transition-colors ${
                   isDarkMode
-                    ? "bg-[#0d0d0d] border-[#1c1c1c]"
-                    : "bg-gray-50 border-gray-200"
+                    ? "bg-white/[0.03] border-white/[0.04] hover:bg-white/[0.04]"
+                    : "bg-white/[0.72] border-black/[0.04] hover:bg-white"
                 }`}
               >
-                <p className="text-xs text-gray-500">Top Objective</p>
-                <p className="text-lg font-semibold truncate max-w-[160px]">
+                <p className={`text-[11px] font-medium ${isDarkMode ? "text-white/45" : "text-slate-500"}`}>
+                  Top Objective
+                </p>
+                <p className={`text-[1.3rem] tracking-[-0.03em] font-semibold truncate max-w-[160px] ${isDarkMode ? "text-white" : "text-slate-900"}`}>
                   {analytics.topTasks[0]?.[0] || "—"}
                 </p>
               </div>
@@ -336,10 +344,10 @@ export default function AuditView({
             .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
             .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
             .custom-scrollbar::-webkit-scrollbar-thumb { background: ${
-              isDarkMode ? "#374151" : "#e5e7eb"
+              isDarkMode ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)"
             }; border-radius: 10px; }
             .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: ${
-              isDarkMode ? "#4b5563" : "#d1d5db"
+              isDarkMode ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.16)"
             }; }
           `,
         }}
