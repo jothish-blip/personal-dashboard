@@ -3,39 +3,33 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useFocusSystem } from "../../engine/useFocusSystem";
 import { FocusSession } from "../../types/types";
-
-const calculateAvgDistractionTime = (sessions: FocusSession[]): number | null => {
-  const { totalSeconds, count } = sessions.reduce(
-    (acc, s) => {
-      if (s.distractions && s.distractions.length > 0) {
-        const firstDist = (s.distractions[0].timestamp - s.startTime) / 1000;
-        if (firstDist > 0) {
-          acc.totalSeconds += firstDist;
-          acc.count++;
-        }
-      }
-      return acc;
-    },
-    { totalSeconds: 0, count: 0 }
-  );
-
-  return count > 0 ? Math.floor(totalSeconds / count) : null;
-};
+import { Play, Pause, Square, Check, Flame, Sparkles } from "lucide-react";
 
 export default function SessionTimer() {
   const {
-    timeRemaining, focusedTime, initialSessionTime,
-    isActive, isPaused, mode, sessions,
-    isSessionComplete, setIsSessionComplete,
-    startSession, pauseSession, stopSession, exitFocusMode,
-    setMode, setTimeRemaining, setInitialSessionTime, setActiveTask,
-    getRemainingTime, currentSession,
-    extraTime 
+    focusedTime,
+    initialSessionTime,
+    isActive,
+    isPaused,
+    mode,
+    sessions,
+    isSessionComplete,
+    setIsSessionComplete,
+    startSession,
+    pauseSession,
+    stopSession,
+    exitFocusMode,
+    setMode,
+    setTimeRemaining,
+    setInitialSessionTime,
+    setActiveTask,
+    getRemainingTime,
+    currentSession,
+    extraTime,
   } = useFocusSystem();
 
-  const [smartAlert, setSmartAlert] = useState<string | null>(null);
-
-  const typedSessions = useMemo(() => sessions as FocusSession[], [sessions]);
+  // Custom Modal State
+  const [activeModal, setActiveModal] = useState<"pause" | "endNormal" | "endExtra" | null>(null);
 
   useEffect(() => {
     if (currentSession) {
@@ -50,65 +44,55 @@ export default function SessionTimer() {
     }
   }, [isActive, currentSession]);
 
-  const avgDistractionTime = useMemo(() => {
-    return calculateAvgDistractionTime(typedSessions);
-  }, [typedSessions]);
-
-  useEffect(() => {
-    let timeout: NodeJS.Timeout;
-
-    if (isActive && avgDistractionTime !== null && avgDistractionTime > 60) {
-      if (Math.abs(focusedTime - (avgDistractionTime - 60)) < 2) {
-        setSmartAlert("⚠️ Stay sharp! You usually lose focus around this mark.");
-        
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          navigator.vibrate([100, 50, 100]);
-        }
-        
-        timeout = setTimeout(() => setSmartAlert(null), 10000); 
-      }
-    }
-
-    return () => {
-      if (timeout) clearTimeout(timeout);
-    };
-  }, [focusedTime, isActive, avgDistractionTime]);
-
   const isExtraMode = !!currentSession?.completedAt;
 
+  // Reset to initial time when session is completely inactive and not paused
   const displayTime = useMemo(() => {
+    if (!isActive && !isPaused && !isExtraMode) {
+      return initialSessionTime;
+    }
     if (currentSession?.completedAt) {
-      return extraTime; 
+      return extraTime;
     }
     if (currentSession) {
       return getRemainingTime();
     }
     return timeRemaining;
-  }, [currentSession, getRemainingTime, timeRemaining, extraTime]);
+  }, [currentSession, getRemainingTime, timeRemaining, extraTime, isActive, isPaused, isExtraMode, initialSessionTime]);
 
   useEffect(() => {
     if (isActive && !isPaused && !isExtraMode && displayTime > 0 && displayTime < 10) {
-      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
+      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(50);
     }
   }, [displayTime, isActive, isPaused, isExtraMode]);
 
+  // Spacebar controls
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === "INPUT") return;
+      if (activeModal) return; // Disable spacebar toggle when a modal is open
+      
       if (e.code === "Space") {
         e.preventDefault();
-        if (isExtraMode) return; // 🔥 Disabled in extra mode
-        if (!isActive || isPaused) startSession();
-        else pauseSession();
+        if (isExtraMode) return;
+        if (!isActive || isPaused) {
+          startSession();
+        } else {
+          handlePause();
+        }
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [isActive, isPaused, isExtraMode, startSession, pauseSession]);
+  }, [isActive, isPaused, isExtraMode, startSession, activeModal]);
 
   const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
-    const s = (seconds % 60).toString().padStart(2, "0");
+    const m = Math.floor(seconds / 60)
+      .toString()
+      .padStart(2, "0");
+    const s = (seconds % 60)
+      .toString()
+      .padStart(2, "0");
     return `${m}:${s}`;
   };
 
@@ -120,194 +104,330 @@ export default function SessionTimer() {
   };
 
   const getDynamicColor = () => {
-    if (isExtraMode) return "text-purple-500 drop-shadow-[0_0_15px_rgba(168,85,247,0.2)]"; 
-
-    const progressRemaining = initialSessionTime > 0 ? displayTime / initialSessionTime : 1; 
-    
-    if (progressRemaining > 0.6) return "text-green-500";
-    if (progressRemaining > 0.3) return "text-yellow-500";
-    if (progressRemaining > 0.15) return "text-orange-500";
-    return "text-red-500 animate-pulse scale-105 transition-transform duration-300"; 
+    if (isExtraMode) return "text-purple-500 drop-shadow-[0_0_15px_rgba(168,85,247,0.2)]";
+    if (isActive && displayTime < 120 && !isExtraMode) return "text-red-500 scale-[1.02] transition-transform duration-300";
+    return "text-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.1)]";
   };
 
   const getStateText = () => {
-    if (!isActive) return "Ready to begin";
-    if (isPaused) return "Paused — your time is frozen";
-    if (isExtraMode) return "You're beyond your goal — keep going if it matters"; 
-    if (displayTime < 120) return "Finish strong!";
-    return "Deep focus in progress";
+    if (!isActive) return "Ready when you are";
+    if (isPaused) return "Paused. Pick up where you left off.";
+    if (isExtraMode) return "Goal completed. Continue if the work needs you.";
+    if (displayTime < 120) return "Almost there";
+    return "You're in flow";
   };
 
-  const circleRadius = 110; 
+  const handlePause = () => {
+    pauseSession();
+    setActiveModal("pause");
+  };
+
+  const handleResume = () => {
+    startSession();
+    setActiveModal(null);
+  };
+
+  const circleRadius = 110;
   const circumference = 2 * Math.PI * circleRadius;
-  
-  const rawProgress = isExtraMode 
-    ? 1 
-    : initialSessionTime > 0 
-      ? (initialSessionTime - displayTime) / initialSessionTime 
-      : 0;
-      
+
+  const rawProgress = isExtraMode
+    ? 1
+    : initialSessionTime > 0
+    ? (initialSessionTime - displayTime) / initialSessionTime
+    : 0;
+
   const progress = Math.min(Math.max(rawProgress, 0), 1);
   const strokeDashoffset = circumference * (1 - progress);
-
   const isInterrupted = !isActive && currentSession && !isSessionComplete;
 
   return (
-    <div className={`flex flex-col items-center justify-center py-10 sm:py-12 md:py-16 border rounded-xl transition-all duration-700 ease-out relative overflow-hidden ${
-      isExtraMode && isActive && !isPaused
-        ? "bg-purple-50/10 border-purple-200/50 shadow-[0_0_50px_rgba(168,85,247,0.15)]"
-        : isActive && displayTime < 120 && !isPaused && !isExtraMode
-          ? "bg-red-50/10 border-red-200 shadow-[0_0_50px_rgba(239,68,68,0.4)]"
-          : isActive && !isPaused 
-            ? "bg-green-50/30 border-green-200 shadow-[0_0_40px_rgba(34,197,94,0.1)]" 
-            : "bg-white border-gray-200 shadow-sm"
-    }`}>
-      
-      {smartAlert && (
-        <div className="absolute top-12 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-amber-100 border border-amber-300 text-amber-800 text-xs sm:text-sm font-medium px-4 py-2 rounded-lg shadow-lg text-center animate-in fade-in slide-in-from-top-4 z-20 flex items-center justify-center gap-2">
-          <span className="animate-bounce">⚡</span> {smartAlert}
+    <>
+      <div
+        className={`flex flex-col items-center justify-center py-10 sm:py-12 md:py-16 rounded-xl transition-all duration-700 ease-out relative overflow-hidden bg-white border border-gray-100 shadow-sm dark:bg-[#050505] dark:border-white/[0.06] ${
+          isExtraMode && isActive && !isPaused
+            ? "dark:shadow-[0_0_60px_rgba(168,85,247,0.22)] shadow-[0_0_40px_rgba(168,85,247,0.1)]"
+            : isActive && displayTime < 120 && !isPaused && !isExtraMode
+            ? "dark:shadow-[0_0_60px_rgba(239,68,68,0.2)] shadow-[0_0_40px_rgba(239,68,68,0.15)]"
+            : isActive && !isPaused
+            ? "dark:shadow-[0_0_50px_rgba(249,115,22,0.18)] shadow-[0_0_40px_rgba(249,115,22,0.1)]"
+            : ""
+        }`}
+      >
+        <div className="absolute top-5 md:top-6 text-[10px] md:text-xs font-medium text-gray-400 dark:text-white/40 uppercase tracking-widest flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-white/30"></span>
+          {getModeLabel()}
         </div>
-      )}
 
-      <div className="absolute top-5 md:top-6 text-[10px] md:text-xs font-medium text-gray-400/80 uppercase tracking-widest flex items-center gap-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
-        {getModeLabel()}
-      </div>
-
-      {isExtraMode && (
-        <div className="absolute top-14 mt-1 flex flex-col items-center z-10 transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2">
-          <div className="text-purple-600 bg-purple-50/80 px-3 py-1.5 rounded-full border border-purple-200/50 text-xs sm:text-sm font-medium shadow-sm flex items-center gap-1.5">
-            🔥 You chose to keep going
+        {isExtraMode && (
+          <div className="absolute top-14 mt-1 flex flex-col items-center z-10 transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2">
+            <div className="text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-3 py-1.5 rounded-full border border-purple-100 dark:border-purple-500/20 text-xs sm:text-sm font-medium flex items-center gap-1.5">
+              <Sparkles size={14} /> Goal completed
+            </div>
+            <div className="text-[10px] text-purple-500/70 dark:text-purple-400/60 mt-1.5 font-medium text-center leading-tight">
+              Extra time is being tracked separately.
+            </div>
           </div>
-          <div className="text-[10px] text-purple-400/80 mt-1.5 font-medium text-center leading-tight">
-            You pushed beyond your limit — strong focus.<br/>
-            (This time won't count toward your initial goal)
-          </div>
-        </div>
-      )}
-
-      {isInterrupted && !isExtraMode && (
-        <div className="absolute top-14 mt-1 text-yellow-600 bg-yellow-50 px-3 py-1.5 rounded-full border border-yellow-200 text-xs sm:text-sm font-medium z-10 shadow-sm animate-pulse">
-          ✔️ Session interrupted — resume where you left
-        </div>
-      )}
-
-      <div className="relative flex items-center justify-center mt-6 mb-8 w-[240px] h-[240px] sm:w-[280px] sm:h-[280px] md:w-[320px] md:h-[320px]">
-        
-        <svg className="absolute inset-0 w-full h-full transform -rotate-90">
-          <defs>
-            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#22c55e" />
-              <stop offset="50%" stopColor="#f59e0b" />
-              <stop offset="100%" stopColor="#ef4444" />
-            </linearGradient>
-            
-            <linearGradient id="extraModeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#c084fc" />
-              <stop offset="100%" stopColor="#9333ea" />
-            </linearGradient>
-          </defs>
-
-          <circle cx="50%" cy="50%" r={circleRadius} stroke="currentColor" strokeWidth="8" fill="transparent" className="text-gray-100/50" />
-          
-          <circle 
-            cx="50%" cy="50%" r={circleRadius} 
-            stroke={isExtraMode ? "url(#extraModeGradient)" : "url(#progressGradient)"} 
-            strokeWidth="8" fill="transparent" 
-            strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" 
-            className={isExtraMode ? "drop-shadow-[0_0_8px_rgba(168,85,247,0.4)] transition-all duration-1000 ease-out" : "transition-all duration-1000 ease-linear"}
-            style={{ 
-              transformOrigin: "50% 50%"
-            }}
-          />
-        </svg>
-
-        <div className={`absolute z-10 flex flex-col items-center justify-center transition-colors duration-500 ease-out ${getDynamicColor()}`}>
-          <div className="text-6xl sm:text-7xl md:text-8xl font-semibold tracking-tighter tabular-nums leading-none">
-            {formatTime(displayTime)}
-          </div>
-          
-          {isExtraMode && (
-            <span className="text-[10px] text-purple-400 mt-2 uppercase tracking-widest font-semibold opacity-80">
-              Extra Time
-            </span>
-          )}
-          
-          <div className="text-[11px] sm:text-xs font-medium text-gray-500/80 mt-3 md:mt-4 flex items-center justify-center gap-2 bg-white/60 backdrop-blur-sm px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
-            <span className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-              isActive && !isPaused && isExtraMode ? "bg-purple-500" 
-              : isActive && !isPaused ? "bg-green-500 animate-pulse" 
-              : isActive && isPaused ? "bg-orange-400" 
-              : "bg-gray-300"
-            }`}></span>
-            {getStateText()}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-3 w-full max-w-[280px] sm:max-w-none sm:w-auto px-4 sm:px-0 z-10">
-        {isExtraMode ? (
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out">
-            <button
-              onClick={() => {
-                if(confirm("Are you sure you want to stop your extra focus?")) stopSession(true);
-              }}
-              className="w-full sm:w-auto px-10 py-3.5 bg-red-50 text-red-600 border border-red-200 text-sm md:text-base font-medium rounded-xl hover:bg-red-100 transition-all duration-300 ease-out active:scale-[0.98]"
-            >
-              ⏹ Stop Extra Focus
-            </button>
-            <button
-              onClick={() => {
-                if(confirm("Count this extra time and end session?")) stopSession(true);
-              }}
-              className="w-full sm:w-auto px-10 py-3.5 bg-purple-50 text-purple-700 border border-purple-200 text-sm md:text-base font-medium rounded-xl hover:bg-purple-100 transition-all duration-300 ease-out active:scale-[0.98] shadow-sm"
-            >
-              ✔ Count This Time
-            </button>
-          </div>
-        ) : (
-          <>
-            {!isActive || isPaused ? (
-              <button
-                onClick={startSession}
-                className="w-full sm:w-auto px-10 py-3.5 bg-gray-900 text-white text-sm md:text-base font-medium rounded-xl hover:bg-black transition-all duration-300 ease-out shadow-md active:scale-[0.98]"
-              >
-                {isPaused || isInterrupted ? "▶ Resume Focus" : "▶ Start Session"}
-              </button>
-            ) : (
-              <button
-                onClick={pauseSession}
-                className="w-full sm:w-auto px-10 py-3.5 bg-orange-50 text-orange-700 border border-orange-200 text-sm md:text-base font-medium rounded-xl hover:bg-orange-100 transition-all duration-300 ease-out active:scale-[0.98]"
-              >
-                ⏸ Pause
-              </button>
-            )}
-
-            {isActive && (
-              <div className="flex sm:flex-row gap-3 w-full sm:w-auto">
-                <button
-                  onClick={() => stopSession(false)}
-                  className="flex-1 sm:flex-none px-6 py-3.5 bg-red-50 text-red-600 border border-red-200 text-sm md:text-base font-medium rounded-xl hover:bg-red-100 transition-all duration-300 ease-out active:scale-[0.98]"
-                >
-                  ⏹ End
-                </button>
-                <button 
-                  onClick={() => { stopSession(false); setTimeout(startSession, 100); }} 
-                  title="Restart Session" 
-                  className="px-4 py-3.5 bg-gray-50 text-gray-500 border border-gray-200 text-sm font-medium rounded-xl hover:bg-gray-100 transition-all duration-300 ease-out active:scale-[0.98] shrink-0"
-                >
-                  ↺
-                </button>
-              </div>
-            )}
-          </>
         )}
+
+        {isInterrupted && !isExtraMode && (
+          <div className="absolute top-14 mt-1 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-3 py-1.5 rounded-full border border-orange-100 dark:border-orange-500/20 text-xs sm:text-sm font-medium z-10 flex items-center gap-1.5">
+            <Check size={14} /> Session interrupted — resume where you left
+          </div>
+        )}
+
+        <div className="relative flex items-center justify-center mt-6 mb-8 w-[240px] h-[240px] sm:w-[280px] sm:h-[280px] md:w-[320px] md:h-[320px]">
+          <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+            <defs>
+              <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#f97316" />
+                <stop offset="100%" stopColor="#ea580c" />
+              </linearGradient>
+
+              <linearGradient id="extraModeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#c084fc" />
+                <stop offset="100%" stopColor="#9333ea" />
+              </linearGradient>
+
+              <linearGradient id="criticalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#ef4444" />
+                <stop offset="100%" stopColor="#dc2626" />
+              </linearGradient>
+            </defs>
+
+            <circle
+              cx="50%"
+              cy="50%"
+              r={circleRadius}
+              strokeWidth="4"
+              fill="transparent"
+              className="stroke-gray-100 dark:stroke-white/[0.06]"
+            />
+
+            <circle
+              cx="50%"
+              cy="50%"
+              r={circleRadius}
+              stroke={
+                isExtraMode 
+                  ? "url(#extraModeGradient)" 
+                  : (isActive && displayTime < 120 && !isPaused) 
+                  ? "url(#criticalGradient)" 
+                  : "url(#progressGradient)"
+              }
+              strokeWidth="4"
+              fill="transparent"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              className="transition-all duration-1000 ease-linear"
+              style={{
+                transformOrigin: "50% 50%",
+              }}
+            />
+          </svg>
+
+          <div
+            className={`absolute z-10 flex flex-col items-center justify-center transition-colors duration-500 ease-out ${getDynamicColor()}`}
+          >
+            <div className="text-6xl sm:text-7xl md:text-8xl font-[550] tracking-tighter tabular-nums leading-none">
+              {formatTime(displayTime)}
+            </div>
+
+            {isExtraMode && (
+              <span className="text-[10px] text-purple-400 mt-2 uppercase tracking-widest font-semibold opacity-80">
+                Extra Time
+              </span>
+            )}
+
+            <div className="text-[11px] sm:text-xs font-medium text-gray-500 dark:text-white/60 mt-4 flex items-center justify-center gap-2">
+              <span
+                className={`w-2 h-2 rounded-full transition-colors duration-300 ${
+                  isActive && !isPaused && isExtraMode
+                    ? "bg-purple-500"
+                    : isActive && !isPaused && displayTime < 120
+                    ? "bg-red-500"
+                    : isActive && !isPaused
+                    ? "bg-orange-500"
+                    : isActive && isPaused
+                    ? "bg-white/40"
+                    : "bg-gray-300 dark:bg-white/20"
+                }`}
+              ></span>
+              {getStateText()}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full max-w-[280px] sm:max-w-none sm:w-auto px-4 sm:px-0 z-10">
+          {isExtraMode ? (
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out">
+              <button
+                onClick={() => setActiveModal("endExtra")}
+                className="w-full sm:w-auto px-10 py-3.5 flex items-center justify-center gap-2 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition-colors shadow-sm active:scale-[0.98]"
+              >
+                <Check size={18} /> Complete Session
+              </button>
+            </div>
+          ) : (
+            <>
+              {!isActive || isPaused ? (
+                <button
+                  onClick={isPaused ? handleResume : startSession}
+                  className="w-full sm:w-auto px-10 py-3.5 flex items-center justify-center gap-2 bg-orange-500 text-white font-medium rounded-xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20 active:scale-[0.98]"
+                >
+                  <Play size={18} className="fill-current" /> {isPaused || isInterrupted ? "Resume Focus" : "Start Session"}
+                </button>
+              ) : (
+                <button
+                  onClick={handlePause}
+                  className="w-full sm:w-auto px-10 py-3.5 flex items-center justify-center gap-2 bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100 dark:bg-white/[0.04] dark:border-white/[0.08] dark:text-white dark:hover:bg-white/[0.06] font-medium rounded-xl transition-colors active:scale-[0.98]"
+                >
+                  <Pause size={18} className="fill-current" /> Pause
+                </button>
+              )}
+
+              {isActive && (
+                <div className="flex sm:flex-row gap-3 w-full sm:w-auto">
+                  <button
+                    onClick={() => setActiveModal("endNormal")}
+                    className="flex-1 sm:flex-none px-6 py-3.5 flex items-center justify-center gap-2 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400 dark:hover:bg-red-500/20 font-medium rounded-xl transition-colors active:scale-[0.98]"
+                  >
+                    <Square size={16} className="fill-current" /> End
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="hidden sm:block absolute bottom-4 text-[10px] text-gray-400 dark:text-white/30 font-medium z-10">
+          Press{" "}
+          <kbd className="px-1.5 py-0.5 bg-gray-50 dark:bg-white/[0.06] border border-gray-200 dark:border-white/[0.08] rounded text-gray-500 dark:text-white/50 font-mono shadow-sm mx-0.5">
+            Space
+          </kbd>{" "}
+          to play/pause
+        </div>
       </div>
 
-      <div className="hidden sm:block absolute bottom-4 text-[10px] text-gray-400/60 font-medium z-10">
-        Press <kbd className="px-1.5 py-0.5 bg-gray-50 border border-gray-200 rounded text-gray-400 font-mono shadow-sm mx-0.5">Space</kbd> to play/pause
-      </div>
+      {/* --- CUSTOM FULL-SCREEN MODALS --- */}
 
-    </div>
+      {/* 1. Pause Modal */}
+      {activeModal === "pause" && (
+        <div className="fixed inset-0 z-[100] bg-white dark:bg-[#050505] flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="max-w-md w-full text-center flex flex-col items-center">
+            <h2 className="text-3xl md:text-4xl font-semibold text-gray-900 dark:text-white mb-3 tracking-tight">
+              Taking a break?
+            </h2>
+            <p className="text-gray-500 dark:text-white/60 mb-10 text-sm md:text-base">
+              You still have <span className="font-semibold text-orange-500">{formatTime(displayTime)}</span> remaining. Continue when you're ready.
+            </p>
+
+            <div className="flex flex-col gap-4 w-full">
+              <button
+                onClick={handleResume}
+                className="w-full px-6 py-4 bg-orange-500 text-white font-medium rounded-xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20 active:scale-[0.98] text-lg flex items-center justify-center gap-2"
+              >
+                <Play size={20} className="fill-current" /> Resume Focus
+              </button>
+              <button
+                onClick={() => {
+                  setActiveModal(null);
+                  stopSession(false);
+                }}
+                className="w-full px-6 py-4 bg-transparent text-gray-400 hover:text-gray-900 dark:text-white/40 dark:hover:text-white font-medium rounded-xl transition-colors active:scale-[0.98]"
+              >
+                End Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. End Normal Session Modal */}
+      {activeModal === "endNormal" && (
+        <div className="fixed inset-0 z-[100] bg-white dark:bg-[#050505] flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="max-w-md w-full text-center flex flex-col items-center">
+            <h2 className="text-3xl md:text-4xl font-semibold text-gray-900 dark:text-white mb-3 tracking-tight">
+              End Session?
+            </h2>
+            <p className="text-gray-500 dark:text-white/60 mb-10 text-sm md:text-base">
+              This session still has time remaining.
+            </p>
+
+            <div className="flex flex-col gap-4 w-full">
+              <button
+                onClick={() => {
+                  setActiveModal(null);
+                  stopSession(false);
+                }}
+                className="w-full px-6 py-4 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400 dark:hover:bg-red-500/20 font-medium rounded-xl transition-colors active:scale-[0.98] text-lg"
+              >
+                End Session
+              </button>
+              <button
+                onClick={() => setActiveModal(null)}
+                className="w-full px-6 py-4 bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100 dark:bg-white/[0.04] dark:border-white/[0.08] dark:text-white dark:hover:bg-white/[0.06] font-medium rounded-xl transition-colors active:scale-[0.98]"
+              >
+                Cancel & Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. End Extra Focus Modal */}
+      {activeModal === "endExtra" && (
+        <div className="fixed inset-0 z-[100] bg-white dark:bg-[#050505] flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="max-w-md w-full text-center flex flex-col items-center">
+            <div className="w-16 h-16 rounded-full bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-6 border border-purple-100 dark:border-purple-500/20">
+              <Sparkles size={28} />
+            </div>
+            <h2 className="text-3xl md:text-4xl font-semibold text-gray-900 dark:text-white mb-3 tracking-tight">
+              Goal Reached
+            </h2>
+            <p className="text-gray-500 dark:text-white/60 mb-8 text-sm md:text-base">
+              You continued beyond your planned focus time.
+            </p>
+
+            <div className="bg-gray-50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/[0.08] rounded-2xl p-6 w-full mb-8 flex flex-col gap-4 text-left shadow-sm">
+              <div className="flex justify-between items-center text-sm font-medium">
+                <span className="text-gray-500 dark:text-white/60">Actual Goal:</span>
+                <span className="text-gray-900 dark:text-white/90">{Math.floor(initialSessionTime / 60)} min</span>
+              </div>
+              <div className="flex justify-between items-center text-sm font-medium">
+                <span className="text-purple-600 dark:text-purple-400">Extra Focus:</span>
+                <span className="text-purple-600 dark:text-purple-400">+{formatTime(extraTime)}</span>
+              </div>
+              <div className="h-px bg-gray-200 dark:bg-white/[0.08] w-full my-1"></div>
+              <div className="flex justify-between items-center text-base font-semibold">
+                <span className="text-gray-900 dark:text-white">Total Time:</span>
+                <span className="text-gray-900 dark:text-white">{formatTime(initialSessionTime + extraTime)}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4 w-full">
+              <button
+                onClick={() => {
+                  setActiveModal(null);
+                  stopSession(true);
+                }}
+                className="w-full px-6 py-4 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition-colors shadow-lg shadow-purple-600/20 active:scale-[0.98] text-lg"
+              >
+                Count Total Time & End
+              </button>
+              <button
+                onClick={() => {
+                  setActiveModal(null);
+                  stopSession(false); 
+                }}
+                className="w-full px-6 py-4 bg-transparent border border-gray-200 dark:border-white/[0.08] text-gray-600 dark:text-white/60 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-white/[0.04] dark:hover:text-white transition-colors active:scale-[0.98]"
+              >
+                Discard Extra Time
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

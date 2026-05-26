@@ -578,7 +578,6 @@ useEffect(() => {
                         </Tooltip>
                         
                         <div className="flex flex-col flex-1 min-w-0">
-                          <span className="text-[10px] text-zinc-500 uppercase tracking-wider mb-0.5">Personal Space</span>
                           <span className={`truncate ${UI_TEXT.item} ${isDarkMode ? "text-zinc-100" : "text-zinc-900"}`}>{userProfile?.full_name || "User Profile"}</span>
                           <span className={`mt-0.5 truncate ${UI_TEXT.meta}`}>{userProfile?.email || "Personal workspace"}</span>
                         </div>
