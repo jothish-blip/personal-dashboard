@@ -29,7 +29,7 @@ const ModuleIcon = ({ module, priority }: { module: string, priority?: string })
     case 'focus': return <Brain size={18} className="text-purple-500" />;
     case 'planner': return <Calendar size={18} className="text-blue-500" />;
     case 'diary': return <Book size={18} className="text-indigo-500" />;
-    case 'mini': return <FileText size={18} className="text-amber-500" />;
+    case 'Workspace': return <FileText size={18} className="text-amber-500" />;
     default: return <Bell size={18} className="text-gray-400" />;
   }
 };

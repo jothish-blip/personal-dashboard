@@ -97,19 +97,19 @@ export default function InsightsBoard({ system }: any) {
 
   // --- STYLING HELPERS ---
   const cardClass = `p-6 rounded-[24px] border shadow-sm flex flex-col justify-between transition-colors ${
-    isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-200"
+    isDarkMode ? "bg-black border-white/[0.08]" : "bg-white border-gray-200"
   }`;
   
   const labelClass = `text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 mb-4 ${
-    isDarkMode ? "text-gray-500" : "text-gray-400"
+    isDarkMode ? "text-zinc-500" : "text-gray-400"
   }`;
 
   const valueClass = `text-3xl font-black tracking-tight ${
-    isDarkMode ? "text-gray-100" : "text-gray-900"
+    isDarkMode ? "text-white" : "text-gray-900"
   }`;
 
   const subTextClass = `text-xs font-medium mt-2 ${
-    isDarkMode ? "text-gray-500" : "text-gray-500"
+    isDarkMode ? "text-zinc-500" : "text-gray-500"
   }`;
 
   return (
@@ -128,7 +128,7 @@ export default function InsightsBoard({ system }: any) {
               <span className={valueClass}>{stats.consistency}%</span>
             </div>
             <div className={subTextClass}>
-              <span className={isDarkMode ? "text-gray-300 font-bold" : "text-gray-700 font-bold"}>{stats.written}</span> written • {stats.skipped} skipped
+              <span className={isDarkMode ? "text-zinc-300 font-bold" : "text-gray-700 font-bold"}>{stats.written}</span> written • {stats.skipped} skipped
             </div>
           </div>
         </div>
@@ -143,7 +143,7 @@ export default function InsightsBoard({ system }: any) {
               <span className={`text-3xl font-black ${isDarkMode ? "text-emerald-400" : "text-emerald-600"}`}>
                 {stats.completedCount}
               </span>
-              <span className={`text-lg font-bold ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
+              <span className={`text-lg font-bold ${isDarkMode ? "text-zinc-600" : "text-gray-400"}`}>
                 / 5
               </span>
             </div>
@@ -167,7 +167,7 @@ export default function InsightsBoard({ system }: any) {
               <span className={`text-3xl font-black ${isDarkMode ? "text-orange-400" : "text-orange-500"}`}>
                 {currentStreak}
               </span>
-              <span className={`text-sm font-bold pb-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+              <span className={`text-sm font-bold pb-1 ${isDarkMode ? "text-zinc-500" : "text-gray-400"}`}>
                 day streak
               </span>
             </div>
@@ -189,7 +189,7 @@ export default function InsightsBoard({ system }: any) {
               </span>
             </div>
             <div className={subTextClass}>
-              <span className={isDarkMode ? "text-gray-300 font-bold" : "text-gray-700 font-bold"}>{stats.sectionsWrittenThisWeek}</span> reflections this week
+              <span className={isDarkMode ? "text-zinc-300 font-bold" : "text-gray-700 font-bold"}>{stats.sectionsWrittenThisWeek}</span> reflections this week
             </div>
           </div>
         </div>
@@ -197,30 +197,30 @@ export default function InsightsBoard({ system }: any) {
       </div>
 
       {/* 2️⃣ BOTTOM ROW: 30-DAY MONTHLY GRAPH */}
-      <div className={`p-6 rounded-[24px] border shadow-sm ${isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-200"}`}>
+      <div className={`p-6 rounded-[24px] border shadow-sm ${isDarkMode ? "bg-black border-white/[0.08]" : "bg-white border-gray-200"}`}>
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <span className={`text-[11px] font-bold uppercase tracking-widest flex items-center gap-2 mb-1.5 ${isDarkMode ? "text-gray-300" : "text-gray-900"}`}>
+            <span className={`text-[11px] font-bold uppercase tracking-widest flex items-center gap-2 mb-1.5 ${isDarkMode ? "text-zinc-300" : "text-gray-900"}`}>
               <BarChart3 size={16} className={isDarkMode ? "text-indigo-400" : "text-indigo-500"} /> Monthly Reflection Graph
             </span>
-            <p className={`text-xs font-medium ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+            <p className={`text-xs font-medium ${isDarkMode ? "text-zinc-500" : "text-gray-500"}`}>
               Your mood and energy levels over the last 30 days.
             </p>
           </div>
 
-          <div className={`flex gap-4 p-2.5 rounded-xl border shrink-0 ${isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-100"}`}>
-            <div className={`flex items-center gap-2 text-[10px] font-bold tracking-widest ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+          <div className={`flex gap-4 p-2.5 rounded-xl border shrink-0 ${isDarkMode ? "bg-black border-white/[0.08]" : "bg-gray-50 border-gray-100"}`}>
+            <div className={`flex items-center gap-2 text-[10px] font-bold tracking-widest ${isDarkMode ? "text-zinc-400" : "text-gray-500"}`}>
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm" /> MOOD
             </div>
-            <div className={`flex items-center gap-2 text-[10px] font-bold tracking-widest ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+            <div className={`flex items-center gap-2 text-[10px] font-bold tracking-widest ${isDarkMode ? "text-zinc-400" : "text-gray-500"}`}>
               <div className="w-2.5 h-2.5 rounded-full bg-orange-400 shadow-sm" /> ENERGY
             </div>
           </div>
         </div>
 
         {/* Graph Area */}
-        <div className={`overflow-x-auto pb-4 scrollbar-hide border-t pt-8 ${isDarkMode ? "border-gray-800" : "border-gray-50"}`}>
+        <div className={`overflow-x-auto pb-4 scrollbar-hide border-t pt-8 ${isDarkMode ? "border-white/[0.08]" : "border-gray-50"}`}>
           <div className="flex gap-2.5 min-w-[900px] h-48 items-end px-2">
             
             {graphDays.map((dayData) => {
@@ -231,13 +231,13 @@ export default function InsightsBoard({ system }: any) {
                 return (
                   <div key={dayData.dateStr} className="flex-1 flex flex-col items-center gap-3 group">
                     <div className={`w-full h-36 border border-dashed rounded-lg flex items-center justify-center transition-colors ${
-                      isDarkMode ? "bg-[#111111]/50 border-gray-800 group-hover:bg-[#1a1a1a]" : "bg-gray-50 border-gray-200 group-hover:bg-gray-100"
+                      isDarkMode ? "bg-white/[0.02] border-white/[0.08] group-hover:bg-white/[0.04]" : "bg-gray-50 border-gray-200 group-hover:bg-gray-100"
                     }`}>
                       <span className={`text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity rotate-[-90deg] ${
-                        isDarkMode ? "text-gray-600" : "text-gray-400"
+                        isDarkMode ? "text-zinc-600" : "text-gray-400"
                       }`}>N/A</span>
                     </div>
-                    <span className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
+                    <span className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? "text-zinc-600" : "text-gray-400"}`}>
                       {dayData.label.split(' ')[1]}
                     </span>
                   </div>
@@ -256,7 +256,7 @@ export default function InsightsBoard({ system }: any) {
                   >
                     {/* Background Track */}
                     <div className={`absolute inset-x-0.5 bottom-0 h-full rounded-t-lg -z-10 transition-colors ${
-                      isDarkMode ? "bg-gray-900/40 group-hover:bg-gray-800/60" : "bg-gray-50 opacity-60 group-hover:bg-gray-100"
+                      isDarkMode ? "bg-white/[0.02] group-hover:bg-white/[0.04]" : "bg-gray-50 opacity-60 group-hover:bg-gray-100"
                     }`} />
                     
                     {/* Bars */}
@@ -264,7 +264,7 @@ export default function InsightsBoard({ system }: any) {
                     <div className="w-[35%] bg-orange-400 rounded-t-[4px] transition-all shadow-sm group-hover:brightness-110" style={{ height: energyH }} />
                   </div>
                   <span className={`text-[9px] font-black uppercase tracking-widest transition-colors ${
-                    isDarkMode ? "text-gray-500 group-hover:text-gray-300" : "text-gray-500 group-hover:text-gray-900"
+                    isDarkMode ? "text-zinc-500 group-hover:text-white" : "text-gray-500 group-hover:text-gray-900"
                   }`}>
                     {dayData.label.split(' ')[1]}
                   </span>

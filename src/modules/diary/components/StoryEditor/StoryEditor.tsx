@@ -45,7 +45,7 @@ export default function StoryEditor({ system }: any) {
         className={`p-1.5 rounded-full transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
           voiceField === field 
             ? (isDarkMode ? 'bg-orange-950/30 text-orange-400' : 'bg-orange-50 text-orange-600')
-            : (isDarkMode ? 'text-gray-600 hover:text-gray-400' : 'text-gray-300 hover:text-gray-600')
+            : (isDarkMode ? 'text-zinc-600 hover:text-white' : 'text-gray-300 hover:text-gray-600')
         }`}
       >
         {voiceField === field ? <MicOff size={14} /> : <Mic size={14} />}
@@ -55,53 +55,53 @@ export default function StoryEditor({ system }: any) {
 
   const textareaBaseClass = `w-full bg-transparent text-sm font-medium outline-none resize-y leading-relaxed disabled:opacity-60 transition-all rounded-xl px-2 py-1.5 -ml-2 ${
     isDarkMode 
-      ? "text-gray-200 placeholder-gray-700 focus:bg-orange-950/10" 
+      ? "text-zinc-200 placeholder-zinc-700 focus:bg-white/[0.03] focus:ring-1 focus:ring-orange-500/20" 
       : "text-gray-800 placeholder-gray-300 focus:bg-orange-50/50"
   }`;
 
   return (
     <div className={`border rounded-[24px] shadow-sm relative overflow-hidden mt-6 text-left transition-colors ${
-      isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-200"
+      isDarkMode ? "bg-black border-white/[0.08]" : "bg-white border-gray-200"
     }`}>
       
       {/* 🔒 LOCKED BANNER */}
       {isLocked && (
         <div className={`p-3 text-[11px] uppercase tracking-widest font-bold flex items-center justify-center gap-2 border-b ${
-          isDarkMode ? "bg-[#111111] text-gray-400 border-gray-800" : "bg-gray-50 text-gray-500 border-gray-100"
+          isDarkMode ? "bg-black text-zinc-500 border-white/[0.08]" : "bg-gray-50 text-gray-500 border-gray-100"
         }`}>
           <Lock size={12} /> Entry Locked
         </div>
       )}
 
       {/* Header: Clean & Minimal */}
-      <div className={`flex items-center justify-between p-5 border-b transition-colors ${
-        isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-100"
+      <div className={`flex items-center justify-between p-5 sm:p-6 md:p-7 border-b transition-colors ${
+        isDarkMode ? "bg-black border-white/[0.08]" : "bg-white border-gray-100"
       }`}>
         <button 
           onClick={() => setIsReadingView(!isReadingView)}
           className={`text-[11px] font-bold uppercase tracking-widest transition-colors ${
-            isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-900"
+            isDarkMode ? "text-zinc-500 hover:text-zinc-300" : "text-gray-400 hover:text-gray-900"
           }`}
         >
           {isReadingView ? 'Edit Entry' : 'Reading View'}
         </button>
 
         <span className={`text-[10px] font-medium transition-colors ${
-          isDarkMode ? "text-gray-500" : "text-gray-400"
+          isDarkMode ? "text-zinc-500" : "text-gray-400"
         }`}>
           {timeStr}
         </span>
       </div>
 
       {!isReadingView ? (
-        <div className={`flex flex-col transition-colors ${isDarkMode ? "bg-[#0a0a0a]" : "bg-white"}`}>
+        <div className={`flex flex-col transition-colors ${isDarkMode ? "bg-black" : "bg-white"}`}>
           
           {/* 1. Morning - Planning */}
-          <div className={`p-5 md:p-6 border-b ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+          <div className={`p-5 sm:p-6 md:p-7 border-b ${isDarkMode ? "border-white/[0.08]" : "border-gray-100"}`}>
             <div className="flex justify-between items-start mb-3">
               <div>
-                <h3 className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>1. Morning</h3>
-                <p className={`text-sm font-bold mt-0.5 ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>Planning</p>
+                <h3 className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-zinc-500" : "text-gray-400"}`}>1. Morning</h3>
+                <p className={`text-sm font-bold mt-0.5 ${isDarkMode ? "text-zinc-200" : "text-gray-900"}`}>Planning</p>
               </div>
               <VoiceIndicator field="morning" />
             </div>
@@ -116,11 +116,11 @@ export default function StoryEditor({ system }: any) {
           </div>
 
           {/* 2. Afternoon - Execution */}
-          <div className={`p-5 md:p-6 border-b ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+          <div className={`p-5 sm:p-6 md:p-7 border-b ${isDarkMode ? "border-white/[0.08]" : "border-gray-100"}`}>
             <div className="flex justify-between items-start mb-3">
               <div>
-                <h3 className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>2. Afternoon</h3>
-                <p className={`text-sm font-bold mt-0.5 ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>Execution</p>
+                <h3 className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-zinc-500" : "text-gray-400"}`}>2. Afternoon</h3>
+                <p className={`text-sm font-bold mt-0.5 ${isDarkMode ? "text-zinc-200" : "text-gray-900"}`}>Execution</p>
               </div>
               <VoiceIndicator field="afternoon" />
             </div>
@@ -135,11 +135,11 @@ export default function StoryEditor({ system }: any) {
           </div>
 
           {/* 3. Evening - Reflection */}
-          <div className={`p-5 md:p-6 border-b ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+          <div className={`p-5 sm:p-6 md:p-7 border-b ${isDarkMode ? "border-white/[0.08]" : "border-gray-100"}`}>
             <div className="flex justify-between items-start mb-3">
               <div>
-                <h3 className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>3. Evening</h3>
-                <p className={`text-sm font-bold mt-0.5 ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>Reflection</p>
+                <h3 className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-zinc-500" : "text-gray-400"}`}>3. Evening</h3>
+                <p className={`text-sm font-bold mt-0.5 ${isDarkMode ? "text-zinc-200" : "text-gray-900"}`}>Reflection</p>
               </div>
               <VoiceIndicator field="evening" />
             </div>
@@ -154,10 +154,10 @@ export default function StoryEditor({ system }: any) {
           </div>
 
           {/* 4. Learning - Key Insight */}
-          <div className={`p-5 md:p-6 border-b ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+          <div className={`p-5 sm:p-6 md:p-7 border-b ${isDarkMode ? "border-white/[0.08]" : "border-gray-100"}`}>
             <div className="mb-3">
-              <h3 className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>4. Learning</h3>
-              <p className={`text-sm font-bold mt-0.5 ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>Key Insight</p>
+              <h3 className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-zinc-500" : "text-gray-400"}`}>4. Learning</h3>
+              <p className={`text-sm font-bold mt-0.5 ${isDarkMode ? "text-zinc-200" : "text-gray-900"}`}>Key Insight</p>
             </div>
             <textarea 
               disabled={isLocked}
@@ -169,10 +169,10 @@ export default function StoryEditor({ system }: any) {
           </div>
 
           {/* 5. Tomorrow - Next Focus */}
-          <div className={`p-5 md:p-6 border-b ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+          <div className={`p-5 sm:p-6 md:p-7 border-b ${isDarkMode ? "border-white/[0.08]" : "border-gray-100"}`}>
             <div className="mb-3">
-              <h3 className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>5. Tomorrow</h3>
-              <p className={`text-sm font-bold mt-0.5 ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>Next Focus</p>
+              <h3 className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-zinc-500" : "text-gray-400"}`}>5. Tomorrow</h3>
+              <p className={`text-sm font-bold mt-0.5 ${isDarkMode ? "text-zinc-200" : "text-gray-900"}`}>Next Focus</p>
             </div>
             <textarea 
               disabled={isLocked}
@@ -184,18 +184,18 @@ export default function StoryEditor({ system }: any) {
           </div>
 
           {/* Footer: Lock Day Only */}
-          <div className={`p-5 md:p-6 transition-colors ${isDarkMode ? "bg-[#0f0f0f]" : "bg-gray-50/50"}`}>
+          <div className={`p-5 sm:p-6 md:p-7 transition-colors ${isDarkMode ? "bg-black" : "bg-gray-50/50"}`}>
             {!isLocked && (
               showLockConfirm ? (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in">
-                  <p className={`text-xs font-bold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  <p className={`text-xs font-bold ${isDarkMode ? "text-zinc-400" : "text-gray-600"}`}>
                     Lock this day? This cannot be edited later.
                   </p>
                   <div className="flex gap-2 w-full sm:w-auto">
                     <button 
                       onClick={() => setShowLockConfirm(false)} 
                       className={`px-4 py-2 text-xs font-bold border rounded-lg transition-colors ${
-                        isDarkMode ? "text-gray-400 border-gray-700 bg-transparent hover:bg-gray-800" : "text-gray-500 border-gray-200 bg-white hover:bg-gray-50"
+                        isDarkMode ? "text-zinc-400 border-white/[0.08] bg-transparent hover:bg-white/[0.04]" : "text-gray-500 border-gray-200 bg-white hover:bg-gray-50"
                       }`}
                     >
                       Cancel
@@ -225,43 +225,43 @@ export default function StoryEditor({ system }: any) {
 
         </div>
       ) : (
-        /* Reading View */
-        <div className={`p-5 md:p-6 text-sm space-y-4 animate-in fade-in duration-300 transition-colors ${
-          isDarkMode ? "bg-[#0a0a0a] text-gray-300" : "bg-white text-gray-700"
+        /* Reading View - Improved for long texts */
+        <div className={`p-5 sm:p-6 md:p-7 text-sm space-y-6 animate-in fade-in duration-300 transition-colors ${
+          isDarkMode ? "bg-black text-zinc-300" : "bg-white text-gray-700"
         }`}>
           {currentEntry.morning && (
-            <p className="truncate flex gap-2">
-              <span className={`font-bold w-20 shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>Planning:</span>
-              <span className={`truncate ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{currentEntry.morning}</span>
-            </p>
+            <div className="space-y-1">
+              <span className={`font-bold block ${isDarkMode ? "text-zinc-200" : "text-gray-900"}`}>Planning:</span>
+              <span className={`block whitespace-pre-wrap ${isDarkMode ? "text-zinc-400" : "text-gray-600"}`}>{currentEntry.morning}</span>
+            </div>
           )}
           {currentEntry.afternoon && (
-            <p className="truncate flex gap-2">
-              <span className={`font-bold w-20 shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>Execution:</span>
-              <span className={`truncate ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{currentEntry.afternoon}</span>
-            </p>
+            <div className="space-y-1">
+              <span className={`font-bold block ${isDarkMode ? "text-zinc-200" : "text-gray-900"}`}>Execution:</span>
+              <span className={`block whitespace-pre-wrap ${isDarkMode ? "text-zinc-400" : "text-gray-600"}`}>{currentEntry.afternoon}</span>
+            </div>
           )}
           {currentEntry.evening && (
-            <p className="truncate flex gap-2">
-              <span className={`font-bold w-20 shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>Reflection:</span>
-              <span className={`truncate ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{currentEntry.evening}</span>
-            </p>
+            <div className="space-y-1">
+              <span className={`font-bold block ${isDarkMode ? "text-zinc-200" : "text-gray-900"}`}>Reflection:</span>
+              <span className={`block whitespace-pre-wrap ${isDarkMode ? "text-zinc-400" : "text-gray-600"}`}>{currentEntry.evening}</span>
+            </div>
           )}
           {currentEntry.learning && (
-            <p className="truncate flex gap-2">
-              <span className={`font-bold w-20 shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>Insight:</span>
-              <span className={`truncate ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{currentEntry.learning}</span>
-            </p>
+            <div className="space-y-1">
+              <span className={`font-bold block ${isDarkMode ? "text-zinc-200" : "text-gray-900"}`}>Insight:</span>
+              <span className={`block whitespace-pre-wrap ${isDarkMode ? "text-zinc-400" : "text-gray-600"}`}>{currentEntry.learning}</span>
+            </div>
           )}
           {currentEntry.tomorrow && (
-            <p className="truncate flex gap-2">
-              <span className={`font-bold w-20 shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>Next Focus:</span>
-              <span className={`font-semibold truncate ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>{currentEntry.tomorrow}</span>
-            </p>
+            <div className="space-y-1">
+              <span className={`font-bold block ${isDarkMode ? "text-zinc-200" : "text-gray-900"}`}>Next Focus:</span>
+              <span className={`font-semibold block whitespace-pre-wrap ${isDarkMode ? "text-zinc-200" : "text-gray-900"}`}>{currentEntry.tomorrow}</span>
+            </div>
           )}
           
           {!(currentEntry.morning || currentEntry.afternoon || currentEntry.evening || currentEntry.learning || currentEntry.tomorrow) && (
-            <p className={`italic text-center py-4 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
+            <p className={`italic text-center py-4 ${isDarkMode ? "text-zinc-600" : "text-gray-400"}`}>
               Nothing written for this day yet.
             </p>
           )}
