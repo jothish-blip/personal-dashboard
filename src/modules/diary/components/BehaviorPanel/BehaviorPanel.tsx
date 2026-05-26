@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useRef } from "react";
 import {
   Smile,
@@ -78,83 +80,83 @@ export default function BehaviorPanel({ system }: any) {
   const getMoodClass = (mood: string, current: string) => {
     if (current !== mood) {
       return isDarkMode
-        ? "bg-[#111111] border-gray-800 text-gray-500 hover:bg-[#1a1a1a]"
+        ? "bg-black border-white/[0.08] text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300"
         : "bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200";
     }
 
     if (mood === "good") {
       return isDarkMode
-        ? "bg-green-950/30 border-green-800 text-green-400 ring-2 ring-green-900/50 ring-offset-1 ring-offset-[#0a0a0a]"
+        ? "bg-green-950/30 border-green-800 text-green-400 ring-2 ring-green-900/50 ring-offset-1 ring-offset-black"
         : "bg-green-50 border-green-300 text-green-700 ring-2 ring-green-100 ring-offset-1";
     }
 
     if (mood === "neutral") {
       return isDarkMode
-        ? "bg-gray-800 border-gray-600 text-gray-200 ring-2 ring-gray-700 ring-offset-1 ring-offset-[#0a0a0a]"
+        ? "bg-white/[0.04] border-white/[0.12] text-white ring-2 ring-white/[0.08] ring-offset-1 ring-offset-black"
         : "bg-gray-100 border-gray-400 text-gray-800 ring-2 ring-gray-100 ring-offset-1";
     }
 
     return isDarkMode
-      ? "bg-red-950/30 border-red-800 text-red-400 ring-2 ring-red-900/50 ring-offset-1 ring-offset-[#0a0a0a]"
+      ? "bg-red-950/30 border-red-800 text-red-400 ring-2 ring-red-900/50 ring-offset-1 ring-offset-black"
       : "bg-red-50 border-red-300 text-red-700 ring-2 ring-red-100 ring-offset-1";
   };
 
   const getEnergyClass = (energy: string, current: string) => {
     if (current !== energy) {
       return isDarkMode
-        ? "bg-[#111111] border-gray-800 text-gray-500 hover:bg-[#1a1a1a]"
+        ? "bg-black border-white/[0.08] text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300"
         : "bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200";
     }
 
     if (energy === "high") {
       return isDarkMode
-        ? "bg-emerald-950/30 border-emerald-800 text-emerald-400 ring-2 ring-emerald-900/50 ring-offset-1 ring-offset-[#0a0a0a]"
+        ? "bg-emerald-950/30 border-emerald-800 text-emerald-400 ring-2 ring-emerald-900/50 ring-offset-1 ring-offset-black"
         : "bg-emerald-50 border-emerald-300 text-emerald-700 ring-2 ring-emerald-100 ring-offset-1";
     }
 
     if (energy === "medium") {
       return isDarkMode
-        ? "bg-orange-950/30 border-orange-800 text-orange-400 ring-2 ring-orange-900/50 ring-offset-1 ring-offset-[#0a0a0a]"
+        ? "bg-orange-950/30 border-orange-800 text-orange-400 ring-2 ring-orange-900/50 ring-offset-1 ring-offset-black"
         : "bg-orange-50 border-orange-300 text-orange-700 ring-2 ring-orange-100 ring-offset-1";
     }
 
     return isDarkMode
-      ? "bg-red-950/30 border-red-800 text-red-400 ring-2 ring-red-900/50 ring-offset-1 ring-offset-[#0a0a0a]"
+      ? "bg-red-950/30 border-red-800 text-red-400 ring-2 ring-red-900/50 ring-offset-1 ring-offset-black"
       : "bg-red-50 border-red-300 text-red-700 ring-2 ring-red-100 ring-offset-1";
   };
 
   const getSleepClass = (sleep: string, current: string) => {
     if (current !== sleep) {
       return isDarkMode
-        ? "bg-[#111111] border-gray-800 text-gray-500 hover:bg-[#1a1a1a]"
+        ? "bg-black border-white/[0.08] text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300"
         : "bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200";
     }
 
     if (sleep === "good") {
       return isDarkMode
-        ? "bg-indigo-950/30 border-indigo-800 text-indigo-400 ring-2 ring-indigo-900/50 ring-offset-1 ring-offset-[#0a0a0a]"
+        ? "bg-indigo-950/30 border-indigo-800 text-indigo-400 ring-2 ring-indigo-900/50 ring-offset-1 ring-offset-black"
         : "bg-indigo-50 border-indigo-300 text-indigo-700 ring-2 ring-indigo-100 ring-offset-1";
     }
 
     if (sleep === "average") {
       return isDarkMode
-        ? "bg-gray-800 border-gray-600 text-gray-200 ring-2 ring-gray-700 ring-offset-1 ring-offset-[#0a0a0a]"
+        ? "bg-white/[0.04] border-white/[0.12] text-white ring-2 ring-white/[0.08] ring-offset-1 ring-offset-black"
         : "bg-gray-100 border-gray-400 text-gray-800 ring-2 ring-gray-100 ring-offset-1";
     }
 
     return isDarkMode
-      ? "bg-red-950/30 border-red-800 text-red-400 ring-2 ring-red-900/50 ring-offset-1 ring-offset-[#0a0a0a]"
+      ? "bg-red-950/30 border-red-800 text-red-400 ring-2 ring-red-900/50 ring-offset-1 ring-offset-black"
       : "bg-red-50 border-red-300 text-red-700 ring-2 ring-red-100 ring-offset-1";
   };
 
-  const baseTextareaClass = `w-full min-h-[46px] max-h-40 resize-none overflow-hidden border rounded-xl px-4 py-3 text-sm font-medium leading-relaxed outline-none focus:border-orange-400 transition-colors shadow-sm ${
+  const baseTextareaClass = `w-full min-h-[46px] max-h-40 resize-none overflow-hidden border rounded-xl px-4 py-3 text-sm font-medium leading-relaxed outline-none transition-colors shadow-sm ${
     isDarkMode
-      ? "bg-[#111111] border-gray-800 text-gray-200 focus:bg-[#1a1a1a] placeholder-gray-600"
-      : "bg-gray-50 border-gray-200 text-gray-800 focus:bg-white placeholder-gray-400"
+      ? "bg-black border-white/[0.08] text-white focus:bg-white/[0.03] focus:border-orange-500/50 placeholder-zinc-600"
+      : "bg-gray-50 border-gray-200 text-gray-800 focus:bg-white focus:border-orange-400 placeholder-gray-400"
   }`;
 
   const dividerClass = `my-7 border-t ${
-    isDarkMode ? "border-gray-800" : "border-gray-200"
+    isDarkMode ? "border-white/[0.08]" : "border-gray-200"
   }`;
 
   const isReadyToLock =
@@ -163,12 +165,12 @@ export default function BehaviorPanel({ system }: any) {
   return (
     <div
       className={`border rounded-[24px] p-6 shadow-sm mt-6 transition-colors ${
-        isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-200"
+        isDarkMode ? "bg-black border-white/[0.08]" : "bg-white border-gray-200"
       }`}
     >
       <div
         className={`flex items-center justify-between mb-6 pb-4 border-b ${
-          isDarkMode ? "border-gray-800" : "border-gray-100"
+          isDarkMode ? "border-white/[0.08]" : "border-gray-100"
         }`}
       >
         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
@@ -406,10 +408,10 @@ export default function BehaviorPanel({ system }: any) {
                     : "bg-orange-50 text-orange-700 border-orange-200 shadow-sm"
                   : isDisabled
                   ? isDarkMode
-                    ? "bg-[#0a0a0a] text-gray-700 border-gray-800 cursor-not-allowed opacity-50"
+                    ? "bg-black opacity-30 text-gray-700 border-white/[0.08] cursor-not-allowed"
                     : "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"
                   : isDarkMode
-                  ? "bg-[#111111] text-gray-400 border-gray-800 hover:bg-[#1a1a1a]"
+                  ? "bg-black text-zinc-400 border-white/[0.08] hover:bg-white/[0.03]"
                   : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 shadow-sm"
               }`}
             >
@@ -429,7 +431,7 @@ export default function BehaviorPanel({ system }: any) {
             isReadyToLock
               ? "bg-orange-500 text-white hover:bg-orange-600 active:scale-95"
               : isDarkMode
-              ? "bg-gray-900 text-gray-600 cursor-not-allowed"
+              ? "bg-white/[0.03] border border-white/[0.06] text-zinc-600 cursor-not-allowed"
               : "bg-gray-100 text-gray-400 cursor-not-allowed"
           }`}
         >

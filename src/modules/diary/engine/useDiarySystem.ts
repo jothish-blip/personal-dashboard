@@ -7,7 +7,7 @@ import { handleDiary } from "@/notifications/engine/nexNotificationBrain";
 import { getSupabaseClient } from "@/lib/supabase";
 import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
-const MAX_ENTRIES_IN_MEMORY = 60;
+const MAX_ENTRIES_IN_MEMORY = Number.MAX_SAFE_INTEGER;
 const MAX_RETRY = 20;
 const MAX_LENGTH = 5000;
 const DEBUG = false;
@@ -297,7 +297,8 @@ export function useDiarySystem() {
     "high" | "medium" | "low" | null
   >(null);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
-  const [rangeFilter, setRangeFilter] = useState<"7d" | "30d" | "all">("7d");
+  // FIXED: Changed default filter state to "all"
+  const [rangeFilter, setRangeFilter] = useState<"7d" | "30d" | "all">("all");
 
   const [newRelatedDate, setNewRelatedDate] = useState("");
   const [voiceField, setVoiceField] = useState<keyof DiaryEntry | null>(null);
@@ -388,64 +389,64 @@ export function useDiarySystem() {
   }, [supabase]);
 
   const syncEntryToDB = async (dateStr: string, entry: DiaryEntry) => {
-  if (entry.isLocked) return;
+    if (entry.isLocked) return;
 
-  try {
-    const user = userRef.current;
+    try {
+      const user = userRef.current;
 
-    if (!user || !supabase) return;
+      if (!user || !supabase) return;
 
-    const payload: DBDiaryEntry = {
-      user_id: user.id,
-      entry_date: dateStr,
-      morning: entry.morning || "",
-      afternoon: entry.afternoon || "",
-      evening: entry.evening || "",
-      learning: entry.learning || "",
-      tomorrow: entry.tomorrow || "",
-      mood: entry.mood || "neutral",
-      energy: entry.energy || "medium",
-      sleep: entry.sleep || "average",
-      tags: entry.tags || [],
-      is_missed: entry.isMissed || false,
-      related_dates: entry.relatedDates || [],
-      focus_area: entry.focusArea || "None",
-      goal_alignment: entry.goalAlignment || 50,
-      frictions: entry.frictions || [],
-      identity: entry.identity || "",
-      chapter: entry.chapter || "",
-      is_locked: entry.isLocked || false,
-      versions: entry.versions || [],
-      morning_time: entry.morningTime || "",
-      afternoon_time: entry.afternoonTime || "",
-      evening_time: entry.eveningTime || "",
-      updated_at: new Date().toISOString(),
-    };
+      const payload: DBDiaryEntry = {
+        user_id: user.id,
+        entry_date: dateStr,
+        morning: entry.morning || "",
+        afternoon: entry.afternoon || "",
+        evening: entry.evening || "",
+        learning: entry.learning || "",
+        tomorrow: entry.tomorrow || "",
+        mood: entry.mood || "neutral",
+        energy: entry.energy || "medium",
+        sleep: entry.sleep || "average",
+        tags: entry.tags || [],
+        is_missed: entry.isMissed || false,
+        related_dates: entry.relatedDates || [],
+        focus_area: entry.focusArea || "None",
+        goal_alignment: entry.goalAlignment || 50,
+        frictions: entry.frictions || [],
+        identity: entry.identity || "",
+        chapter: entry.chapter || "",
+        is_locked: entry.isLocked || false,
+        versions: entry.versions || [],
+        morning_time: entry.morningTime || "",
+        afternoon_time: entry.afternoonTime || "",
+        evening_time: entry.eveningTime || "",
+        updated_at: new Date().toISOString(),
+      };
 
-    const { error } = await (supabase as any)
-      .from("diary_entries")
-      .upsert(payload, { onConflict: "user_id, entry_date" });
+      const { error } = await (supabase as any)
+        .from("diary_entries")
+        .upsert(payload, { onConflict: "user_id, entry_date" });
 
-    if (error) {
-      console.error("Supabase Diary Upsert Failed", {
-        error,
-        payload,
+      if (error) {
+        console.error("Supabase Diary Upsert Failed", {
+          error,
+          payload,
+        });
+
+        throw error;
+      }
+    } catch (err: any) {
+      console.error("Diary DB Sync Exception", {
+        message: err?.message,
+        details: err?.details,
+        hint: err?.hint,
+        code: err?.code,
+        full: err,
       });
 
-      throw error;
+      throw err;
     }
-  } catch (err: any) {
-    console.error("Diary DB Sync Exception", {
-      message: err?.message,
-      details: err?.details,
-      hint: err?.hint,
-      code: err?.code,
-      full: err,
-    });
-
-    throw err;
-  }
-};
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -556,8 +557,7 @@ export function useDiarySystem() {
             .from("diary_entries")
             .select("*")
             .eq("user_id", currentUser.id)
-            .order("entry_date", { ascending: false })
-            .limit(MAX_ENTRIES_IN_MEMORY);
+            .order("entry_date", { ascending: false });
 
           if (!isMounted) return;
 
@@ -653,14 +653,6 @@ export function useDiarySystem() {
       }
 
       const dates = Object.keys(entriesMap).sort().reverse();
-
-      if (dates.length > MAX_ENTRIES_IN_MEMORY) {
-        const trimmed: Record<string, DiaryEntry> = {};
-        dates.slice(0, MAX_ENTRIES_IN_MEMORY).forEach((d) => {
-          trimmed[d] = entriesMap[d];
-        });
-        entriesMap = trimmed;
-      }
 
       setAllEntries(entriesMap);
       setCurrentEntry(entriesMap[actualToday] || DEFAULT_ENTRY);
@@ -1059,11 +1051,11 @@ export function useDiarySystem() {
     rangeFilter,
   ]);
 
+  // FIXED: Removed the .slice(0, 14) so it won't cut the archive short!
   const historyDates = allDates
     .filter((d) => d <= actualToday)
     .sort()
-    .reverse()
-    .slice(0, 14);
+    .reverse();
 
   const searchResults: any[] = [];
 

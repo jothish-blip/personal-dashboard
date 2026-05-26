@@ -22,7 +22,7 @@ import { NexNotification } from "@/notifications/types/types";
 import ProfileStreakSwitcher from "@/navigation/components/ProfileStreakSwitcher/ProfileStreakSwitcher";
 
 interface MobileNavProps {
-  activePaths?: Record<string, boolean> | null; // Allow null to prevent crashes
+  activePaths?: Record<string, boolean> | null; 
   handleNav?: (path: string) => void;
   notifications?: NexNotification[];
   unreadCount?: number;
@@ -158,7 +158,7 @@ export default function MobileNav(props: MobileNavProps) {
       )}
 
       <div className={`md:hidden space-y-1 z-50 relative transition-colors duration-300 pb-1 ${
-        isDarkMode ? "bg-[#050505]/95 border-b border-gray-800" : "bg-white/95 border-b border-gray-100"
+        isDarkMode ? "bg-black/95 border-b border-white/[0.08]" : "bg-white/95 border-b border-gray-100"
       }`}>
 
         {/* TOP ROW: LOGO & TOOLS */}
@@ -167,7 +167,7 @@ export default function MobileNav(props: MobileNavProps) {
           <div className="flex items-center gap-2.5">
             <div 
               className={`flex items-center justify-center w-[28px] h-[28px] rounded-lg border shadow-[0_4px_20px_rgba(0,0,0,0.12)] transition-all duration-300 cursor-pointer ${
-                isDarkMode ? "bg-[#111111] border-white/8" : "bg-[#f4f4f5] border-black/8"
+                isDarkMode ? "bg-black border-white/[0.08] hover:bg-white/[0.03]" : "bg-[#f4f4f5] border-black/8"
               }`}
               onClick={() => handleNav("/")}
             >
@@ -198,7 +198,7 @@ export default function MobileNav(props: MobileNavProps) {
                 className={`flex items-center justify-center w-[40px] h-[40px] transition-colors rounded-full ${
                   unreadCount > 0 
                     ? (isDarkMode ? "text-orange-400" : "text-orange-500") 
-                    : (isDarkMode ? "text-gray-500" : "text-gray-400")
+                    : (isDarkMode ? "text-zinc-500" : "text-gray-400")
                 }`}
               >
                 <Bell size={20} className={unreadCount > 0 ? "animate-pulse drop-shadow-[0_0_4px_rgba(249,115,22,0.5)]" : ""} />
@@ -231,13 +231,13 @@ export default function MobileNav(props: MobileNavProps) {
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsProfileOpen(false)} />
                   <div className={`absolute right-0 top-12 mt-2 w-56 border rounded-xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-200 ${
-                    isDarkMode ? "bg-[#111111] border-gray-800 shadow-black/50" : "bg-white border-gray-200 shadow-gray-200/50"
+                    isDarkMode ? "bg-black border-white/[0.08] shadow-black/50" : "bg-white border-gray-200 shadow-gray-200/50"
                   }`}>
-                    <div className={`px-4 py-3 border-b mb-1 ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+                    <div className={`px-4 py-3 border-b mb-1 ${isDarkMode ? "border-white/[0.08]" : "border-gray-100"}`}>
                       <p className={`text-sm font-bold truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                         {userProfile?.full_name || "User"}
                       </p>
-                      <p className={`text-[10px] font-bold uppercase tracking-widest truncate mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                      <p className={`text-[10px] font-bold uppercase tracking-widest truncate mt-0.5 ${isDarkMode ? "text-zinc-500" : "text-gray-400"}`}>
                         {userProfile?.email || ""}
                       </p>
                     </div>
@@ -245,10 +245,10 @@ export default function MobileNav(props: MobileNavProps) {
                     <button
                       onClick={() => { handleNav("/settings"); setIsProfileOpen(false); }}
                       className={`w-full px-4 py-2.5 text-sm font-medium flex items-center gap-3 transition ${
-                        isDarkMode ? "text-gray-300 hover:bg-[#1a1a1a]" : "text-gray-700 hover:bg-gray-50"
+                        isDarkMode ? "text-zinc-300 hover:bg-white/[0.03]" : "text-gray-700 hover:bg-gray-50"
                       }`}
                     >
-                      <Settings size={15} className={isDarkMode ? "text-gray-500" : "text-gray-400"} /> Settings
+                      <Settings size={15} className={isDarkMode ? "text-zinc-500" : "text-gray-400"} /> Settings
                     </button>
 
                     <button
@@ -305,11 +305,11 @@ export default function MobileNav(props: MobileNavProps) {
                     isDraggingThis ? "opacity-50 scale-110 shadow-lg z-50" : "opacity-100"
                   } ${
                     isActive 
-                      ? isDarkMode ? "text-orange-400 bg-orange-950/30" : "text-orange-600 bg-orange-50" 
-                      : isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-800"
+                      ? isDarkMode ? "text-orange-400 bg-orange-500/10 border border-orange-500/15" : "text-orange-600 bg-orange-50 border border-orange-200" 
+                      : isDarkMode ? "text-zinc-500 hover:text-zinc-300" : "text-gray-500 hover:text-gray-800"
                   }`}
                 >
-                  <Icon size={18} className={isEditMode ? "text-gray-400" : ""} />
+                  <Icon size={18} className={isEditMode ? "text-zinc-400" : ""} />
                   <span className="leading-none">{item.label}</span>
                   {isActive && !isEditMode && (
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-orange-500 rounded-t-full shadow-[0_-2px_6px_rgba(249,115,22,0.6)]" />

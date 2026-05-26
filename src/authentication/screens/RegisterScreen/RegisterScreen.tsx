@@ -251,16 +251,17 @@ function LandingExperience() {
         </button>
 
         {/* Sign In */}
-        <button
-          onClick={() => router.push("/login")}
-          className={`hidden sm:flex h-11 px-5 rounded-2xl items-center justify-center text-[13px] font-semibold transition-all duration-300 ${
-            isDarkMode
-              ? "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-              : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
-          }`}
-        >
-          Sign in
-        </button>
+<button
+  onClick={() => router.push("/login")}
+  className={`flex h-11 px-4 sm:px-5 rounded-2xl items-center justify-center text-[13px] font-semibold transition-all duration-300 active:scale-95 ${
+    isDarkMode
+      ? "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
+      : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
+  }`}
+>
+  <span className="sm:hidden">Login</span>
+  <span className="hidden sm:block">Sign in</span>
+</button>
 
         {/* Primary CTA */}
         <button

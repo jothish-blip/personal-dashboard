@@ -73,8 +73,68 @@ export function useNexCore() {
     }
   };
 
-  const logAction = (action: string, name: string, detail: string, currentState: NexState): Log[] => {
-    return [{ id: crypto.randomUUID(), time: new Date().toISOString(), action, name, detail }, ...currentState.logs].slice(0, 100);
+  const logAction = async (action: string, name: string, detail: string) => {
+    const user = userRef.current;
+    const supabase = getSupabaseClient();
+    const id = crypto.randomUUID();
+    const time = new Date().toISOString();
+
+    const newLog = { id, action, name, detail, time };
+
+    // Update local UI instantly
+    setState(prev => {
+      const newState = {
+        ...prev,
+        logs: [newLog, ...prev.logs].slice(0, 100)
+      };
+      debouncedSave(KEY, newState);
+      return newState;
+    });
+
+    if (!user || !supabase) return;
+
+    // Save to Supabase
+    const { error } = await (supabase as any)
+      .from("audit_logs")
+      .insert({
+        id,
+        user_id: user.id,
+        action,
+        name,
+        detail,
+        time
+      });
+
+    if (error) console.error("Audit log sync error:", error);
+  };
+
+  const fetchLogsFromDB = async () => {
+    const user = userRef.current;
+    if (!user) return;
+
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    const { data, error } = await (supabase as any)
+      .from("audit_logs")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("time", { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error("Audit fetch error:", error);
+      return;
+    }
+
+    setState(prev => {
+      const newState = {
+        ...prev,
+        logs: data || []
+      };
+      debouncedSave(KEY, newState);
+      return newState;
+    });
   };
 
   const addToQueue = (action: QueueAction) => {
@@ -263,7 +323,7 @@ export function useNexCore() {
     
     if (cleanupRef.current) cleanupRef.current();
 
-    const channelName = `tasks-${user.id}`;
+    const channelName = `realtime-${user.id}`;
     
     const existingChannels = supabase.getChannels();
     existingChannels.forEach((c) => {
@@ -278,8 +338,15 @@ export function useNexCore() {
       "postgres_changes",
       { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` },
       () => {
-        // Fix 3 applied: removed setTimeout delay for instant UI sync.
         fetchTasksFromDB();
+      }
+    );
+
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "audit_logs", filter: `user_id=eq.${user.id}` },
+      () => {
+        fetchLogsFromDB();
       }
     );
 
@@ -306,10 +373,11 @@ export function useNexCore() {
         
         if (newUser) {
           await fetchTasksFromDB();
+          await fetchLogsFromDB();
           setupRealtime(); 
         } else {
           if (cleanupRef.current) cleanupRef.current();
-          setState(prev => ({ ...prev, tasks: [] })); 
+          setState(prev => ({ ...prev, tasks: [], logs: [] })); 
         }
       }
     };
@@ -358,10 +426,19 @@ export function useNexCore() {
       addNotification("system", "Back Online", "Connection restored. Syncing data...", "low");
       processQueue();
       fetchTasksFromDB();
+      fetchLogsFromDB();
     };
     const handleOffline = () => addNotification("system", "Offline", "No internet connection. Actions will be queued.", "high");
-    const handleFocus = () => fetchTasksFromDB();
-    const handleVisibility = () => { if (document.visibilityState === "visible") fetchTasksFromDB(); };
+    const handleFocus = () => {
+      fetchTasksFromDB();
+      fetchLogsFromDB();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchTasksFromDB();
+        fetchLogsFromDB();
+      }
+    };
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
@@ -432,12 +509,13 @@ export function useNexCore() {
       if (prev.tasks.some(t => t.id === newId)) return prev;
       const newState = {
         ...prev,
-        tasks: [...prev.tasks, { id: newId, name: name.trim(), group: groupName, history: {} }],
-        logs: logAction("CREATE", name.trim(), `Created new objective in ${groupName}`, prev)
+        tasks: [...prev.tasks, { id: newId, name: name.trim(), group: groupName, history: {} }]
       };
       debouncedSave(KEY, newState);
       return newState;
     });
+
+    await logAction("CREATE", name.trim(), `Created new objective in ${groupName}`);
 
     const supabase = getSupabaseClient();
     
@@ -462,12 +540,13 @@ export function useNexCore() {
       const updatedTasks = prev.tasks.map(t => t.id === id ? { ...t, name: newName.trim() } : t);
       const newState = {
         ...prev,
-        tasks: updatedTasks,
-        logs: logAction("UPDATE", newName.trim(), `Renamed objective`, prev)
+        tasks: updatedTasks
       };
       debouncedSave(KEY, newState);
       return newState;
     });
+
+    await logAction("UPDATE", newName.trim(), `Renamed objective`);
 
     const supabase = getSupabaseClient();
     if (!navigator.onLine || !supabase) {
@@ -491,12 +570,13 @@ export function useNexCore() {
       const updatedTasks = prev.tasks.map(t => t.group === oldGroup ? { ...t, group: newGroup.trim() } : t);
       const newState = {
         ...prev,
-        tasks: updatedTasks,
-        logs: logAction("UPDATE", newGroup.trim(), `Renamed group from ${oldGroup}`, prev)
+        tasks: updatedTasks
       };
       debouncedSave(KEY, newState);
       return newState;
     });
+
+    await logAction("UPDATE", newGroup.trim(), `Renamed group from ${oldGroup}`);
 
     const supabase = getSupabaseClient();
     if (!navigator.onLine || !supabase) {
@@ -541,12 +621,13 @@ export function useNexCore() {
     setState(prev => {
       const newState = { 
         ...prev, 
-        tasks: updatedTasksArray,
-        logs: logAction("TOGGLE", task.name, `Marked as ${status ? 'Complete' : 'Incomplete'} for ${dateStr}`, prev)
+        tasks: updatedTasksArray
       };
       debouncedSave(KEY, newState);
       return newState;
     });
+
+    await logAction("TOGGLE", task.name, `Marked as ${status ? 'Complete' : 'Incomplete'} for ${dateStr}`);
 
     queueMicrotask(() => {
       window.dispatchEvent(new Event("nextask-live-update"));
@@ -577,12 +658,15 @@ export function useNexCore() {
     setState(prev => {
       const newState = { 
         ...prev, 
-        tasks: prev.tasks.filter(t => t.id !== id),
-        logs: taskToDelete ? logAction("DELETE", taskToDelete.name, "Permanently deleted objective", prev) : prev.logs
+        tasks: prev.tasks.filter(t => t.id !== id)
       };
       debouncedSave(KEY, newState);
       return newState;
     });
+
+    if (taskToDelete) {
+      await logAction("DELETE", taskToDelete.name, "Permanently deleted objective");
+    }
 
     const supabase = getSupabaseClient();
     if (!navigator.onLine || !supabase) { 
@@ -596,32 +680,48 @@ export function useNexCore() {
     }
   };
 
-  const lockToday = () => {
+  const lockToday = async () => {
     const today = getTodayLocal();
+    let alreadyLocked = false;
+
     setState(prev => {
-      if (prev.meta.lockedDates.includes(today)) return prev;
+      if (prev.meta.lockedDates.includes(today)) {
+        alreadyLocked = true;
+        return prev;
+      }
       const newState = { 
         ...prev, 
-        meta: { ...prev.meta, lockedDates: [...new Set([...prev.meta.lockedDates, today])] },
-        logs: logAction("SYSTEM", "Daily Lock", `Locked execution data for ${today}`, prev)
+        meta: { ...prev.meta, lockedDates: [...new Set([...prev.meta.lockedDates, today])] }
       };
       debouncedSave(KEY, newState);
       return newState;
     });
+
+    if (!alreadyLocked) {
+      await logAction("SYSTEM", "Daily Lock", `Locked execution data for ${today}`);
+    }
   };
 
-  const unlockDate = (dateStr: string) => {
+  const unlockDate = async (dateStr: string) => {
     const today = getTodayLocal();
+    let requiresUnlock = true;
+
     setState(prev => {
-      if (dateStr !== today || prev.meta.rollbackUsedDates?.includes(dateStr) || !prev.meta.lockedDates.includes(dateStr)) return prev;
+      if (dateStr !== today || prev.meta.rollbackUsedDates?.includes(dateStr) || !prev.meta.lockedDates.includes(dateStr)) {
+        requiresUnlock = false;
+        return prev;
+      }
       const newState = { 
         ...prev, 
-        meta: { ...prev.meta, lockedDates: prev.meta.lockedDates.filter(d => d !== dateStr), rollbackUsedDates: [...(prev.meta.rollbackUsedDates || []), dateStr] },
-        logs: logAction("SYSTEM", "Unlock", `Rollback utilized for ${dateStr}`, prev)
+        meta: { ...prev.meta, lockedDates: prev.meta.lockedDates.filter(d => d !== dateStr), rollbackUsedDates: [...(prev.meta.rollbackUsedDates || []), dateStr] }
       };
       debouncedSave(KEY, newState);
       return newState;
     });
+
+    if (requiresUnlock) {
+      await logAction("SYSTEM", "Unlock", `Rollback utilized for ${dateStr}`);
+    }
   };
 
   const setMonthYear = (value: string) => {
@@ -640,7 +740,7 @@ export function useNexCore() {
     });
   };
 
-  const exportData = () => {
+  const exportData = async () => {
     const payload = JSON.stringify(state, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -650,28 +750,43 @@ export function useNexCore() {
     anchor.click();
     URL.revokeObjectURL(url);
     
-    setState(prev => {
-      const newState = { ...prev, logs: logAction("EXPORT", "Data Backup", "User exported full JSON state", prev) };
-      debouncedSave(KEY, newState);
-      return newState;
-    });
+    await logAction("EXPORT", "Data Backup", "User exported full JSON state");
   };
 
-  const addAuditLog = (action: string, name: string, detail: string) => {
-    setState(prev => {
-      const newState = { ...prev, logs: logAction(action, name, detail, prev) };
-      debouncedSave(KEY, newState);
-      return newState;
-    });
+  const addAuditLog = async (action: string, name: string, detail: string) => {
+    await logAction(action, name, detail);
   };
 
-  const clearAllLogs = () => {
+  const clearAllLogs = async () => {
     if (!window.confirm("Delete all audit logs? This action cannot be undone.")) return;
+    
     setState(prev => {
       const newState = { ...prev, logs: [] };
       debouncedSave(KEY, newState);
       return newState;
     });
+
+    const user = userRef.current;
+    const supabase = getSupabaseClient();
+    
+    if (user && supabase && navigator.onLine) {
+      await (supabase as any).from("audit_logs").delete().eq("user_id", user.id);
+    }
+  };
+
+  const deleteLog = async (id: string | number) => {
+    setState(prev => {
+      const newState = { ...prev, logs: prev.logs.filter(l => l.id !== id) };
+      debouncedSave(KEY, newState);
+      return newState;
+    });
+
+    const user = userRef.current;
+    const supabase = getSupabaseClient();
+    
+    if (user && supabase && navigator.onLine) {
+      await (supabase as any).from("audit_logs").delete().eq("id", id).eq("user_id", user.id);
+    }
   };
 
   return {
@@ -691,7 +806,8 @@ export function useNexCore() {
     exportData,
     checkMomentum,
     addAuditLog,
-    clearAllLogs, 
+    clearAllLogs,
+    deleteLog,
     currentUser,
     currentStreak 
   };
