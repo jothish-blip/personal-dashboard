@@ -7,6 +7,7 @@ import { Play, Pause, Square, Check, Flame, Sparkles } from "lucide-react";
 
 export default function SessionTimer() {
   const {
+    timeRemaining,
     focusedTime,
     initialSessionTime,
     isActive,
