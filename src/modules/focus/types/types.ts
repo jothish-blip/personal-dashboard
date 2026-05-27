@@ -49,6 +49,7 @@ export interface ActiveSession {
 
 // 🔥 COMPLETED SESSION (PERSISTED HISTORY)
 export interface FocusSession extends ActiveSession {
+  initialSessionTime: number;
   // When session fully ended
   endTime: number;
 
