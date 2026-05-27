@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useFocusSystem } from "../../engine/useFocusSystem";
-import { FocusSession } from "../../types/types";;
+import { FocusSession } from "../../types/types";
+import { Target } from "lucide-react";
 
 // 🔥 UPDATE THIS PATH to match where your ThemeProvider actually lives!
-// Example: "@/components/ThemeProvider" or "@/context/ThemeProvider" or "../ThemeProvider"
 import { useTheme } from "@/theme/ThemeProvider";
 
 export default function TaskSelector() {
@@ -28,20 +28,87 @@ export default function TaskSelector() {
     : activeTaskId;
 
   const intentHistory = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<
+      string,
+      {
+        count: number;
+        latest: number;
+      }
+    >();
+  
+    (sessions as FocusSession[]).forEach(
+      (s: FocusSession) => {
+        // 🔥 THE FIX: Fallback to taskId if taskTitle is missing
+        const title = s.taskTitle || s.taskId || "";
+        
+        if (!title) return;
+  
+        const cleanTitle = title
+          .trim()
+          .replace(/\s+/g, " ");
+  
+        if (
+          cleanTitle === "Untitled Focus" ||
+          cleanTitle === "Archived Focus"
+        )
+          return;
+  
+        const normalized =
+          cleanTitle.toLowerCase();
+  
+        const existing =
+          map.get(normalized);
+  
+      map.set(normalized, {
+      count:
+     (existing?.count || 0) + 1,
 
-    (sessions as FocusSession[]).forEach((s: FocusSession) => {
-      if (!s.taskTitle || s.taskTitle === "Untitled Focus" || s.taskTitle === "Archived Focus") return;
-      map.set(s.taskTitle, (map.get(s.taskTitle) || 0) + 1);
-    });
-
+      latest: Math.max(
+      existing?.latest || 0,
+      s.startTime ||
+       Date.now()
+      ),
+      });
+      }
+    );
+    
+    
+  
     return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10);
+      .sort((a, b) => {
+        // Recent first
+        if (
+          b[1].latest !== a[1].latest
+        ) {
+          return (
+            b[1].latest -
+            a[1].latest
+          );
+        }
+        
+  
+        // Then by session count
+        return (
+          b[1].count -
+          a[1].count
+        );
+      })
+      .map(([task, meta]) => [
+        task
+          .split(" ")
+          .map(
+            word =>
+              word.charAt(0).toUpperCase() +
+              word.slice(1)
+          )
+          .join(" "),
+        meta.count,
+        meta.latest
+      ]);
   }, [sessions]);
 
   const visibleHistory = showHistory ? intentHistory : intentHistory.slice(0, 3);
-  const suggested = intentHistory[0]?.[0];
+  const suggested = intentHistory[0]?.[0] as string | undefined;
 
   const handleSetIntent = (intentValue?: string) => {
     const valueToSet = intentValue !== undefined ? intentValue : taskInput;
@@ -67,8 +134,18 @@ export default function TaskSelector() {
     }
   };
 
+  const getLastUsedText = (timestamp: number) => {
+    const diff = Date.now() - timestamp;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  
+    if (days === 0) return "Today";
+    if (days === 1) return "Yesterday";
+  
+    return `${days}d ago`;
+  };
+
   return (
-    <div className={`p-6 rounded-2xl border space-y-6 transition-all ${
+    <div className={`p-6 rounded-2xl border space-y-7 transition-all ${
       isDarkMode 
         ? "bg-black border-gray-800 shadow-none" 
         : "bg-gradient-to-br from-white via-gray-50 to-blue-50 border-gray-200 shadow-[0_6px_30px_rgba(0,0,0,0.05)]"
@@ -77,35 +154,41 @@ export default function TaskSelector() {
       {/* HEADER & STATUS */}
       <div className="flex justify-between items-center">
         <h2 className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
-          🎯 Current Intent
+          <Target size={16} className={isDarkMode ? "text-gray-400" : "text-gray-500"} /> Current Intent
         </h2>
         <span className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md transition-all shadow-sm ${
           isActive 
-            ? isDarkMode ? "bg-orange-950/30 text-orange-400 border border-orange-900/50" : "bg-orange-100 text-orange-700 border border-orange-200"
+            ? isDarkMode ? "bg-orange-500/8 text-orange-400 border border-orange-500/15" : "bg-orange-50 text-orange-700 border border-orange-200"
             : activeTaskId 
-              ? isDarkMode ? "bg-green-950/30 text-green-400 border border-green-900/50" : "bg-green-100 text-green-700 border border-green-200"
-              : isDarkMode ? "bg-gray-900 text-gray-400 border border-gray-800" : "bg-gray-100 text-gray-500 border border-gray-200"
+              ? isDarkMode ? "bg-green-500/8 text-green-400 border border-green-500/15" : "bg-green-50 text-green-700 border border-green-200"
+              : isDarkMode ? "bg-white/[0.04] text-gray-400 border border-white/[0.08]" : "bg-gray-50 text-gray-500 border border-gray-200"
         }`}>
           {isActive ? "Locked" : activeTaskId ? "Ready" : "Pending"}
         </span>
       </div>
 
       {/* 🥇 HERO BLOCK: ACTIVE INTENT DISPLAY */}
-      <div className={`p-5 rounded-2xl border transition-all ${
+      <div className={`p-5 rounded-2xl border transition-all relative overflow-hidden ${
         isActive 
           ? isDarkMode ? "bg-[#0a0500] border-orange-900/50 shadow-inner" : "bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200 shadow-inner"
           : activeTaskId
-            ? isDarkMode ? "bg-[#00050a] border-blue-900/50 shadow-sm" : "bg-gradient-to-br from-blue-50 to-white border-blue-200 shadow-sm"
+            ? isDarkMode ? "bg-white/[0.02] border-white/[0.08] shadow-sm" : "bg-gradient-to-br from-gray-50 to-white border-gray-200 shadow-sm"
             : isDarkMode ? "bg-black border-gray-800 shadow-sm" : "bg-white border-gray-100 shadow-sm"
       }`}>
+        
+        {/* Subtle top accent line for active tasks */}
+        {isActive && (
+          <div className="absolute top-0 left-0 h-[2px] w-full bg-orange-500/40" />
+        )}
+
         <div className="flex justify-between items-center mb-2">
           <div className="text-[10px] uppercase font-bold tracking-wider text-gray-400">
             Active Intent
           </div>
           
           {isActive && (
-            <div className={`text-[10px] font-bold animate-pulse uppercase tracking-wider px-2 py-0.5 rounded border ${
-              isDarkMode ? "text-orange-400 bg-orange-900/30 border-orange-800/50" : "text-orange-600 bg-orange-100 border-orange-200"
+            <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+              isDarkMode ? "text-orange-400 bg-orange-500/10 border-orange-500/20" : "text-orange-600 bg-orange-100 border-orange-200"
             }`}>
               🔒 Locked during session
             </div>
@@ -124,18 +207,18 @@ export default function TaskSelector() {
         </div>
 
         <div className={`text-lg md:text-xl font-bold leading-snug break-words ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-          {displayTask || "No intent declared"}
+          {displayTask || "Choose what matters now"}
         </div>
         
         <div className={`text-xs mt-2 font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
           {isActive
-            ? "Execution locked. Stay committed to the target."
-            : "Define one clear goal before starting."}
+            ? "Focus locked for this session."
+            : "Choose one thing worth focusing on."}
         </div>
       </div>
 
       {!isActive && (
-        <div className="flex flex-col gap-5 animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
           
           {/* USER INPUT LAYER */}
           <div className="flex flex-col sm:flex-row gap-3 items-center">
@@ -144,18 +227,18 @@ export default function TaskSelector() {
               value={taskInput}
               onChange={(e) => setTaskInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={suggested ? `e.g., ${suggested}` : "What is your primary focus?"}
+              placeholder={suggested ? `e.g., ${suggested}` : "What are you focusing on?"}
               disabled={isActive}
-              className={`w-full sm:flex-1 px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 shadow-sm text-sm transition-all font-medium ${
+              className={`w-full min-h-[48px] sm:flex-1 px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 shadow-sm text-sm transition-all font-medium ${
                 isDarkMode 
-                  ? "bg-[#0a0a0a] border-gray-800 focus:ring-blue-800 focus:border-blue-800 text-white disabled:bg-gray-900 disabled:text-gray-600 placeholder:text-gray-600" 
-                  : "bg-white border-gray-200 focus:ring-blue-300 focus:border-blue-300 text-gray-900 disabled:bg-gray-50 disabled:text-gray-400 placeholder:text-gray-400"
+                  ? "bg-[#0a0a0a] border-gray-800 focus:ring-orange-500/30 focus:border-orange-500/30 text-white disabled:bg-gray-900 disabled:text-gray-600 placeholder:text-gray-600" 
+                  : "bg-white border-gray-200 focus:ring-orange-500/30 focus:border-orange-500/30 text-gray-900 disabled:bg-gray-50 disabled:text-gray-400 placeholder:text-gray-400"
               }`}
             />
             <button
               onClick={() => handleSetIntent()}
               disabled={isActive || taskInput.trim().length < 3}
-              className="w-full sm:w-auto px-6 py-3 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-30 transition-all active:scale-95 shadow-md"
+              className="w-full sm:w-auto min-h-[48px] px-6 py-3 text-sm font-bold bg-orange-500 text-white rounded-xl hover:bg-orange-600 disabled:opacity-30 transition-all active:scale-95 shadow-[0_0_20px_rgba(249,115,22,0.12)]"
             >
               Commit
             </button>
@@ -163,23 +246,25 @@ export default function TaskSelector() {
 
           {/* 🎯 DAILY GOAL SETTING */}
           <div className={`flex items-center justify-between border rounded-xl px-4 py-3 shadow-sm ${
-            isDarkMode ? "bg-black border-gray-800" : "bg-gradient-to-br from-green-50 to-white border-green-200"
+            isDarkMode ? "bg-black border-gray-800" : "bg-gradient-to-br from-gray-50 to-white border-gray-200"
           }`}>
-            <div className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? "text-green-400" : "text-green-700"}`}>
-              Daily Target
+            <div className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+              Daily Focus Goal
             </div>
             <div className="flex items-center gap-2">
               <input
                 type="number"
                 value={dailyGoal / 3600}
                 onChange={(e) => updateDailyGoal(Number(e.target.value) * 3600)}
-                className={`w-12 text-center text-sm font-bold border rounded-md px-2 py-1 focus:outline-none focus:ring-2 transition-shadow ${
-                  isDarkMode ? "bg-[#0a0a0a] border-gray-700 text-green-400 focus:ring-green-800" : "bg-white border-green-200 text-green-800 focus:ring-green-300"
+                className={`w-14 text-center text-base font-extrabold border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 transition-shadow ${
+                  isDarkMode 
+                    ? "bg-[#0a0a0a] border-gray-700 text-orange-400 focus:ring-orange-500/30" 
+                    : "bg-white border-gray-200 text-orange-600 focus:ring-orange-500/30"
                 }`}
                 min={1}
                 max={16}
               />
-              <span className={`text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-green-500" : "text-green-600"}`}>hrs</span>
+              <span className={`text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>hrs</span>
             </div>
           </div>
 
@@ -205,10 +290,12 @@ export default function TaskSelector() {
                       onClick={() => handleSetIntent(task)}
                       className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all border active:scale-95 ${
                         isSelected 
-                          ? "bg-blue-600 text-white border-blue-600 shadow-md" 
+                          ? isDarkMode
+                            ? "bg-orange-500/15 text-orange-300 border-orange-500/20"
+                            : "bg-orange-50 text-orange-600 border-orange-200"
                           : isDarkMode 
-                              ? "bg-black text-gray-300 border-gray-700 hover:bg-gray-800 hover:border-gray-600" 
-                              : "bg-white text-gray-600 border-gray-200 hover:bg-blue-50 hover:border-blue-200"
+                            ? "bg-black text-gray-400 border-gray-700 hover:bg-gray-800 hover:border-gray-600" 
+                            : "bg-white text-gray-600 border-gray-200 hover:bg-orange-50/50 hover:border-orange-200/50"
                       }`}
                     >
                       {task}
@@ -237,22 +324,49 @@ export default function TaskSelector() {
               </div>
               
               <div className={`space-y-1.5 transition-all duration-300 ${showHistory ? "max-h-[200px] overflow-y-auto custom-scrollbar pr-1" : "max-h-[140px] overflow-hidden"}`}>
-                {visibleHistory.map(([task, count], i) => (
-                  <div 
-                    key={i}
-                    className={`flex justify-between items-center text-xs px-3 py-2.5 rounded-lg border transition-all cursor-pointer hover:shadow-sm active:scale-[0.98] ${
-                      isDarkMode ? "bg-black hover:bg-[#0a0500] border-gray-800" : "bg-white hover:bg-orange-50 border-gray-100"
-                    }`}
-                    onClick={() => handleSetIntent(task)}
-                  >
-                    <span className={`font-semibold truncate pr-3 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>{task}</span>
-                    <span className={`text-[10px] font-bold tracking-wide whitespace-nowrap px-2 py-0.5 rounded border ${
-                      isDarkMode ? "text-orange-400 bg-orange-950/30 border-orange-900/50" : "text-orange-600 bg-orange-50 border-orange-100"
-                    }`}>
-                      {count} session{count !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                ))}
+                {visibleHistory.map((item, i) => {
+                  const task = item[0] as string;
+                  const count = item[1] as number;
+                  const latest = item[2] as number;
+                  
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => handleSetIntent(task)}
+                      className={`flex justify-between items-center text-xs px-3 py-3 rounded-lg border transition-all cursor-pointer active:scale-[0.98] ${
+                        activeTaskId === task
+                          ? isDarkMode
+                            ? "bg-orange-500/10 border-orange-500/20"
+                            : "bg-orange-50 border-orange-200"
+                          : isDarkMode
+                          ? "bg-black hover:bg-white/[0.03] border-gray-800 hover:border-white/[0.08]"
+                          : "bg-white hover:bg-orange-50 border-gray-100"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div
+                          className={`font-semibold truncate ${
+                            isDarkMode
+                              ? "text-gray-300"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          {task}
+                        </div>
+                    
+                        <div className={`text-[10px] mt-1 ${isDarkMode ? "text-white/40" : "text-gray-500"}`}>
+                          {count} session{count !== 1 ? "s" : ""} • {getLastUsedText(latest)}
+                        </div>
+                      </div>
+                    
+                      {activeTaskId === task && (
+                        <div className="text-[10px] font-semibold text-orange-400">
+                          Selected
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               {!showHistory && intentHistory.length > 3 && (
@@ -265,10 +379,11 @@ export default function TaskSelector() {
               )}
             </div>
           )}
-
         </div>
       )}
-
     </div>
   );
 }
+
+
+

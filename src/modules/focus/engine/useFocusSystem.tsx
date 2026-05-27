@@ -82,6 +82,7 @@ const mapDBSessionToFocusSession = (row: DBFocusSession): FocusSession => {
     startTime,
     endTime: safeEndTime, 
     initialDuration: duration,
+    initialSessionTime: duration,
     distractions: safeDistractions,
     durationSeconds: duration,
     totalSessionSeconds: duration,
@@ -92,6 +93,35 @@ const mapDBSessionToFocusSession = (row: DBFocusSession): FocusSession => {
     distractionCount: safeDistractions.length,
     topDistraction: null,
     avgDistractionGap: 0,
+  };
+};
+
+// 🔥 FIX: Smart state merger. Prevents stale Supabase data from silently unpausing your timer.
+const mergeSessions = (local: ExtendedActiveSession | null, remote: ExtendedActiveSession): ExtendedActiveSession => {
+  if (!local || local.id !== remote.id) return remote;
+  
+  const localSegments = local.pauseSegments || [];
+  const remoteSegments = remote.pauseSegments || [];
+  const pauseMap = new Map();
+  
+  [...remoteSegments, ...localSegments].forEach(seg => {
+    const existing = pauseMap.get(seg.start);
+    // Keep closed pauses if they exist, otherwise accept open pauses
+    if (!existing || (!existing.end && seg.end)) {
+      pauseMap.set(seg.start, seg);
+    }
+  });
+  
+  const mergedPauses = Array.from(pauseMap.values()).sort((a, b) => a.start - b.start);
+  const localDists = Array.isArray(local.distractions) ? local.distractions : [];
+  const remoteDists = Array.isArray(remote.distractions) ? remote.distractions : [];
+  
+  return {
+    ...remote,
+    extraStartTime: local.extraStartTime || remote.extraStartTime,
+    completedAt: local.completedAt || remote.completedAt,
+    pauseSegments: mergedPauses,
+    distractions: localDists.length >= remoteDists.length ? localDists : remoteDists
   };
 };
 
@@ -157,7 +187,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("daily_goal", seconds.toString());
   };
 
-  // 🔥 Centralized alarm killer
   const stopAlarm = useCallback(() => {
     if (!audioRef.current) return;
     
@@ -170,7 +199,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // 🔥 Extracted extra focus logic to support manual user UI interaction
   const startExtraFocus = useCallback(() => {
     if (!isActiveRef.current) return;
 
@@ -179,7 +207,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     const session = currentSessionRef.current;
     if (!session) return;
 
-    // Mark session as played securely
     playedSessionRef.current.add(session.id);
     const MAX = 20;
     const updated = Array.from(playedSessionRef.current).slice(-MAX);
@@ -203,43 +230,32 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     setIsSessionComplete(true);
   }, []);
 
+  // 🔥 FIX: Automatically treats an open pause segment as continuously growing, preventing silent accumulation
   const getPausedTime = useCallback((session: ExtendedActiveSession, since: number = 0) => {
     return (session.pauseSegments || []).reduce((acc, seg) => {
       const segStart = Math.max(seg.start, since);
-      const segEnd = seg.end || Date.now();
+      const segEnd = seg.end || Date.now(); 
       if (segEnd <= segStart) return acc;
       return acc + (segEnd - segStart);
     }, 0);
   }, []);
 
+  // 🔥 FIX: Time calculation relies strictly on stamps, independent of the `isPaused` flag
   const getElapsedTime = useCallback(() => {
     const session = currentSessionRef.current;
     if (!session) return 0;
-
-    if (isPausedRef.current) {
-      const lastPause = session.pauseSegments?.slice(-1)[0];
-      if (lastPause && !lastPause.end) {
-        const pausedAt = lastPause.start;
-        const completedPauses = session.pauseSegments!.slice(0, -1).reduce((acc, seg) => {
-          const segStart = Math.max(seg.start, 0);
-          const segEnd = seg.end || pausedAt;
-          return acc + (segEnd - segStart);
-        }, 0);
-        const elapsedMs = pausedAt - session.startTime - completedPauses;
-        return Math.max(0, Math.floor(elapsedMs / 1000));
-      }
-    }
-
+    
     const elapsedMs = Date.now() - session.startTime - getPausedTime(session);
     return Math.max(0, Math.floor(elapsedMs / 1000));
   }, [getPausedTime]);
 
   const getRemainingTime = useCallback(() => {
     const session = currentSessionRef.current;
-    const initial = initialSessionTimeRef.current;
-    if (!session) return initial;
+    if (!session) return initialSessionTimeRef.current;
+    
     const elapsed = getElapsedTime();
-    return Math.max(0, initial - elapsed);
+    // 🔥 FIX: Ensure we calculate strictly against the session's actual original duration
+    return Math.max(0, (session.initialDuration || initialSessionTimeRef.current) - elapsed);
   }, [getElapsedTime]);
 
   const getExtraTime = useCallback(() => {
@@ -265,7 +281,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     setIsFocusMode(true);
     if (typeof document !== 'undefined' && !document.fullscreenElement) {
       document.documentElement.requestFullscreen?.().catch((err) => {
-        console.warn("Focus Mode fullscreen blocked (likely missing user gesture):", err);
+        console.warn("Focus Mode fullscreen blocked:", err);
       });
     }
   };
@@ -298,32 +314,27 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (activeData?.session) {
-        const s = activeData.session as ExtendedActiveSession;
+        const remoteSession = activeData.session as ExtendedActiveSession;
+        // Merge with local state so we don't accidentally unpause
+        const merged = mergeSessions(currentSessionRef.current, remoteSession);
 
-        setCurrentSession(prev => {
-          if (prev && prev.id === s.id) return prev;
-          return s;
-        });
-
+        setCurrentSession(merged);
         setIsActive(true);
-        setMode(s.mode);
+        setMode(merged.mode);
 
-        const segments = s.pauseSegments || [];
+        const segments = merged.pauseSegments || [];
         const lastSegment = segments[segments.length - 1];
         setIsPaused(!!(lastSegment && !lastSegment.end)); 
 
-        const duration = s.initialDuration || initialSessionTime;
+        const duration = merged.initialDuration || initialSessionTime;
         setInitialSessionTime(duration);
 
-        if (s.completedAt) {
-          triggerSessionComplete(s.id);
+        if (merged.completedAt) {
+          triggerSessionComplete(merged.id);
         }
         
       } else {
-        setCurrentSession(prev => {
-          if (prev) return prev;
-          return null;
-        });
+        setCurrentSession(null);
         setIsActive(false);
         setIsSessionComplete(false);
         setExtraTime(0);
@@ -371,7 +382,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error("❌ DB SAVE FAILED:", err);
       if (retries > 0) {
-        console.log(`Retrying save... (${retries} left)`);
         setTimeout(() => syncSessionToDB(session, isCompleted, retries - 1), 1000);
       }
     }
@@ -444,9 +454,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
           .update({ last_seen: new Date().toISOString() })
           .eq("user_id", currentUser.id)
           .throwOnError();
-      } catch (e) {
-        console.error("Active Session Last Seen Update Failed", e);
-      }
+      } catch (e) {}
     }, 30000); 
 
     return () => clearInterval(interval);
@@ -489,52 +497,25 @@ export function FocusProvider({ children }: { children: ReactNode }) {
             exitFocusMode();
             localStorage.removeItem("focus_active_session"); 
           } else if (payload.new?.session) {
-            const session = payload.new.session as ExtendedActiveSession;
+            const remoteSession = payload.new.session as ExtendedActiveSession;
+            const merged = mergeSessions(currentSessionRef.current, remoteSession);
             
-            setCurrentSession(prev => {
-              if (prev && prev.id === session.id) {
-                return {
-                  ...prev,
-                  extraStartTime: session.extraStartTime ?? prev?.extraStartTime,
-                  completedAt: session.completedAt ?? prev?.completedAt,
-                  pauseSegments: (() => {
-                    const local = prev?.pauseSegments || [];
-                    const remote = session.pauseSegments || [];
-                    const merged = [...local, ...remote];
-                    const unique = Array.from(new Map(merged.map(item => [item.start, item])).values());
-                    return unique.sort((a, b) => a.start - b.start);
-                  })(),
-                  distractions: (() => {
-                    const remote = Array.isArray(session.distractions) ? session.distractions : [];
-                    const local = Array.isArray(prev?.distractions) ? prev.distractions : [];
-                    return remote.length >= local.length ? remote : local;
-                  })()
-                };
-              }
-              return {
-                ...session,
-                extraStartTime: session.extraStartTime,
-                completedAt: session.completedAt,
-                pauseSegments: session.pauseSegments || [],
-                distractions: Array.isArray(session.distractions) ? session.distractions : []
-              };
-            });
-            
+            setCurrentSession(merged);
             setIsActive(true);
-            setMode(session.mode);
+            setMode(merged.mode);
             
-            const segments = session.pauseSegments || [];
+            const segments = merged.pauseSegments || [];
             const lastSegment = segments[segments.length - 1];
             setIsPaused(!!(lastSegment && !lastSegment.end));
 
-            const sessionDuration = session.initialDuration || initialSessionTimeRef.current;
+            const sessionDuration = merged.initialDuration || initialSessionTimeRef.current;
             setInitialSessionTime(sessionDuration);
 
-            if (session.completedAt) {
-              triggerSessionComplete(session.id);
+            if (merged.completedAt) {
+              triggerSessionComplete(merged.id);
             }
 
-            localStorage.setItem("focus_active_session", JSON.stringify(session));
+            localStorage.setItem("focus_active_session", JSON.stringify(merged));
           }
         }
       )
@@ -597,9 +578,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         if (parsed.id === latestRefSession.id) { 
           finalSession = parsed;
         }
-      } catch (e) {
-        console.error("Error parsing latest session fallback", e);
-      }
+      } catch (e) {}
     }
 
     const finalElapsed = Math.min(getElapsedTime(), finalSession.initialDuration || initialSessionTimeRef.current);
@@ -691,33 +670,19 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (isPausedRef.current) return;
-      if (!isActiveRef.current) return;
-      
       const session = currentSessionRef.current;
       
       if (!session) {
-          console.warn("SessionTimer: Active state true but currentSession is null. Fixing desync.");
-          setIsActive(false);
+          if (isActiveRef.current) {
+            setIsActive(false);
+          }
           return;
       }
 
-      if (session.startTime > Date.now()) {
-          console.warn("Invalid session time detected");
-          return;
-      }
+      if (session.startTime > Date.now()) return;
 
       const rem = getRemainingTime();
       const elapsed = getElapsedTime();
-
-      if (process.env.NODE_ENV === "development") {
-        console.table({
-          elapsed,
-          remaining: rem,
-          paused: Math.floor(getPausedTime(session) / 1000),
-          extra: getExtraTime(),
-        });
-      }
 
       setTimeRemaining(rem);
       setFocusedTime(elapsed);
@@ -727,9 +692,10 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         setExtraTime(getExtraTime());
       }
 
+      // 🔥 FIX: Completion checking strictly depends on true remaining time
       const isActuallyComplete =
         !isPausedRef.current && 
-        elapsed >= session.initialDuration &&
+        rem <= 0 &&
         !session.completedAt &&
         !playedSessionRef.current.has(session.id);
 
@@ -746,10 +712,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         
         localStorage.setItem("focus_active_session", JSON.stringify(updatedSession));
         
-        // 🔥 HARD COMPLETE
         setIsSessionComplete(true);
 
-        // 🔥 PLAY IMMEDIATELY
         if (audioRef.current) {
           audioRef.current.loop = true;
           audioRef.current.volume = 1.0;
@@ -771,7 +735,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
           );
         }
 
-        // 🔥 AUTO-STOP AFTER 10s (OR IF MANUALLY TRIGGERED)
         if (alarmTimeoutRef.current) {
           clearTimeout(alarmTimeoutRef.current);
         }
@@ -784,9 +747,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
               await (supabase as any).from("focus_active_sessions").update({
                 session: updatedSession
               }).eq("user_id", currentUser.id).throwOnError(); 
-            } catch (err) {
-              console.error("❌ Failed to update active session state in DB:", err);
-            }
+            } catch (err) {}
           }
         })();
       }
@@ -844,6 +805,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       const segments = updatedSession.pauseSegments || [];
       const last = segments[segments.length - 1];
 
+      // Resume logic
       if (last && !last.end) {
         last.end = Date.now();
         updatedSession.pauseSegments = segments;
@@ -853,8 +815,11 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       }
 
       setCurrentSession(updatedSession);
+      currentSessionRef.current = updatedSession;
       setIsActive(true);
+      isActiveRef.current = true;
       setIsPaused(false);
+      isPausedRef.current = false;
       setIsSessionComplete(false); 
       
       const sessionDuration = updatedSession.initialDuration || initialSessionTime;
@@ -870,7 +835,9 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }
 
     setIsActive(true);
+    isActiveRef.current = true;
     setIsPaused(false);
+    isPausedRef.current = false;
     setIsSessionComplete(false);
     setExtraTime(0);
     
@@ -888,14 +855,11 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       initialDuration: timeRemaining
     };
     
-    // 🔥 FINAL FIX: Guaranteed wipe of ghost ID on fresh start
     playedSessionRef.current.delete(newSession.id);
-    localStorage.setItem(
-      "played_sessions",
-      JSON.stringify(Array.from(playedSessionRef.current))
-    );
+    localStorage.setItem("played_sessions", JSON.stringify(Array.from(playedSessionRef.current)));
     
     setCurrentSession(newSession);
+    currentSessionRef.current = newSession;
     localStorage.setItem("focus_active_session", JSON.stringify(newSession));
     
     enterFocusMode();
@@ -910,9 +874,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         session: newSession,
         last_seen: new Date().toISOString()
       }).throwOnError(); 
-    } catch (err) {
-      console.error("❌ Failed to start active session in DB:", err);
-    }
+    } catch (err) {}
   };
 
   return (
@@ -937,10 +899,10 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         setActiveTask: setActiveTaskId,
         startSession, 
         
-        // UX additions exposed to your frontend
         stopAlarm,
         startExtraFocus,
 
+        // Synchronous pause handling forces instantaneous state ref push to stop interval leaks
         pauseSession: () => {
           if (!currentSession || isPausedRef.current) return; 
 
@@ -957,16 +919,17 @@ export function FocusProvider({ children }: { children: ReactNode }) {
           };
 
           setCurrentSession(updatedSession);
+          currentSessionRef.current = updatedSession;
           setIsPaused(true);
+          isPausedRef.current = true;
+          
           localStorage.setItem("focus_active_session", JSON.stringify(updatedSession));
           
           if (currentUser?.id) {
             (async () => {
               try {
                 await (supabase as any).from("focus_active_sessions").update({ session: updatedSession }).eq("user_id", currentUser.id).throwOnError();
-              } catch (e: unknown) {
-                console.error("Supabase pause error:", e);
-              }
+              } catch (e) {}
             })();
           }
 
@@ -1004,13 +967,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
             if (currentUser?.id) {
               (async () => {
                 try {
-                  await (supabase as any).from("focus_active_sessions")
-                    .update({ session: updated })
-                    .eq("user_id", currentUser.id)
-                    .throwOnError();
-                } catch (e: unknown) {
-                  console.error("Supabase add distraction error:", e);
-                }
+                  await (supabase as any).from("focus_active_sessions").update({ session: updated }).eq("user_id", currentUser.id).throwOnError();
+                } catch (e) {}
               })();
             }
 
@@ -1043,13 +1001,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
             if (currentUser?.id) {
               (async () => {
                 try {
-                  await (supabase as any).from("focus_active_sessions")
-                    .update({ session: updated })
-                    .eq("user_id", currentUser.id)
-                    .throwOnError();
-                } catch (e: unknown) {
-                  console.error("Supabase undo distraction error:", e);
-                }
+                  await (supabase as any).from("focus_active_sessions").update({ session: updated }).eq("user_id", currentUser.id).throwOnError();
+                } catch (e) {}
               })();
             }
 

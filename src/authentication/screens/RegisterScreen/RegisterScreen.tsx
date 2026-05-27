@@ -169,20 +169,20 @@ function LandingExperience() {
 {/* ========================================================= */}
 {/* 1. ULTRA PREMIUM TOP NAV */}
 {/* ========================================================= */}
-<nav className="fixed top-4 left-0 right-0 z-50 px-4 sm:px-6">
+<nav className="fixed top-2 sm:top-3 lg:top-4 left-0 right-0 z-50 px-2 sm:px-4 md:px-6 lg:px-8">
   <div
-    className={`max-w-[1320px] mx-auto transition-all duration-500 rounded-[28px] border backdrop-blur-2xl ${
+    className={`w-full max-w-[1800px] mx-auto transition-all duration-500 rounded-[22px] sm:rounded-[28px] border backdrop-blur-2xl ${
       isDarkMode
         ? "bg-black/35 border-white/[0.08] shadow-[0_10px_60px_rgba(0,0,0,0.45)]"
         : "bg-white/70 border-zinc-200/70 shadow-[0_10px_40px_rgba(0,0,0,0.06)]"
     }`}
   >
-    <div className="h-[74px] px-5 sm:px-7 flex items-center justify-between">
+    <div className="relative h-[64px] sm:h-[70px] lg:h-[74px] 2xl:h-[82px] px-3 sm:px-5 md:px-6 lg:px-7 xl:px-8 flex items-center justify-between">
 
       {/* Left: Logo */}
-      <div className="flex items-center gap-3 cursor-pointer select-none">
+      <div className="flex items-center gap-2 sm:gap-3 cursor-pointer select-none min-w-0">
         <div
-          className={`relative w-11 h-11 rounded-2xl flex items-center justify-center border overflow-hidden ${
+          className={`relative w-10 h-10 sm:w-11 sm:h-11 lg:w-12 lg:h-12 rounded-[18px] sm:rounded-2xl flex items-center justify-center border overflow-hidden flex-shrink-0 ${
             isDarkMode
               ? "bg-white/[0.03] border-white/[0.08]"
               : "bg-white border-zinc-200"
@@ -194,13 +194,13 @@ function LandingExperience() {
           <img
             src="/favicon.ico"
             alt="NexTask"
-            className="relative z-10 w-5 h-5 object-contain"
+            className="relative z-10 w-4 h-4 sm:w-5 sm:h-5 object-contain"
           />
         </div>
 
-        <div className="flex flex-col leading-none">
+        <div className="flex flex-col leading-none min-w-0">
           <span
-            className={`font-semibold tracking-tight text-[15px] ${
+            className={`font-semibold tracking-tight text-[14px] sm:text-[15px] lg:text-[16px] truncate ${
               isDarkMode ? "text-white" : "text-zinc-900"
             }`}
           >
@@ -208,7 +208,7 @@ function LandingExperience() {
           </span>
 
           <span
-            className={`text-[11px] font-medium ${
+            className={`text-[10px] sm:text-[11px] font-medium truncate ${
               isDarkMode ? "text-zinc-500" : "text-zinc-400"
             }`}
           >
@@ -219,26 +219,29 @@ function LandingExperience() {
 
       {/* Center: subtle trust indicator */}
       <div
-        className={`hidden lg:flex items-center gap-3 text-[12px] font-medium ${
+        className={`hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-2 lg:gap-3 text-[11px] lg:text-[12px] font-medium whitespace-nowrap ${
           isDarkMode ? "text-zinc-500" : "text-zinc-500"
         }`}
       >
         <span>Tasks</span>
         <span className="w-1 h-1 rounded-full bg-orange-500/50" />
+
         <span>Focus</span>
         <span className="w-1 h-1 rounded-full bg-orange-500/50" />
+
         <span>Planner</span>
         <span className="w-1 h-1 rounded-full bg-orange-500/50" />
+
         <span>Reflection</span>
       </div>
 
       {/* Right Actions */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
 
         {/* Theme Toggle */}
         <button
           onClick={toggleTheme}
-          className={`group h-11 w-11 rounded-2xl flex items-center justify-center border transition-all duration-300 active:scale-95 ${
+          className={`group h-10 w-10 sm:h-11 sm:w-11 lg:h-12 lg:w-12 rounded-[18px] sm:rounded-2xl flex items-center justify-center border transition-all duration-300 active:scale-95 ${
             isDarkMode
               ? "bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.06] text-zinc-400 hover:text-white"
               : "bg-white border-zinc-200 hover:bg-zinc-50 text-zinc-500 hover:text-zinc-900"
@@ -246,32 +249,44 @@ function LandingExperience() {
           aria-label="Toggle theme"
         >
           <div className="transition-transform duration-500 group-hover:rotate-12">
-            {isDarkMode ? <Sun size={15} /> : <Moon size={15} />}
+            {isDarkMode ? (
+              <Sun size={15} />
+            ) : (
+              <Moon size={15} />
+            )}
           </div>
         </button>
 
         {/* Sign In */}
-<button
-  onClick={() => router.push("/login")}
-  className={`flex h-11 px-4 sm:px-5 rounded-2xl items-center justify-center text-[13px] font-semibold transition-all duration-300 active:scale-95 ${
-    isDarkMode
-      ? "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-      : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
-  }`}
->
-  <span className="sm:hidden">Login</span>
-  <span className="hidden sm:block">Sign in</span>
-</button>
+        <button
+          onClick={() => router.push("/login")}
+          className={`flex h-10 sm:h-11 lg:h-12 px-3 sm:px-4 lg:px-5 rounded-[18px] sm:rounded-2xl items-center justify-center text-[12px] sm:text-[13px] font-semibold transition-all duration-300 active:scale-95 whitespace-nowrap ${
+            isDarkMode
+              ? "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
+              : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
+          }`}
+        >
+          <span className="sm:hidden">Login</span>
+          <span className="hidden sm:block">
+            Sign in
+          </span>
+        </button>
 
         {/* Primary CTA */}
         <button
           onClick={scrollToHeroAuth}
-          className="group relative overflow-hidden h-11 px-5 sm:px-6 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold transition-all duration-300 active:scale-95 shadow-[0_8px_30px_rgba(249,115,22,0.28)]"
+          className="group relative overflow-hidden h-10 sm:h-11 lg:h-12 px-4 sm:px-5 lg:px-6 rounded-[18px] sm:rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-[12px] sm:text-[13px] lg:text-[14px] font-semibold transition-all duration-300 active:scale-95 shadow-[0_8px_30px_rgba(249,115,22,0.28)] whitespace-nowrap"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50" />
 
-          <div className="relative flex items-center gap-2">
-            <span>Start Free</span>
+          <div className="relative flex items-center gap-1.5 sm:gap-2">
+            <span className="hidden min-[420px]:block">
+              Start Free
+            </span>
+
+            <span className="block min-[420px]:hidden">
+              Start
+            </span>
 
             <ArrowRight
               size={14}
@@ -284,7 +299,7 @@ function LandingExperience() {
   </div>
 </nav>
 
-<main className="relative z-10 pt-36">
+<main className="relative z-10 pt-[100px] sm:pt-[120px] lg:pt-[140px]">
 
 {/* ========================================================= */}
 {/* 2. HERO SECTION */}
