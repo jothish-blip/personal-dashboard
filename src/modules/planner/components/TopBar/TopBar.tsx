@@ -90,12 +90,7 @@ export default function TopBar({
 
   return (
     <>
-      <nav
-        style={{
-          marginTop: "calc(var(--navbar-h, 80px) + 1rem)",
-        }}
-        className="relative z-20 px-4 md:px-6 font-sans"
-      >
+      <nav className="relative z-20 px-4 md:px-6 pt-3 md:pt-4 font-sans">
         <div className="max-w-[1450px] mx-auto">
           <div
             className={`
