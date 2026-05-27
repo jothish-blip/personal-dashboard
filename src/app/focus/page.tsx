@@ -118,7 +118,7 @@ function FocusPageContent() {
         {/* STANDARD DASHBOARD */}
         {!isFocusMode && (
 
-          <div className="max-w-[1400px] mx-auto px-3 sm:px-4 md:px-6 pt-36 sm:pt-32 md:pt-28 pb-6 space-y-5 md:space-y-6 animate-in fade-in duration-500">
+          <div className="max-w-[1400px] mx-auto px-3 sm:px-4 md:px-6 pt-4 sm:pt-5 md:pt-6 pb-6 space-y-5 md:space-y-6 animate-in fade-in duration-500">
 
             <div className="mb-2">
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900">
