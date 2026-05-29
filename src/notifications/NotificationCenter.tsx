@@ -76,12 +76,39 @@ export default function NotificationCenter({
   };
 
   return (
-    <div className={`absolute top-full right-0 mt-2 w-[360px] md:w-[420px] rounded-xl border z-[100] overflow-hidden flex flex-col max-h-[560px] shadow-2xl transition-colors duration-300 ${
-      isDarkMode ? "bg-black border-white/[0.08] shadow-black/60" : "bg-white border-gray-100 shadow-slate-200/50"
-    }`}>
+    <div
+      className={`
+        fixed
+        md:top-[84px]
+        md:right-[110px]
 
+        top-[72px]
+        left-3
+        right-3
+        bottom-[88px]
+
+        md:left-auto
+        md:bottom-auto
+        md:w-[420px]
+
+        z-[99999]
+        overflow-hidden
+        flex flex-col
+        rounded-[28px]
+        border
+        shadow-[0_24px_80px_rgba(0,0,0,0.28)]
+        backdrop-blur-[18px]
+        transition-all duration-300
+        animate-in fade-in zoom-in-95
+        ${
+          isDarkMode
+            ? "bg-neutral-950/96 border-white/[0.06]"
+            : "bg-white/96 border-zinc-200"
+        }
+      `}
+    >
       {/* Header */}
-      <div className={`px-4 py-4 border-b space-y-4 transition-colors ${isDarkMode ? "border-white/[0.08]" : "border-gray-100"}`}>
+      <div className={`px-4 py-4 border-b space-y-4 transition-colors shrink-0 ${isDarkMode ? "border-white/[0.08]" : "border-gray-100"}`}>
 
         <div className="flex items-center justify-between">
           <h3 className={`text-sm font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
@@ -142,7 +169,7 @@ export default function NotificationCenter({
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-2 py-2 space-y-1 scrollbar-hide">
 
         {filteredNotifications.length === 0 ? (
-          <div className={`py-16 flex flex-col items-center text-center ${isDarkMode ? "text-zinc-600" : "text-gray-400"}`}>
+          <div className={`py-16 flex flex-col items-center justify-center text-center h-full ${isDarkMode ? "text-zinc-600" : "text-gray-400"}`}>
             <LayoutGrid size={20} className="mb-2" />
             <p className="text-sm">No notifications</p>
           </div>
@@ -152,7 +179,7 @@ export default function NotificationCenter({
               key={n.id}
               onClick={() => handleNotificationClick(n)}
               className={`flex gap-3 px-3 py-3 rounded-md cursor-pointer transition-all ${
-                isDarkMode ? "hover:bg-white/[0.03]" : "hover:bg-gray-50"
+                isDarkMode ? "hover:bg-white/[0.04]" : "hover:bg-gray-50"
               }`}
             >
               <div className="mt-0.5 shrink-0">
@@ -189,7 +216,9 @@ export default function NotificationCenter({
       </div>
 
       {/* Footer */}
-      <div className={`px-4 py-3 border-t flex items-center justify-between transition-colors ${isDarkMode ? "border-white/[0.08] bg-black" : "border-gray-100 bg-gray-50/50"}`}>
+      <div className={`px-4 py-3 border-t shrink-0 flex items-center justify-between transition-colors ${
+        isDarkMode ? "border-white/[0.08] bg-black/40" : "border-gray-100 bg-gray-50/50"
+      }`}>
 
         <span className={`text-xs ${isDarkMode ? "text-zinc-500" : "text-gray-400"}`}>
           {unreadCount} unread

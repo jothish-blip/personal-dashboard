@@ -30,6 +30,21 @@ const getNowLocal = () => {
   };
 };
 
+const formatTime12Hour = (time?: string) => {
+  if (!time) return "";
+
+  const [hours, minutes] = time.split(":").map(Number);
+
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+
+  return date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
 export default function AddEventModal({
   isOpen,
   onClose,
@@ -40,17 +55,20 @@ export default function AddEventModal({
   const { isDarkMode } = useTheme();
   const titleInputRef = useRef<HTMLInputElement>(null);
   
-  // Auto-focus & ALWAYS default to Present Time when opened
+  // Auto-focus & preserve existing date/time for edits and reschedules
   useEffect(() => {
     if (isOpen) {
-      const now = getNowLocal();
-  
-      setFormData({
-        ...formData,
-        date: now.date,
-        time: now.time,
-      });
-  
+      if (!formData.id) {
+        const now = getNowLocal();
+
+        // Using formData spread directly to respect the defined prop type
+        setFormData({
+          ...formData,
+          date: formData.date || now.date,
+          time: formData.time || now.time,
+        });
+      }
+
       setTimeout(() => {
         titleInputRef.current?.focus();
       }, 50);
@@ -311,8 +329,9 @@ export default function AddEventModal({
                     weekday: "short",
                     month: "short",
                     day: "numeric",
-                    hour: "2-digit",
+                    hour: "numeric",
                     minute: "2-digit",
+                    hour12: true,
                   })}
                 </p>
               </div>

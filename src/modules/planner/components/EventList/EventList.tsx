@@ -24,13 +24,27 @@ interface EventListProps {
   getDateLabel: (dateStr: string) => string;
 }
 
+const formatTime12Hour = (time?: string) => {
+  if (!time) return "No time";
+
+  const [hours, minutes] = time.split(":");
+  const date = new Date();
+  date.setHours(Number(hours), Number(minutes));
+
+  return date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
 const getActionLabel = (action: string) => {
   switch (action) {
     case "CREATE": return "Created task";
     case "UPDATE": return "Updated task";
     case "DELETE": return "Deleted task";
     case "STATUS_TOGGLE": return "Completed task";
-    case "RESCHEDULE": return "Recovered task";
+    case "RESCHEDULE": return "Rescheduled task";
     default: return action;
   }
 };
@@ -163,7 +177,7 @@ export default function EventList({
             </div>
             {visibleEvents[0] && (
               <p className={`text-sm font-medium ${isDarkMode ? "text-white/50" : "text-slate-500"}`}>
-                Next up: <span className={isDarkMode ? "text-white" : "text-slate-900"}>{visibleEvents[0].title} – {visibleEvents[0].time}</span>
+                Next up: <span className={isDarkMode ? "text-white" : "text-slate-900"}>{visibleEvents[0].title} – {formatTime12Hour(visibleEvents[0].time)}</span>
               </p>
             )}
           </header>
@@ -287,7 +301,7 @@ export default function EventList({
                     <span className={`text-sm font-medium leading-snug ${isDarkMode ? "text-white/80" : "text-slate-700"}`}>{log.details}</span>
                   </div>
                   <span className={`text-[10px] font-semibold uppercase tracking-wider shrink-0 lg:text-right ${isDarkMode ? "text-white/40" : "text-slate-400"}`}>
-                    {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(log.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
                   </span>
                 </div>
               ))
@@ -337,7 +351,7 @@ export default function EventList({
                           transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] z-20 relative backdrop-blur-[20px] border
                           hover:-translate-y-0.5 hover:shadow-md
                           ${isCompleted 
-                            ? (isDarkMode ? 'scale-[0.98] opacity-50 bg-white/[0.01] border-transparent hover:shadow-none hover:translate-y-0' : 'scale-[0.98] opacity-60 bg-black/[0.01] border-transparent hover:shadow-none hover:translate-y-0')
+                            ? (isDarkMode ? 'opacity-70 grayscale-[15%] bg-white/[0.01] border-transparent hover:shadow-none hover:translate-y-0' : 'opacity-70 grayscale-[15%] bg-black/[0.01] border-transparent hover:shadow-none hover:translate-y-0')
                             : (isDarkMode ? 'bg-white/[0.03] hover:bg-white/[0.045] border-white/[0.04]' : 'bg-white/[0.7] hover:bg-white border-black/[0.04] shadow-sm')
                           }
                           `}
@@ -352,7 +366,7 @@ export default function EventList({
                             <button 
                               onClick={(e) => { 
                                 e.stopPropagation(); 
-                                if (isCompleted) return; // Prevent unlocking completed tasks
+                                if (isCompleted) return; 
                                 toggleStatus(ev.id); 
                               }}
                               className={`shrink-0 mt-0.5 md:mt-0 relative z-10 transition-transform duration-300 ${!isCompleted && 'active:scale-75 hover:scale-110'}`}
@@ -387,15 +401,12 @@ export default function EventList({
                               
                               <div className="flex flex-col mt-2 gap-1.5">
                                 <div className={`flex flex-wrap items-center gap-3 text-[10px] font-medium uppercase tracking-[0.15em] ${isDarkMode ? "text-white/50" : "text-slate-400"}`}>
-                                  <span className={`px-2 py-1 rounded-md border flex items-center gap-1.5 ${
-                                    isDarkMode ? "bg-white/[0.04] text-white/70 border-transparent" : "bg-black/[0.03] text-slate-600 border-transparent"
+                                  <span className={`px-3 py-1.5 rounded-xl text-xs font-semibold tracking-wide ${
+                                    isDarkMode
+                                      ? "bg-orange-500/10 text-orange-300"
+                                      : "bg-orange-50 text-orange-700"
                                   }`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${
-                                      ev.priority === "high" ? "bg-red-500" :
-                                      ev.priority === "medium" ? "bg-orange-400" :
-                                      "bg-white/40"
-                                    }`} />
-                                    {ev.time}
+                                    🕒 {formatTime12Hour(ev.time)}
                                   </span>
                                   
                                   <span>{ev.type}</span>
@@ -414,7 +425,7 @@ export default function EventList({
                             </div>
                           </div>
 
-                          <div className={`flex items-center justify-end gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300 pt-4 lg:pt-0 border-t lg:border-none mt-2 lg:mt-0 w-full lg:w-auto ${
+                          <div className={`flex items-center justify-end gap-2 opacity-70 lg:opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 pt-4 lg:pt-0 border-t lg:border-none mt-2 lg:mt-0 w-full lg:w-auto ${
                             isDarkMode ? "border-white/[0.04]" : "border-black/[0.04]"
                           }`}>
                             {!isCompleted && (

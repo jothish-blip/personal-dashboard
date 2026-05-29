@@ -239,7 +239,20 @@ export function usePlannerSystem() {
           if (payload.eventType === "INSERT") {
             setEvents(prev => [mapRow(payload.new), ...prev]);
           } else if (payload.eventType === "UPDATE") {
-            setEvents(prev => prev.map(e => e.id === payload.new.id ? mapRow(payload.new) : e));
+            setEvents(prev => prev.map(e => {
+              if (e.id !== payload.new.id) return e;
+              const updated = mapRow(payload.new);
+              
+              // Prevent unnecessary local re-renders from our own DB writes
+              if (
+                e.date === updated.date &&
+                e.time === updated.time &&
+                e.status === updated.status
+              ) {
+                return e;
+              }
+              return updated;
+            }));
           } else if (payload.eventType === "DELETE") {
             setEvents(prev => prev.filter(e => e.id !== payload.old.id));
           }
@@ -425,7 +438,7 @@ export function usePlannerSystem() {
     newDate.setHours(newDate.getHours() + 1, 0, 0, 0);
 
     for (let i = 0; i < 48; i++) {
-      const dateStr = newDate.toISOString().split("T")[0];
+      const dateStr = toLocalDateString(newDate);
       const timeStr = `${String(newDate.getHours()).padStart(2, "0")}:00`;
       const isTaken = currentEvents.some(e => e.date === dateStr && e.time === timeStr && e.status === "pending");
 
@@ -437,10 +450,10 @@ export function usePlannerSystem() {
 
   const rescheduleTask = (id: string) => {
     setEvents(prev => {
-      let updatedEvents = [...prev];
-      const taskIndex = updatedEvents.findIndex(e => e.id === id);
+      const taskIndex = prev.findIndex(e => e.id === id);
       if (taskIndex === -1) return prev;
       
+      let updatedEvents = [...prev];
       const slot = findNextAvailableSlot(updatedEvents);
       if (slot) {
         updatedEvents[taskIndex] = { ...updatedEvents[taskIndex], date: slot.date, time: slot.time, status: "pending" };
@@ -464,7 +477,8 @@ export function usePlannerSystem() {
       let count = 0;
       const recovered: PlannerEvent[] = [];
 
-      updatedEvents = updatedEvents.map(e => {
+      for (let i = 0; i < updatedEvents.length; i++) {
+        const e = updatedEvents[i];
         if (e.status === "missed") {
           const slot = findNextAvailableSlot(updatedEvents);
           if (slot) {
@@ -475,12 +489,11 @@ export function usePlannerSystem() {
             localStorage.removeItem(`planner_now_${e.id}`);
             
             const updated = { ...e, date: slot.date, time: slot.time, status: "pending" as const };
+            updatedEvents[i] = updated; // Update in place so findNextAvailableSlot sees it for the next task
             recovered.push(updated);
-            return updated;
           }
         }
-        return e;
-      });
+      }
       
       if (count > 0) {
         syncEventsToDB(recovered); 
