@@ -177,9 +177,9 @@ export default function DistractionTracker() {
   }, [isActive]);
 
   return (
-    <div className={`bg-white dark:bg-[#070707] border p-4 md:p-5 rounded-2xl shadow-sm flex flex-col gap-4 transition-all duration-500 relative overflow-hidden ${
+    <div className={`bg-white dark:bg-zinc-900 border p-4 md:p-5 rounded-2xl shadow-sm flex flex-col gap-4 transition-all duration-500 relative overflow-hidden ${
       recoveryMode 
-        ? "border-orange-400 bg-orange-50/30 ring-4 ring-orange-100 dark:border-orange-500/50 dark:bg-orange-500/10 dark:ring-orange-500/20" 
+        ? "border-orange-400 bg-orange-50/30 ring-2 ring-orange-100 dark:border-orange-500/50 dark:bg-orange-500/10 dark:ring-orange-500/20" 
         : "border-gray-200 dark:border-white/[0.06]"
     }`}>
       
@@ -194,12 +194,13 @@ export default function DistractionTracker() {
         
         {/* LEFT INFO */}
         <div className="flex-1" title={insights.topReason ? `You mostly get distracted by ${insights.topReason}` : undefined}>
+          
           <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90 flex items-center gap-2">
-            Behavior Tracker
+            Focus Insights
             {warning.badge && (
               <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-bold ${
                 count >= 5 
-                  ? "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400 animate-pulse" 
+                  ? "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400" 
                   : "bg-gray-100 text-gray-600 dark:bg-white/[0.04] dark:text-white/60"
               }`}>
                 {warning.badge}
@@ -217,7 +218,7 @@ export default function DistractionTracker() {
             
             {/* Streak Indicator */}
             {distractionStreak >= 2 && (
-              <div className="text-orange-500 dark:text-orange-400 font-bold animate-pulse flex items-center gap-1">
+              <div className="text-orange-500 dark:text-orange-400 font-bold flex items-center gap-1">
                 🔥 {distractionStreak} slip-ups in a row
               </div>
             )}
@@ -246,7 +247,6 @@ export default function DistractionTracker() {
                   ${isActive 
                     ? "bg-orange-50 text-orange-600 hover:bg-orange-100 hover:shadow-md border border-orange-100 dark:bg-orange-500/10 dark:text-orange-500 dark:border-orange-500/20 dark:hover:bg-orange-500/20" 
                     : "bg-gray-50 text-gray-400 cursor-not-allowed border border-gray-100 dark:bg-white/[0.02] dark:text-white/30 dark:border-white/[0.04]"}
-                  ${count >= 3 && isActive ? "animate-pulse ring-2 ring-orange-200 dark:ring-orange-500/30" : ""}
                 `}
               >
                 What pulled your attention?
@@ -254,13 +254,13 @@ export default function DistractionTracker() {
             )}
 
             {isLogging && (
-              <div className="hidden md:flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-200 bg-gray-50 dark:bg-[#050505] p-1.5 rounded-xl border border-gray-100 dark:border-white/[0.06] shadow-inner dark:shadow-none">
+              <div className="hidden md:flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-200 bg-gray-50 dark:bg-zinc-800 p-1.5 rounded-xl border border-gray-100 dark:border-white/[0.06] shadow-inner dark:shadow-none">
                 <span className="text-xs font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider ml-2 mr-1">Why?</span>
                 {REASONS.map((r) => (
                   <button
                     key={r.id}
                     onClick={() => handleLogDistraction(r.label)}
-                    className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:bg-[#0A0A0A] dark:border-white/[0.06] dark:text-white/80 dark:hover:border-white/[0.1] dark:hover:bg-white/[0.04] rounded-lg transition-all active:scale-95 shadow-sm"
+                    className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:bg-zinc-900 dark:border-white/[0.06] dark:text-white/80 dark:hover:border-white/[0.1] dark:hover:bg-white/[0.04] rounded-lg transition-all active:scale-95 shadow-sm"
                   >
                     {r.label}
                   </button>
@@ -277,7 +277,7 @@ export default function DistractionTracker() {
             {recoveryMode && (
               <div className="px-5 py-3 md:py-2 text-sm font-bold text-orange-700 bg-orange-100 dark:bg-orange-500/10 dark:text-orange-400 rounded-xl animate-in zoom-in duration-300 flex items-center gap-2 shadow-sm border border-orange-200 dark:border-orange-500/20">
                 <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping"></span>
-                Back to focus
+                Refocused
               </div>
             )}
           </div>
@@ -292,9 +292,9 @@ export default function DistractionTracker() {
 
       {/* MOBILE LOGGING SHEET */}
       {isLogging && (
-        <div className="fixed inset-0 z-[9999] bg-black/50 dark:bg-black/80 backdrop-blur-sm flex flex-col justify-end md:hidden animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#090909] rounded-t-3xl p-5 pb-8 max-h-[60vh] overflow-y-auto animate-in slide-in-from-bottom-full duration-300 shadow-2xl border-t border-gray-100 dark:border-white/[0.08]">
-            <div className="flex justify-between items-center mb-5 sticky top-0 bg-white dark:bg-[#090909] z-10 pt-2 pb-2">
+        <div className="fixed inset-0 z-[9999] bg-black/40 dark:bg-black/60 backdrop-blur-sm flex flex-col justify-end md:hidden animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 rounded-t-3xl p-5 pb-8 max-h-[75vh] overflow-y-auto animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.4)] border-t border-gray-100 dark:border-white/[0.08]">
+            <div className="flex justify-between items-center mb-5 sticky top-0 bg-white dark:bg-zinc-900 z-10 pt-2 pb-2">
               <div className="text-lg font-bold text-gray-900 dark:text-white/90">Why did you lose focus?</div>
               <button 
                 onClick={() => setIsLogging(false)} 
@@ -304,12 +304,12 @@ export default function DistractionTracker() {
               </button>
             </div>
             
-            <div className="grid grid-cols-2 gap-3 pb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-4">
               {REASONS.map((r) => (
                 <button
                   key={r.id}
                   onClick={() => handleLogDistraction(r.label)}
-                  className="py-4 px-2 text-sm font-semibold rounded-xl bg-gray-50 border border-gray-200 text-gray-800 hover:border-gray-300 active:bg-gray-100 dark:bg-[#0A0A0A] dark:border-white/[0.06] dark:text-white/80 dark:hover:border-white/[0.1] dark:active:bg-white/[0.04] active:scale-95 transition-all shadow-sm"
+                  className="py-4 px-3 text-sm font-semibold rounded-xl bg-gray-50 border border-gray-200 text-gray-800 hover:border-gray-300 active:bg-gray-100 dark:bg-zinc-800 dark:border-white/[0.06] dark:text-white/80 dark:hover:border-white/[0.1] dark:active:bg-white/[0.04] active:scale-95 transition-all shadow-sm"
                 >
                   {r.label}
                 </button>
@@ -340,7 +340,7 @@ export default function DistractionTracker() {
         </div>
 
         {count > 0 && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-gray-500 dark:text-white/50 bg-gray-50/80 dark:bg-[#050505] p-2.5 rounded-lg border border-gray-100 dark:border-white/[0.06] mt-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-gray-500 dark:text-white/50 bg-gray-50/80 dark:bg-zinc-800 p-2.5 rounded-lg border border-gray-100 dark:border-white/[0.06] mt-2">
             <div className="flex items-center gap-1.5">
               <span className="uppercase tracking-wider font-bold text-gray-400 dark:text-white/40">Top distraction:</span> 
               <span className="text-gray-700 dark:text-white/80 font-bold bg-white dark:bg-white/[0.04] px-1.5 py-0.5 rounded border border-gray-100 dark:border-white/[0.04] shadow-sm">{insights.topReason}</span>

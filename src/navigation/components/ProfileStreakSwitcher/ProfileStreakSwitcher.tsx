@@ -29,7 +29,7 @@ export default function ProfileStreakSwitcher({ userProfile, currentStreak, isDa
       }, isStreakCurrentlyShowing ? 3500 : 9000); // 3.5s for Streak, 9s for Profile
     };
 
-    // Initial delay before the very first switch to Streak
+    // Initial delay before the very first switch to Streak I have set to 6 seconds to give users a chance to see their profile avatar before switching to the streak view
     timeout = setTimeout(() => {
       setShowStreak(true);
       switchView(true);
