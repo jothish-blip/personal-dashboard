@@ -96,7 +96,6 @@ const mapDBSessionToFocusSession = (row: DBFocusSession): FocusSession => {
   };
 };
 
-// 🔥 FIX: Smart state merger. Prevents stale Supabase data from silently unpausing your timer.
 const mergeSessions = (local: ExtendedActiveSession | null, remote: ExtendedActiveSession): ExtendedActiveSession => {
   if (!local || local.id !== remote.id) return remote;
   
@@ -106,7 +105,6 @@ const mergeSessions = (local: ExtendedActiveSession | null, remote: ExtendedActi
   
   [...remoteSegments, ...localSegments].forEach(seg => {
     const existing = pauseMap.get(seg.start);
-    // Keep closed pauses if they exist, otherwise accept open pauses
     if (!existing || (!existing.end && seg.end)) {
       pauseMap.set(seg.start, seg);
     }
@@ -188,11 +186,10 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   };
 
   const stopAlarm = useCallback(() => {
-    if (!audioRef.current) return;
-    
-    audioRef.current.pause();
-    audioRef.current.currentTime = 0;
-    
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
     if (alarmTimeoutRef.current) {
       clearTimeout(alarmTimeoutRef.current);
       alarmTimeoutRef.current = null;
@@ -230,7 +227,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     setIsSessionComplete(true);
   }, []);
 
-  // 🔥 FIX: Automatically treats an open pause segment as continuously growing, preventing silent accumulation
   const getPausedTime = useCallback((session: ExtendedActiveSession, since: number = 0) => {
     return (session.pauseSegments || []).reduce((acc, seg) => {
       const segStart = Math.max(seg.start, since);
@@ -240,7 +236,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }, 0);
   }, []);
 
-  // 🔥 FIX: Time calculation relies strictly on stamps, independent of the `isPaused` flag
   const getElapsedTime = useCallback(() => {
     const session = currentSessionRef.current;
     if (!session) return 0;
@@ -254,7 +249,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     if (!session) return initialSessionTimeRef.current;
     
     const elapsed = getElapsedTime();
-    // 🔥 FIX: Ensure we calculate strictly against the session's actual original duration
     return Math.max(0, (session.initialDuration || initialSessionTimeRef.current) - elapsed);
   }, [getElapsedTime]);
 
@@ -315,7 +309,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
       if (activeData?.session) {
         const remoteSession = activeData.session as ExtendedActiveSession;
-        // Merge with local state so we don't accidentally unpause
         const merged = mergeSessions(currentSessionRef.current, remoteSession);
 
         setCurrentSession(merged);
@@ -418,13 +411,14 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window !== "undefined") {
       audioRef.current = new Audio("/sounds/alarm.mp3");
-      audioRef.current.loop = true;
       audioRef.current.volume = 1.0;
       if ("Notification" in window && Notification.permission === "default") {
         Notification.requestPermission();
       }
     }
-  }, []);
+    // Cleanup audio explicitly
+    return () => stopAlarm();
+  }, [stopAlarm]);
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -557,7 +551,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", handleStorageSync);
   }, [stopAlarm]); 
 
-  const stopSession = async (isNatural = false) => {
+  // 🔥 FIX: Extracted exact `saveExtraTime` intent from UI
+  const stopSession = async (saveExtraTime = false) => {
     setIsSessionComplete(false);
     stopAlarm(); 
 
@@ -582,7 +577,9 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }
 
     const finalElapsed = Math.min(getElapsedTime(), finalSession.initialDuration || initialSessionTimeRef.current);
-    const finalExtraTime = finalSession.extraStartTime ? getExtraTime() : 0;
+    
+    // 🔥 FIX: Accurately dismiss extra time calculation if user clicks 'Discard'
+    const finalExtraTime = (saveExtraTime && finalSession.extraStartTime) ? getExtraTime() : 0;
     
     const endTime = Date.now();
     const totalDuration = (endTime - finalSession.startTime) / 1000;
@@ -599,7 +596,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
     localStorage.removeItem("focus_active_session");
 
-    if (isNatural) {
+    if (saveExtraTime) {
       localStorage.removeItem("focus_complete_signal");
       localStorage.setItem("focus_complete_signal", JSON.stringify({ time: Date.now() }));
       localStorage.removeItem("focus_checkpoint"); 
@@ -692,7 +689,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         setExtraTime(getExtraTime());
       }
 
-      // 🔥 FIX: Completion checking strictly depends on true remaining time
       const isActuallyComplete =
         !isPausedRef.current && 
         rem <= 0 &&
@@ -714,6 +710,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         
         setIsSessionComplete(true);
 
+        // 🔥 FIX: Ensures audio plays only when it reaches exactly zero the first time
         if (audioRef.current) {
           audioRef.current.loop = true;
           audioRef.current.volume = 1.0;

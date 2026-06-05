@@ -72,8 +72,6 @@ export default function TaskSelector() {
       }
     );
     
-    
-  
     return Array.from(map.entries())
       .sort((a, b) => {
         // Recent first
@@ -86,7 +84,6 @@ export default function TaskSelector() {
           );
         }
         
-  
         // Then by session count
         return (
           b[1].count -
@@ -145,34 +142,34 @@ export default function TaskSelector() {
   };
 
   return (
-    <div className={`p-6 rounded-2xl border space-y-7 transition-all ${
+    <div className={`p-6 rounded-2xl border space-y-7 transition-colors duration-300 ${
       isDarkMode 
-        ? "bg-black border-gray-800 shadow-none" 
-        : "bg-gradient-to-br from-white via-gray-50 to-blue-50 border-gray-200 shadow-[0_6px_30px_rgba(0,0,0,0.05)]"
+        ? "bg-[#050505] border-gray-800 shadow-none" 
+        : "bg-white border-gray-200 shadow-[0_6px_30px_rgba(0,0,0,0.05)]"
     }`}>
       
       {/* HEADER & STATUS */}
       <div className="flex justify-between items-center">
-        <h2 className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
-          <Target size={16} className={isDarkMode ? "text-gray-400" : "text-gray-500"} /> Current Intent
+        <h2 className={`text-sm font-semibold flex items-center gap-2 transition-colors ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+          <Target size={16} className={isDarkMode ? "text-gray-500" : "text-gray-500"} /> Current Intent
         </h2>
-        <span className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md transition-all shadow-sm ${
+        <span className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md transition-colors duration-300 shadow-sm border ${
           isActive 
-            ? isDarkMode ? "bg-orange-500/8 text-orange-400 border border-orange-500/15" : "bg-orange-50 text-orange-700 border border-orange-200"
+            ? isDarkMode ? "bg-orange-950/40 text-orange-400 border-orange-900/50" : "bg-orange-50 text-orange-700 border-orange-200"
             : activeTaskId 
-              ? isDarkMode ? "bg-green-500/8 text-green-400 border border-green-500/15" : "bg-green-50 text-green-700 border border-green-200"
-              : isDarkMode ? "bg-white/[0.04] text-gray-400 border border-white/[0.08]" : "bg-gray-50 text-gray-500 border border-gray-200"
+              ? isDarkMode ? "bg-emerald-950/40 text-emerald-400 border-emerald-900/50" : "bg-emerald-50 text-emerald-700 border-emerald-200"
+              : isDarkMode ? "bg-[#111111] text-gray-400 border-gray-800" : "bg-gray-50 text-gray-500 border-gray-200"
         }`}>
           {isActive ? "Locked" : activeTaskId ? "Ready" : "Pending"}
         </span>
       </div>
 
       {/* 🥇 HERO BLOCK: ACTIVE INTENT DISPLAY */}
-      <div className={`p-5 rounded-2xl border transition-all relative overflow-hidden ${
+      <div className={`p-5 rounded-2xl border transition-colors duration-300 relative overflow-hidden ${
         isActive 
-          ? isDarkMode ? "bg-[#0a0500] border-orange-900/50 shadow-inner" : "bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200 shadow-inner"
+          ? isDarkMode ? "bg-orange-950/20 border-orange-900/40 shadow-inner" : "bg-orange-50 border-orange-200 shadow-inner"
           : activeTaskId
-            ? isDarkMode ? "bg-white/[0.02] border-white/[0.08] shadow-sm" : "bg-gradient-to-br from-gray-50 to-white border-gray-200 shadow-sm"
+            ? isDarkMode ? "bg-[#111111] border-gray-800 shadow-sm" : "bg-gray-50 border-gray-200 shadow-sm"
             : isDarkMode ? "bg-black border-gray-800 shadow-sm" : "bg-white border-gray-100 shadow-sm"
       }`}>
         
@@ -182,13 +179,13 @@ export default function TaskSelector() {
         )}
 
         <div className="flex justify-between items-center mb-2">
-          <div className="text-[10px] uppercase font-bold tracking-wider text-gray-400">
+          <div className={`text-[10px] uppercase font-bold tracking-wider transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
             Active Intent
           </div>
           
           {isActive && (
-            <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-              isDarkMode ? "text-orange-400 bg-orange-500/10 border-orange-500/20" : "text-orange-600 bg-orange-100 border-orange-200"
+            <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border transition-colors ${
+              isDarkMode ? "text-orange-400 bg-orange-950/30 border-orange-900/50" : "text-orange-600 bg-orange-100 border-orange-200"
             }`}>
               🔒 Locked during session
             </div>
@@ -206,11 +203,11 @@ export default function TaskSelector() {
           )}
         </div>
 
-        <div className={`text-lg md:text-xl font-bold leading-snug break-words ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+        <div className={`text-lg md:text-xl font-bold leading-snug break-words transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>
           {displayTask || "Choose what matters now"}
         </div>
         
-        <div className={`text-xs mt-2 font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+        <div className={`text-xs mt-2 font-medium transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
           {isActive
             ? "Focus locked for this session."
             : "Choose one thing worth focusing on."}
@@ -229,26 +226,26 @@ export default function TaskSelector() {
               onKeyDown={handleKeyDown}
               placeholder={suggested ? `e.g., ${suggested}` : "What are you focusing on?"}
               disabled={isActive}
-              className={`w-full min-h-[48px] sm:flex-1 px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 shadow-sm text-sm transition-all font-medium ${
+              className={`w-full min-h-[48px] sm:flex-1 px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 shadow-sm text-sm font-medium transition-colors duration-300 ${
                 isDarkMode 
-                  ? "bg-[#0a0a0a] border-gray-800 focus:ring-orange-500/30 focus:border-orange-500/30 text-white disabled:bg-gray-900 disabled:text-gray-600 placeholder:text-gray-600" 
-                  : "bg-white border-gray-200 focus:ring-orange-500/30 focus:border-orange-500/30 text-gray-900 disabled:bg-gray-50 disabled:text-gray-400 placeholder:text-gray-400"
+                  ? "bg-[#111111] border-gray-800 focus:ring-orange-500/30 focus:border-orange-500/50 text-white disabled:bg-black disabled:text-gray-600 placeholder:text-gray-600" 
+                  : "bg-white border-gray-200 focus:ring-orange-500/30 focus:border-orange-500/50 text-gray-900 disabled:bg-gray-50 disabled:text-gray-400 placeholder:text-gray-400"
               }`}
             />
             <button
               onClick={() => handleSetIntent()}
               disabled={isActive || taskInput.trim().length < 3}
-              className="w-full sm:w-auto min-h-[48px] px-6 py-3 text-sm font-bold bg-orange-500 text-white rounded-xl hover:bg-orange-600 disabled:opacity-30 transition-all active:scale-95 shadow-[0_0_20px_rgba(249,115,22,0.12)]"
+              className="w-full sm:w-auto min-h-[48px] px-6 py-3 text-sm font-bold bg-orange-500 text-white rounded-xl hover:bg-orange-600 disabled:opacity-30 transition-all active:scale-95 shadow-md"
             >
               Commit
             </button>
           </div>
 
           {/* 🎯 DAILY GOAL SETTING */}
-          <div className={`flex items-center justify-between border rounded-xl px-4 py-3 shadow-sm ${
-            isDarkMode ? "bg-black border-gray-800" : "bg-gradient-to-br from-gray-50 to-white border-gray-200"
+          <div className={`flex items-center justify-between border rounded-xl px-4 py-3 shadow-sm transition-colors duration-300 ${
+            isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-200"
           }`}>
-            <div className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+            <div className={`text-xs font-bold uppercase tracking-wider transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
               Daily Focus Goal
             </div>
             <div className="flex items-center gap-2">
@@ -256,15 +253,15 @@ export default function TaskSelector() {
                 type="number"
                 value={dailyGoal / 3600}
                 onChange={(e) => updateDailyGoal(Number(e.target.value) * 3600)}
-                className={`w-14 text-center text-base font-extrabold border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 transition-shadow ${
+                className={`w-14 text-center text-base font-extrabold border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${
                   isDarkMode 
-                    ? "bg-[#0a0a0a] border-gray-700 text-orange-400 focus:ring-orange-500/30" 
+                    ? "bg-black border-gray-800 text-orange-400 focus:ring-orange-500/30" 
                     : "bg-white border-gray-200 text-orange-600 focus:ring-orange-500/30"
                 }`}
                 min={1}
                 max={16}
               />
-              <span className={`text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>hrs</span>
+              <span className={`text-xs font-bold uppercase tracking-widest transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>hrs</span>
             </div>
           </div>
 
@@ -272,11 +269,11 @@ export default function TaskSelector() {
           {recentTasks.length > 0 && (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
                   Quick Start
                 </span>
                 {recentTasks.length > 3 && (
-                  <span className="text-[10px] text-gray-400 font-medium">Last used</span>
+                  <span className={`text-[10px] font-medium transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Last used</span>
                 )}
               </div>
               
@@ -288,14 +285,14 @@ export default function TaskSelector() {
                       key={idx}
                       disabled={isActive}
                       onClick={() => handleSetIntent(task)}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all border active:scale-95 ${
+                      className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all border active:scale-95 shadow-sm ${
                         isSelected 
                           ? isDarkMode
-                            ? "bg-orange-500/15 text-orange-300 border-orange-500/20"
+                            ? "bg-orange-950/40 text-orange-400 border-orange-900/50"
                             : "bg-orange-50 text-orange-600 border-orange-200"
                           : isDarkMode 
-                            ? "bg-black text-gray-400 border-gray-700 hover:bg-gray-800 hover:border-gray-600" 
-                            : "bg-white text-gray-600 border-gray-200 hover:bg-orange-50/50 hover:border-orange-200/50"
+                            ? "bg-[#111111] text-gray-300 border-gray-800 hover:bg-[#1a1a1a] hover:border-gray-700" 
+                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
                       }`}
                     >
                       {task}
@@ -308,15 +305,15 @@ export default function TaskSelector() {
 
           {/* 🧠 FOCUS HISTORY */}
           {intentHistory.length > 0 && (
-            <div className={`space-y-2 mt-2 pt-5 border-t ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+            <div className={`space-y-2 mt-2 pt-5 border-t transition-colors duration-300 ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
               <div className="flex justify-between items-center mb-3">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
                   Focus History
                 </span>
                 {intentHistory.length > 3 && (
                   <button
                     onClick={() => setShowHistory(prev => !prev)}
-                    className={`text-[10px] font-bold transition-colors ${isDarkMode ? "text-gray-500 hover:text-white" : "text-gray-500 hover:text-black"}`}
+                    className={`text-[10px] font-bold transition-colors ${isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-800"}`}
                   >
                     {showHistory ? "Hide" : "Show All"}
                   </button>
@@ -333,34 +330,28 @@ export default function TaskSelector() {
                     <div
                       key={i}
                       onClick={() => handleSetIntent(task)}
-                      className={`flex justify-between items-center text-xs px-3 py-3 rounded-lg border transition-all cursor-pointer active:scale-[0.98] ${
+                      className={`flex justify-between items-center text-xs px-3 py-3 rounded-xl border transition-all cursor-pointer active:scale-[0.98] ${
                         activeTaskId === task
                           ? isDarkMode
-                            ? "bg-orange-500/10 border-orange-500/20"
+                            ? "bg-orange-950/20 border-orange-900/40"
                             : "bg-orange-50 border-orange-200"
                           : isDarkMode
-                          ? "bg-black hover:bg-white/[0.03] border-gray-800 hover:border-white/[0.08]"
-                          : "bg-white hover:bg-orange-50 border-gray-100"
+                          ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800 hover:border-gray-700"
+                          : "bg-white hover:bg-gray-50 border-gray-100 hover:border-gray-200"
                       }`}
                     >
                       <div className="min-w-0">
-                        <div
-                          className={`font-semibold truncate ${
-                            isDarkMode
-                              ? "text-gray-300"
-                              : "text-gray-700"
-                          }`}
-                        >
+                        <div className={`font-semibold truncate transition-colors ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
                           {task}
                         </div>
                     
-                        <div className={`text-[10px] mt-1 ${isDarkMode ? "text-white/40" : "text-gray-500"}`}>
+                        <div className={`text-[10px] mt-1 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
                           {count} session{count !== 1 ? "s" : ""} • {getLastUsedText(latest)}
                         </div>
                       </div>
                     
                       {activeTaskId === task && (
-                        <div className="text-[10px] font-semibold text-orange-400">
+                        <div className={`text-[10px] font-bold transition-colors ${isDarkMode ? "text-orange-500" : "text-orange-600"}`}>
                           Selected
                         </div>
                       )}
@@ -371,7 +362,7 @@ export default function TaskSelector() {
 
               {!showHistory && intentHistory.length > 3 && (
                 <div 
-                  className={`text-[10px] font-bold text-center mt-2 cursor-pointer transition-colors pt-1 ${isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`} 
+                  className={`text-[10px] font-bold text-center mt-2 cursor-pointer pt-1 transition-colors ${isDarkMode ? "text-gray-600 hover:text-gray-400" : "text-gray-400 hover:text-gray-600"}`} 
                   onClick={() => setShowHistory(true)}
                 >
                   +{intentHistory.length - 3} more
@@ -384,6 +375,3 @@ export default function TaskSelector() {
     </div>
   );
 }
-
-
-

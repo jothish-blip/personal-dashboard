@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import { useFocusSystem } from "../../engine/useFocusSystem";
 import { Distraction, FocusSession } from "../../types/types";
 import { ChevronDown, ChevronUp, AlertCircle, Play, Pause, Info, TrendingUp } from "lucide-react";
+import { useTheme } from "@/theme/ThemeProvider";
 
 type DateFilter = "all" | "today" | "yesterday" | "week" | "custom";
 
@@ -13,6 +14,7 @@ const getDateStr = (ts: number) => {
 
 export default function SessionHistory() {
   const { sessions: contextSessions, isLoaded } = useFocusSystem();
+  const { isDarkMode } = useTheme();
   
   // 🔥 Only keep sessions that are 1 minute (60s) or longer.
   const typedSessions = useMemo(() => {
@@ -63,19 +65,19 @@ export default function SessionHistory() {
     return "Custom";
   };
 
-  const getSessionClassification = (distractionCount: number, mode: string, initialSessionTime: number) => {
+  const getSessionClassification = (distractionCount: number, mode: string, initialSessionTime: number, isDark: boolean) => {
     const isDeepWork = mode === "deepWork" || initialSessionTime > 1800;
     
     if (isDeepWork) {
-      if (distractionCount <= 2) return { label: "Deep Focus", style: "bg-green-100 text-green-700 dark:text-white/80 dark:bg-white/[0.04] border border-transparent dark:border-white/[0.08]" };
-      if (distractionCount <= 6) return { label: "Stable", style: "bg-blue-100 text-blue-700 dark:text-white/60 dark:bg-white/[0.02] border border-transparent dark:border-white/[0.04]" };
-      if (distractionCount <= 10) return { label: "Attention Shifted", style: "bg-orange-100 text-orange-700 dark:text-orange-400 dark:bg-orange-400/10 border border-transparent dark:border-orange-500/20" };
-      return { label: "Interrupted", style: "bg-red-100 text-red-700 dark:text-red-400 dark:bg-red-500/10 border border-transparent dark:border-red-500/20" };
+      if (distractionCount <= 2) return { label: "Deep Focus", style: isDark ? "bg-emerald-950/30 text-emerald-400 border border-emerald-900/50" : "bg-emerald-50 text-emerald-700 border border-emerald-200" };
+      if (distractionCount <= 6) return { label: "Stable", style: isDark ? "bg-blue-950/30 text-blue-400 border border-blue-900/50" : "bg-blue-50 text-blue-700 border border-blue-200" };
+      if (distractionCount <= 10) return { label: "Attention Shifted", style: isDark ? "bg-orange-950/30 text-orange-400 border border-orange-900/50" : "bg-orange-50 text-orange-700 border border-orange-200" };
+      return { label: "Interrupted", style: isDark ? "bg-red-950/30 text-red-400 border border-red-900/50" : "bg-red-50 text-red-700 border border-red-200" };
     } else {
-      if (distractionCount === 0) return { label: "Deep Focus", style: "bg-green-100 text-green-700 dark:text-white/80 dark:bg-white/[0.04] border border-transparent dark:border-white/[0.08]" };
-      if (distractionCount <= 3) return { label: "Stable", style: "bg-blue-100 text-blue-700 dark:text-white/60 dark:bg-white/[0.02] border border-transparent dark:border-white/[0.04]" };
-      if (distractionCount <= 6) return { label: "Attention Shifted", style: "bg-orange-100 text-orange-700 dark:text-orange-400 dark:bg-orange-400/10 border border-transparent dark:border-orange-500/20" };
-      return { label: "Interrupted", style: "bg-red-100 text-red-700 dark:text-red-400 dark:bg-red-500/10 border border-transparent dark:border-red-500/20" };
+      if (distractionCount === 0) return { label: "Deep Focus", style: isDark ? "bg-emerald-950/30 text-emerald-400 border border-emerald-900/50" : "bg-emerald-50 text-emerald-700 border border-emerald-200" };
+      if (distractionCount <= 3) return { label: "Stable", style: isDark ? "bg-blue-950/30 text-blue-400 border border-blue-900/50" : "bg-blue-50 text-blue-700 border border-blue-200" };
+      if (distractionCount <= 6) return { label: "Attention Shifted", style: isDark ? "bg-orange-950/30 text-orange-400 border border-orange-900/50" : "bg-orange-50 text-orange-700 border border-orange-200" };
+      return { label: "Interrupted", style: isDark ? "bg-red-950/30 text-red-400 border border-red-900/50" : "bg-red-50 text-red-700 border border-red-200" };
     }
   };
 
@@ -204,10 +206,12 @@ export default function SessionHistory() {
   }, [sortedSessions, todayStr, yesterdayStr]);
 
   return (
-    <div className="bg-white dark:bg-black border border-gray-200 dark:border-white/[0.06] p-5 rounded-xl h-full max-h-[700px] flex flex-col font-sans text-gray-900 dark:text-white/90">
+    <div className={`p-5 rounded-xl h-full max-h-[700px] flex flex-col font-sans transition-colors duration-300 border ${
+      isDarkMode ? "bg-black border-gray-800 text-white/90" : "bg-white border-gray-200 text-gray-900"
+    }`}>
       
       <div className="flex items-center justify-between mb-5 shrink-0">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white/90">Session History</h2>
+        <h2 className={`text-sm font-semibold ${isDarkMode ? "text-white/90" : "text-gray-900"}`}>Session History</h2>
       </div>
 
       <div className="shrink-0 mb-6">
@@ -218,8 +222,12 @@ export default function SessionHistory() {
               onClick={() => setFilter(f)}
               className={`px-3.5 py-1.5 text-xs font-medium rounded-full transition-all whitespace-nowrap border ${
                 filter === f
-                  ? "bg-gray-900 text-white border-transparent dark:bg-orange-500/10 dark:text-orange-500 dark:border-orange-500/20 shadow-sm dark:shadow-[0_0_15px_rgba(249,115,22,0.1)]"
-                  : "bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200 dark:bg-white/[0.02] dark:text-white/60 dark:border-white/[0.06] dark:hover:bg-white/[0.06] dark:hover:text-white/80"
+                  ? (isDarkMode 
+                      ? "bg-orange-950/30 text-orange-400 border-orange-500/20 shadow-[0_0_15px_rgba(249,115,22,0.1)]" 
+                      : "bg-gray-900 text-white border-transparent shadow-sm")
+                  : (isDarkMode 
+                      ? "bg-[#111111] text-gray-400 hover:text-gray-300 hover:bg-[#1a1a1a] border-transparent" 
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent")
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -231,7 +239,11 @@ export default function SessionHistory() {
           <div className="mt-3 animate-in fade-in slide-in-from-top-1">
             <input
               type="date"
-              className="border border-gray-200 dark:border-white/[0.1] px-3 py-1.5 rounded-lg text-xs text-gray-700 dark:text-white/80 bg-gray-50 dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-1 dark:focus:ring-white/20 dark:[color-scheme:dark]"
+              className={`px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-2 transition-colors duration-300 border ${
+                isDarkMode 
+                  ? "bg-[#111111] border-gray-800 text-gray-300 focus:ring-gray-700 [color-scheme:dark]" 
+                  : "bg-gray-50 border-gray-200 text-gray-700 focus:ring-blue-500/20"
+              }`}
               value={getDateStr(customDate.getTime())}
               onChange={(e) => {
                 if (e.target.value) {
@@ -245,27 +257,29 @@ export default function SessionHistory() {
       </div>
 
       {dailySummary && (
-        <div className="mb-6 p-4 rounded-xl bg-gray-50 dark:bg-[#070707] border border-gray-200 dark:border-white/[0.06] flex flex-col gap-3 shrink-0">
+        <div className={`mb-6 p-4 rounded-xl flex flex-col gap-3 shrink-0 border transition-colors ${
+          isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-gray-50 border-gray-200"
+        }`}>
           <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-500 dark:text-white/60 font-medium">Summary Overview</span>
-            <span className="text-[10px] text-gray-400 dark:text-white/40 flex items-center gap-1"><TrendingUp size={12} /> {dailySummary.insight}</span>
+            <span className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Summary Overview</span>
+            <span className={`text-[10px] flex items-center gap-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}><TrendingUp size={12} /> {dailySummary.insight}</span>
           </div>
           <div className="grid grid-cols-4 gap-4">
             <div className="flex flex-col">
-              <span className="text-[10px] text-gray-400 dark:text-white/40 uppercase tracking-widest mb-1">Sessions</span>
-              <span className="text-base font-semibold text-gray-900 dark:text-white/90">{dailySummary.sessions}</span>
+              <span className={`text-[10px] uppercase tracking-widest mb-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Sessions</span>
+              <span className={`text-base font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>{dailySummary.sessions}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] text-gray-400 dark:text-white/40 uppercase tracking-widest mb-1">Focused</span>
-              <span className="text-base font-semibold text-gray-900 dark:text-white/90">{dailySummary.focusMins}m</span>
+              <span className={`text-[10px] uppercase tracking-widest mb-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Focused</span>
+              <span className={`text-base font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>{dailySummary.focusMins}m</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] text-gray-400 dark:text-white/40 uppercase tracking-widest mb-1">Quality</span>
-              <span className="text-base font-semibold text-gray-900 dark:text-white/90">{dailySummary.avgQuality}%</span>
+              <span className={`text-[10px] uppercase tracking-widest mb-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Quality</span>
+              <span className={`text-base font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>{dailySummary.avgQuality}%</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] text-gray-400 dark:text-white/40 uppercase tracking-widest mb-1 truncate">Top Issue</span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white/90 truncate pt-0.5">{dailySummary.topIssue}</span>
+              <span className={`text-[10px] uppercase tracking-widest mb-1 truncate ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Top Issue</span>
+              <span className={`text-sm font-medium truncate pt-0.5 ${isDarkMode ? "text-white" : "text-gray-900"}`}>{dailySummary.topIssue}</span>
             </div>
           </div>
         </div>
@@ -274,15 +288,15 @@ export default function SessionHistory() {
       <div className="overflow-y-auto pr-2 flex-1 custom-scrollbar relative">
         
         {!isLoaded ? (
-          <div className="flex flex-col items-center justify-center text-gray-400 dark:text-white/40 py-10 h-full animate-pulse">
-            <span className="w-5 h-5 border-2 border-gray-200 dark:border-white/20 border-t-gray-500 dark:border-t-white/60 rounded-full animate-spin mb-3"></span>
+          <div className={`flex flex-col items-center justify-center py-10 h-full animate-pulse ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+            <span className={`w-5 h-5 border-2 rounded-full animate-spin mb-3 ${isDarkMode ? "border-gray-800 border-t-gray-400" : "border-gray-200 border-t-gray-500"}`}></span>
             <span className="text-xs font-medium">Loading history...</span>
           </div>
         ) : filteredSessions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-gray-400 dark:text-white/40 py-12 h-full animate-in fade-in">
-            <Info size={24} className="mb-3 opacity-50 dark:opacity-30" />
-            <span className="text-sm font-medium text-gray-500 dark:text-white/60">No valid sessions logged</span>
-            <span className="text-xs text-center mt-1.5 opacity-80 dark:opacity-60">
+          <div className={`flex flex-col items-center justify-center py-12 h-full animate-in fade-in ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+            <Info size={24} className="mb-3 opacity-50" />
+            <span className="text-sm font-medium">No valid sessions logged</span>
+            <span className="text-xs text-center mt-1.5 opacity-80">
               {filter === "today" 
                 ? "Start a session (> 1 min) to see your data here." 
                 : "No valid data recorded for this time period."}
@@ -292,7 +306,9 @@ export default function SessionHistory() {
           Object.entries(groupedSessions).map(([dateLabel, daySessions]) => (
             <div key={dateLabel} className="mb-8 relative">
               
-              <h3 className="text-[10px] font-bold dark:font-medium text-gray-500 dark:text-white/40 uppercase tracking-widest sticky top-0 bg-white/95 dark:bg-black/95 backdrop-blur-md py-2 z-20 mb-4">
+              <h3 className={`text-[10px] font-bold uppercase tracking-widest sticky top-0 py-2 z-20 mb-4 transition-colors ${
+                isDarkMode ? "text-gray-500 bg-black/95" : "text-gray-500 bg-white/95"
+              }`}>
                 {dateLabel}
               </h3>
 
@@ -321,12 +337,11 @@ export default function SessionHistory() {
                   const displayExtra = totalFocusDuration - focusedDur;
                   const pausedDuration = Math.max(0, totalDuration - (focusedDur + extraDur));
                   
-                  // 🔥 Updated Focus Quality Formula
                   const focusQuality = (focusedDur + pausedDuration) > 0 
                     ? Math.round((focusedDur / (focusedDur + pausedDuration)) * 100) 
                     : 0;
                   
-                  const classification = getSessionClassification(distCount, session.mode, session.initialSessionTime || 1500);
+                  const classification = getSessionClassification(distCount, session.mode, session.initialSessionTime || 1500, isDarkMode);
                   const isExpanded = expandedId === session.id;
                   const isLast = index === daySessions.length - 1;
                   const hasExtraFlow = extraDur > 30;
@@ -335,16 +350,15 @@ export default function SessionHistory() {
                     <div key={session.id} className="flex gap-4 relative group">
                       
                       {/* Left Time Column with Paused Duration */}
-                      <div className="w-[65px] shrink-0 flex flex-col items-end text-[10px] font-medium text-gray-500 dark:text-white/40 pt-1.5 opacity-80">
+                      <div className={`w-[65px] shrink-0 flex flex-col items-end text-[10px] font-medium pt-1.5 opacity-80 ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
                         <span>{formatStartTime(session.startTime)}</span>
-                        <div className="flex flex-col items-center justify-center h-5 my-0.5 opacity-40 dark:opacity-30">
+                        <div className="flex flex-col items-center justify-center h-5 my-0.5 opacity-40">
                            <span className="text-[8px]">↓</span>
                         </div>
                         <span>{formatEndTime(session)}</span>
                         
-                        {/* Explicit Paused indicator under timestamps */}
                         {pausedDuration >= 5 && (
-                          <span className="text-[9px] text-gray-400 dark:text-white/30 mt-1.5 whitespace-nowrap text-center leading-tight">
+                          <span className={`text-[9px] mt-1.5 whitespace-nowrap text-center leading-tight ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
                             {formatCleanDuration(pausedDuration)} paused
                           </span>
                         )}
@@ -352,23 +366,25 @@ export default function SessionHistory() {
 
                       {/* Line & Dot */}
                       <div className="relative flex flex-col items-center">
-                        <div className={`w-px absolute top-3 z-0 ${isLast ? 'h-full bg-gradient-to-b from-gray-200 dark:from-white/[0.08] to-transparent' : 'h-full bg-gray-200 dark:bg-white/[0.08]'}`}></div>
-                        <div className={`w-2 h-2 rounded-full z-10 mt-2 ring-4 ring-white dark:ring-black shadow-sm transition-transform duration-300 group-hover:scale-125 ${
-                          hasExtraFlow ? 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.4)]' : 'bg-blue-500 dark:bg-orange-500 dark:shadow-[0_0_10px_rgba(249,115,22,0.3)]'
+                        <div className={`w-px absolute top-3 z-0 ${isLast ? `h-full bg-gradient-to-b to-transparent ${isDarkMode ? "from-gray-800" : "from-gray-200"}` : `h-full ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}`}></div>
+                        <div className={`w-2 h-2 rounded-full z-10 mt-2 ring-4 shadow-sm transition-transform duration-300 group-hover:scale-125 ${isDarkMode ? "ring-black" : "ring-white"} ${
+                          hasExtraFlow ? 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.4)]' : 'bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.3)]'
                         }`}></div>
                       </div>
 
                       {/* Main Card */}
                       <div className="flex-1 pb-2 min-w-0">
                         <div
-                          className={`p-3.5 bg-white dark:bg-[#070707] rounded-xl transition-all relative overflow-hidden border ${
-                            isExpanded ? "border-blue-200 shadow-md ring-1 ring-blue-50 dark:ring-0 dark:bg-[#0B0B0B] dark:border-white/[0.1] dark:shadow-lg" : "border-gray-200 dark:border-white/[0.04] hover:bg-gray-50 dark:hover:bg-white/[0.03] hover:border-gray-300 dark:hover:border-white/[0.08]"
+                          className={`p-3.5 rounded-xl transition-all relative overflow-hidden border ${
+                            isExpanded 
+                              ? (isDarkMode ? "bg-[#111111] border-gray-700 shadow-lg" : "bg-white border-blue-200 ring-1 ring-blue-50 shadow-md") 
+                              : (isDarkMode ? "bg-[#0a0a0a] border-gray-800 hover:bg-[#111111] hover:border-gray-700" : "bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300")
                           }`}
                         >
                           {/* Top Row: Title, Badges, Percentage */}
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex flex-col gap-1.5 pr-2 min-w-0">
-                              <span className="text-sm font-medium text-gray-900 dark:text-white/90 truncate">
+                              <span className={`text-sm font-medium truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                                 {session.taskTitle ||
                                 session.taskId ||
                                 "Untitled Focus"}
@@ -378,7 +394,9 @@ export default function SessionHistory() {
                                   {classification.label}
                                 </span>
                                 {hasExtraFlow && (
-                                  <span className="text-[9px] font-medium px-2 py-0.5 bg-purple-100 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-400 rounded whitespace-nowrap">
+                                  <span className={`text-[9px] font-medium px-2 py-0.5 border rounded whitespace-nowrap ${
+                                    isDarkMode ? "bg-purple-950/30 border-purple-900/50 text-purple-400" : "bg-purple-100 border-purple-200 text-purple-700"
+                                  }`}>
                                     Goal Completed • +{Math.floor(extraDur / 60)}m Extra Focus
                                   </span>
                                 )}
@@ -387,27 +405,26 @@ export default function SessionHistory() {
                             
                             {/* Focus Quality Rating */}
                             <div className="flex flex-col items-end shrink-0">
-                              <span className="text-sm font-semibold text-gray-900 dark:text-white/90">{focusQuality}%</span>
-                              <span className="text-[8px] text-gray-400 dark:text-white/40 uppercase tracking-widest mt-0.5">Quality</span>
+                              <span className={`text-sm font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>{focusQuality}%</span>
+                              <span className={`text-[8px] uppercase tracking-widest mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Quality</span>
                             </div>
                           </div>
 
-                          {/* Simplified Subtext (Restored Paused Value) */}
-                          <div className="text-[11px] text-gray-500 dark:text-white/50 flex flex-wrap items-center gap-1.5 mt-2">
-                            <span className="font-medium text-gray-700 dark:text-white/80">{formatCleanDuration(focusedDur)} Focused</span>
+                          {/* Simplified Subtext */}
+                          <div className={`text-[11px] flex flex-wrap items-center gap-1.5 mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                            <span className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>{formatCleanDuration(focusedDur)} Focused</span>
                             
                             {displayExtra > 0 && (
                               <>
                                 <span className="opacity-40">•</span>
-                                <span className="text-purple-600 dark:text-purple-400">+{formatCleanDuration(displayExtra)} Extra</span>
+                                <span className={isDarkMode ? "text-purple-400" : "text-purple-600"}>+{formatCleanDuration(displayExtra)} Extra</span>
                               </>
                             )}
                             
-                            {/* Restored Paused Time in Subtext */}
                             {pausedDuration >= 5 && (
                               <>
                                 <span className="opacity-40">•</span>
-                                <span className="text-yellow-600 dark:text-yellow-500/80">{formatCleanDuration(pausedDuration)} Paused</span>
+                                <span className={isDarkMode ? "text-yellow-500/80" : "text-yellow-600"}>{formatCleanDuration(pausedDuration)} Paused</span>
                               </>
                             )}
 
@@ -426,14 +443,14 @@ export default function SessionHistory() {
                           </div>
 
                           {/* Visual Timeline Bar */}
-                          <div className="w-full h-1 bg-gray-100 dark:bg-white/[0.04] rounded-full overflow-hidden flex mt-3 mb-1">
+                          <div className={`w-full h-1 rounded-full overflow-hidden flex mt-3 mb-1 ${isDarkMode ? "bg-[#1a1a1a]" : "bg-gray-100"}`}>
                             <div
-                              className="bg-blue-500 dark:bg-orange-500"
+                              className="bg-orange-500"
                               style={{ width: `${(focusedDur / totalDuration) * 100}%` }}
                             />
                             {pausedDuration > 0 && (
                               <div
-                                className="bg-yellow-400 dark:bg-yellow-500/50"
+                                className={isDarkMode ? "bg-yellow-500/50" : "bg-yellow-400"}
                                 style={{ width: `${(pausedDuration / totalDuration) * 100}%` }}
                               />
                             )}
@@ -449,7 +466,9 @@ export default function SessionHistory() {
                           {canExpand && (
                             <button
                               onClick={() => setExpandedId(isExpanded ? null : session.id)}
-                              className="text-[10px] text-gray-500 dark:text-white/40 hover:text-blue-600 dark:hover:text-white/70 font-medium flex items-center gap-1 transition-colors mt-3 w-fit"
+                              className={`text-[10px] font-medium flex items-center gap-1 transition-colors mt-3 w-fit ${
+                                isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-blue-600"
+                              }`}
                             >
                               {isExpanded ? <><ChevronUp size={12} /> Hide details</> : <><ChevronDown size={12} /> View details</>}
                             </button>
@@ -457,26 +476,32 @@ export default function SessionHistory() {
 
                           {/* EXPANDED AREA */}
                           {isExpanded && canExpand && (
-                            <div className="mt-3 pt-4 border-t border-gray-100 dark:border-white/[0.06] animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className={`mt-3 pt-4 border-t animate-in fade-in slide-in-from-top-2 duration-200 ${
+                              isDarkMode ? "border-gray-800" : "border-gray-100"
+                            }`}>
                               <div className="flex flex-col gap-5">
                                 
                                 {/* Distraction Details (ALL DISTRACTIONS SHOWN) */}
                                 {distCount > 0 && (
                                   <div>
                                     <div className="flex items-center justify-between mb-3">
-                                      <span className="text-[11px] font-medium text-gray-500 dark:text-white/60 flex items-center gap-1.5">
+                                      <span className={`text-[11px] font-medium flex items-center gap-1.5 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                                         <AlertCircle size={12} /> Distraction Timeline
                                       </span>
                                     </div>
                                     
-                                    <div className="bg-gray-50 dark:bg-[#050505] border border-gray-200 dark:border-white/[0.06] rounded-lg p-3">
+                                    <div className={`border rounded-lg p-3 ${isDarkMode ? "bg-black border-gray-800" : "bg-gray-50 border-gray-200"}`}>
                                       {/* Top Issue highlight */}
                                       {getTopDistraction(dists) && (
-                                        <div className="text-xs font-medium text-gray-700 dark:text-white/80 mb-3 border-b border-gray-200 dark:border-white/[0.06] pb-3 flex items-center justify-between">
+                                        <div className={`text-xs font-medium mb-3 border-b pb-3 flex items-center justify-between ${
+                                          isDarkMode ? "text-gray-300 border-gray-800" : "text-gray-700 border-gray-200"
+                                        }`}>
                                           <span>
-                                            Top trigger: <span className="text-gray-900 dark:text-white ml-1">{getTopDistraction(dists)?.reason}</span>
+                                            Top trigger: <span className={isDarkMode ? "text-white ml-1" : "text-gray-900 ml-1"}>{getTopDistraction(dists)?.reason}</span>
                                           </span>
-                                          <span className="text-gray-500 dark:text-white/40 text-[10px] px-2 py-0.5 bg-gray-200 dark:bg-white/[0.04] rounded-md">
+                                          <span className={`text-[10px] px-2 py-0.5 rounded-md ${
+                                            isDarkMode ? "text-gray-500 bg-gray-800" : "text-gray-500 bg-gray-200"
+                                          }`}>
                                             {getTopDistraction(dists)?.count} occurrences
                                           </span>
                                         </div>
@@ -485,9 +510,11 @@ export default function SessionHistory() {
                                       {/* Exact List of All Distractions */}
                                       <div className="flex flex-col gap-1.5">
                                         {dists.map((d: Distraction, i: number) => (
-                                          <div key={d.id || i} className="flex justify-between items-center bg-white dark:bg-white/[0.03] hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors border border-gray-100 dark:border-white/[0.04] px-3 py-2 rounded-lg">
-                                            <span className="text-[11px] text-gray-800 dark:text-white/80 font-medium truncate pr-4">{d.reason}</span>
-                                            <span className="text-[10px] text-gray-400 dark:text-white/40 font-mono shrink-0">
+                                          <div key={d.id || i} className={`flex justify-between items-center transition-colors border px-3 py-2 rounded-lg ${
+                                            isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-100"
+                                          }`}>
+                                            <span className={`text-[11px] font-medium truncate pr-4 ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>{d.reason}</span>
+                                            <span className={`text-[10px] font-mono shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
                                               {new Date(d.timestamp).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                             </span>
                                           </div>
@@ -500,26 +527,28 @@ export default function SessionHistory() {
                                 {/* Pause Timeline */}
                                 {hasPauses && (
                                   <div>
-                                    <div className="text-[11px] font-medium text-gray-500 dark:text-white/60 mb-2 flex items-center gap-1.5">
+                                    <div className={`text-[11px] font-medium mb-2 flex items-center gap-1.5 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                                       <Pause size={12} /> Pause Timeline
                                     </div>
                                     
-                                    <div className="space-y-1.5 bg-gray-50 dark:bg-[#050505] p-2 rounded-lg border border-gray-200 dark:border-white/[0.06]">
+                                    <div className={`space-y-1.5 p-2 rounded-lg border ${isDarkMode ? "bg-black border-gray-800" : "bg-gray-50 border-gray-200"}`}>
                                       {[...pauseTimeline].sort((a: any, b: any) => a.start - b.start).map((seg: any, i: number) => {
                                         const start = new Date(seg.start);
                                         const end = seg.end ? new Date(seg.end) : null;
                                         const durationSeconds = seg.end ? Math.floor((seg.end - seg.start) / 1000) : 0;
 
                                         return (
-                                          <div key={i} className="text-[10px] flex justify-between items-center px-2 py-1.5 rounded transition-colors text-gray-600 dark:text-white/60 hover:bg-white dark:hover:bg-white/[0.03]">
+                                          <div key={i} className={`text-[10px] flex justify-between items-center px-2 py-1.5 rounded transition-colors ${
+                                            isDarkMode ? "text-gray-400 hover:bg-[#111111]" : "text-gray-600 hover:bg-white"
+                                          }`}>
                                             <div className="flex items-center gap-2 font-mono">
                                               <span>{start.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: '2-digit', minute: '2-digit' })}</span>
-                                              <span className="text-gray-300 dark:text-white/20">→</span>
+                                              <span className={isDarkMode ? "text-gray-600" : "text-gray-300"}>→</span>
                                               <span>{end ? end.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: '2-digit', minute: '2-digit' }) : "Active"}</span>
                                             </div>
                                             
                                             {end && (
-                                              <span className="text-gray-500 dark:text-white/40">
+                                              <span className={isDarkMode ? "text-gray-500" : "text-gray-500"}>
                                                 {formatCleanDuration(durationSeconds)} pause
                                               </span>
                                             )}

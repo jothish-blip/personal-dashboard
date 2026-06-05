@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useFocusSystem } from "../../engine/useFocusSystem";
 import { FocusSession, FocusMode } from "../../types/types";
 import { Target, Flame, AlertTriangle, Clock, Inbox, Activity, Zap, TrendingUp, ChevronRight, Pause } from "lucide-react";
+import { useTheme } from "@/theme/ThemeProvider";
 
 type DateRange = "today" | "yesterday" | "week" | "month" | "year" | "custom";
 
@@ -43,6 +44,8 @@ export default function FocusStatsCard() {
     isPaused,
     currentSession
   } = useFocusSystem();
+
+  const { isDarkMode } = useTheme();
   
   // 🔥 1-MINUTE RULE: Filter out micro-sessions globally before any math is done
   const typedSessions = useMemo(() => {
@@ -243,7 +246,6 @@ export default function FocusStatsCard() {
     return { data, bestDayObj };
   }, [datesInWeek, typedSessions]);
 
-  // 🔥 Smart Formatter: Adapts cleanly depending on the length of time
   const formatHrsMins = (seconds: number) => {
     if (seconds < 60) return `${Math.floor(seconds)}s`;
     const h = Math.floor(seconds / 3600);
@@ -253,11 +255,11 @@ export default function FocusStatsCard() {
   };
 
   const getFocusBadge = () => {
-    if (totalSessions === 0) return { label: "Idle", style: "bg-gray-100 text-gray-500 dark:bg-white/[0.04] dark:text-white/50 border border-transparent dark:border-white/[0.08]" };
-    if (isInFlow) return { label: "Flow State", style: "bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400 border border-transparent dark:border-purple-500/20" };
-    if (avgScore >= 80) return { label: "Deep Focus", style: "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400 border border-transparent dark:border-green-500/20" };
-    if (avgScore >= 50) return { label: "Stable", style: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-transparent dark:border-blue-500/20" };
-    return { label: "Distracted", style: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400 border border-transparent dark:border-red-500/20" };
+    if (totalSessions === 0) return { label: "Idle", style: isDarkMode ? "bg-[#111111] text-gray-400 border border-gray-800" : "bg-gray-100 text-gray-500 border border-transparent" };
+    if (isInFlow) return { label: "Flow State", style: isDarkMode ? "bg-purple-950/30 text-purple-400 border border-purple-900/50" : "bg-purple-100 text-purple-700 border border-transparent" };
+    if (avgScore >= 80) return { label: "Deep Focus", style: isDarkMode ? "bg-emerald-950/30 text-emerald-400 border border-emerald-900/50" : "bg-green-100 text-green-700 border border-transparent" };
+    if (avgScore >= 50) return { label: "Stable", style: isDarkMode ? "bg-blue-950/30 text-blue-400 border border-blue-900/50" : "bg-blue-100 text-blue-700 border border-transparent" };
+    return { label: "Distracted", style: isDarkMode ? "bg-red-950/30 text-red-400 border border-red-900/50" : "bg-red-100 text-red-700 border border-transparent" };
   };
   const badge = getFocusBadge();
 
@@ -347,37 +349,39 @@ export default function FocusStatsCard() {
         .filter(s => getDateStr(s.startTime) === dStr)
         .reduce<number>((acc, s) => acc + s.durationSeconds + (s.extraDuration || 0), 0);
       
-      let colorClass = "bg-gray-100 dark:bg-white/[0.04]";
-      if (daySeconds > 0) colorClass = "bg-green-100 dark:bg-orange-500/20";
-      if (daySeconds > 3600) colorClass = "bg-green-300 dark:bg-orange-500/40";
-      if (daySeconds > 7200) colorClass = "bg-green-500 dark:bg-orange-500/70";
-      if (daySeconds > 10800) colorClass = "bg-green-700 dark:bg-orange-500 dark:shadow-[0_0_10px_rgba(249,115,22,0.3)]";
+      let colorClass = isDarkMode ? "bg-[#111111]" : "bg-gray-100";
+      if (daySeconds > 0) colorClass = isDarkMode ? "bg-orange-950/40" : "bg-green-100";
+      if (daySeconds > 3600) colorClass = isDarkMode ? "bg-orange-500/40" : "bg-green-300";
+      if (daySeconds > 7200) colorClass = isDarkMode ? "bg-orange-500/70" : "bg-green-500";
+      if (daySeconds > 10800) colorClass = isDarkMode ? "bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.3)]" : "bg-green-700";
 
       days.push(
         <div 
           key={i} 
-          className={`w-3 h-3 md:w-4 md:h-4 rounded-[2px] ${colorClass} hover:ring-2 dark:hover:ring-1 ring-gray-400 dark:ring-white/50 transition-all cursor-help`}
+          className={`w-3 h-3 md:w-4 md:h-4 rounded-[2px] ${colorClass} transition-all cursor-help hover:ring-2 ${isDarkMode ? "hover:ring-gray-400" : "hover:ring-gray-400"}`}
           title={`${d.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}: ${formatHrsMins(daySeconds)}`}
         />
       );
     }
 
     return (
-      <div className="mt-6 border-t border-gray-100 dark:border-white/[0.06] pt-5 animate-in fade-in zoom-in-95">
-        <h3 className="text-[10px] font-bold text-gray-400 dark:text-white/40 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-          <Activity size={14} className="text-blue-500 dark:text-orange-500" /> Focus Intensity Map
+      <div className={`mt-6 border-t pt-5 animate-in fade-in zoom-in-95 transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+        <h3 className={`text-[10px] font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+          <Activity size={14} className={isDarkMode ? "text-orange-500" : "text-blue-500"} /> Focus Intensity Map
         </h3>
-        <div className="flex flex-wrap gap-1 md:gap-1.5 p-4 bg-white dark:bg-[#070707] border border-gray-200 dark:border-white/[0.06] rounded-xl overflow-y-auto max-h-[160px] custom-scrollbar shadow-sm hover:bg-white/[0.02] transition-all duration-300">
+        <div className={`flex flex-wrap gap-1 md:gap-1.5 p-4 rounded-xl overflow-y-auto max-h-[160px] custom-scrollbar shadow-sm transition-colors duration-300 border ${
+          isDarkMode ? "bg-[#111111] border-gray-800 hover:bg-[#1a1a1a]" : "bg-white border-gray-200 hover:bg-gray-50"
+        }`}>
           {days}
         </div>
         <div className="flex justify-end items-center gap-1.5 mt-3">
-          <span className="text-[10px] text-gray-400 dark:text-white/40 font-medium mr-1">Less</span>
-          <div className="w-2.5 h-2.5 bg-gray-100 dark:bg-white/[0.04] rounded-[2px]"></div>
-          <div className="w-2.5 h-2.5 bg-green-100 dark:bg-orange-500/20 rounded-[2px]"></div>
-          <div className="w-2.5 h-2.5 bg-green-300 dark:bg-orange-500/40 rounded-[2px]"></div>
-          <div className="w-2.5 h-2.5 bg-green-500 dark:bg-orange-500/70 rounded-[2px]"></div>
-          <div className="w-2.5 h-2.5 bg-green-700 dark:bg-orange-500 rounded-[2px]"></div>
-          <span className="text-[10px] text-gray-400 dark:text-white/40 font-medium ml-1">More</span>
+          <span className={`text-[10px] font-medium mr-1 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Less</span>
+          <div className={`w-2.5 h-2.5 rounded-[2px] ${isDarkMode ? "bg-[#111111]" : "bg-gray-100"}`}></div>
+          <div className={`w-2.5 h-2.5 rounded-[2px] ${isDarkMode ? "bg-orange-950/40" : "bg-green-100"}`}></div>
+          <div className={`w-2.5 h-2.5 rounded-[2px] ${isDarkMode ? "bg-orange-500/40" : "bg-green-300"}`}></div>
+          <div className={`w-2.5 h-2.5 rounded-[2px] ${isDarkMode ? "bg-orange-500/70" : "bg-green-500"}`}></div>
+          <div className={`w-2.5 h-2.5 rounded-[2px] ${isDarkMode ? "bg-orange-500" : "bg-green-700"}`}></div>
+          <span className={`text-[10px] font-medium ml-1 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>More</span>
         </div>
       </div>
     );
@@ -389,9 +393,11 @@ export default function FocusStatsCard() {
 
   if (!isLoaded) {
     return (
-      <div className="flex justify-center items-center h-64 w-full max-w-[580px] bg-white dark:bg-black border border-gray-200 dark:border-white/[0.06] rounded-2xl shadow-sm animate-pulse mb-4 md:mb-0">
-         <div className="text-sm font-bold text-gray-400 dark:text-white/40 flex items-center gap-2">
-           <Activity size={18} className="animate-spin text-gray-300 dark:text-white/30" />
+      <div className={`flex justify-center items-center h-64 w-full max-w-[580px] rounded-2xl shadow-sm animate-pulse mb-4 md:mb-0 border transition-colors ${
+        isDarkMode ? "bg-black border-gray-800 text-gray-500" : "bg-white border-gray-200 text-gray-400"
+      }`}>
+         <div className="text-sm font-bold flex items-center gap-2">
+           <Activity size={18} className="animate-spin" />
            Loading Analytics...
          </div>
       </div>
@@ -400,10 +406,12 @@ export default function FocusStatsCard() {
 
   if (isLoaded && typedSessions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 w-full max-w-[580px] bg-white dark:bg-black border border-gray-200 dark:border-white/[0.06] rounded-2xl shadow-sm text-center mb-4 md:mb-0 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-all duration-300">
-        <Inbox size={48} className="mx-auto mb-4 text-gray-300 dark:text-white/20 stroke-[1px]" />
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white/90">No Data Collected</h3>
-        <p className="text-sm text-gray-500 dark:text-white/50 mt-2 max-w-[300px]">
+      <div className={`flex flex-col items-center justify-center p-12 w-full max-w-[580px] rounded-2xl shadow-sm text-center mb-4 md:mb-0 transition-colors duration-300 border ${
+        isDarkMode ? "bg-black border-gray-800 hover:bg-[#0a0a0a]" : "bg-white border-gray-200 hover:bg-gray-50"
+      }`}>
+        <Inbox size={48} className={`mx-auto mb-4 stroke-[1px] ${isDarkMode ? "text-gray-600" : "text-gray-300"}`} />
+        <h3 className={`text-lg font-bold transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>No Data Collected</h3>
+        <p className={`text-sm mt-2 max-w-[300px] transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
           Metrics will appear here once you complete a focus session longer than 1 minute.
         </p>
       </div>
@@ -411,15 +419,17 @@ export default function FocusStatsCard() {
   }
 
   return (
-    <div className="flex justify-center lg:justify-end w-full font-sans text-gray-900 dark:text-white/90">
-      <div className="bg-white dark:bg-black border border-gray-200 dark:border-white/[0.06] p-6 rounded-2xl shadow-sm w-full max-w-[520px] xl:max-w-[580px] animate-in fade-in duration-300 mb-4 md:mb-0">
+    <div className={`flex justify-center lg:justify-end w-full font-sans transition-colors duration-300 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+      <div className={`p-6 rounded-2xl shadow-sm w-full max-w-[520px] xl:max-w-[580px] animate-in fade-in duration-300 mb-4 md:mb-0 border transition-colors ${
+        isDarkMode ? "bg-black border-gray-800" : "bg-white border-gray-200"
+      }`}>
         
         {/* HEADER ARCHITECTURE */}
         <div className="space-y-7">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex flex-col gap-1.5">
-              <h2 className="text-sm font-semibold text-gray-800 dark:text-white/90 flex items-center gap-2">
-                <Activity size={16} className="text-blue-500 dark:text-orange-500" />
+              <h2 className={`text-sm font-semibold flex items-center gap-2 transition-colors ${isDarkMode ? "text-white" : "text-gray-800"}`}>
+                <Activity size={16} className={isDarkMode ? "text-orange-500" : "text-blue-500"} />
                 {selectedRange === "today" && "Today’s Analytics"}
                 {selectedRange === "yesterday" && "Yesterday’s Analytics"}
                 {selectedRange === "week" && "Weekly Analytics"}
@@ -431,29 +441,29 @@ export default function FocusStatsCard() {
                   {badge.label}
                 </div>
               </h2>
-              <div className="text-[10px] text-gray-400 dark:text-white/40 font-bold uppercase tracking-wider flex items-center gap-1">
+              <div className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
                 <Target size={12} /> Target: {Math.floor(dailyGoal / 3600)}h / day
               </div>
             </div>
 
             {/* DATE NAVIGATION */}
-            <div className="flex items-center bg-gray-50 dark:bg-white/[0.02] rounded-lg w-fit border border-gray-200 dark:border-white/[0.06] shrink-0">
-              <button onClick={() => shiftDate(-1)} className="px-3 py-1.5 text-gray-500 dark:text-white/50 hover:bg-gray-200 dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white/90 rounded-l-lg transition-colors active:scale-95">◀</button>
-              <button onClick={jumpToToday} className="px-3 py-1.5 text-xs font-bold text-gray-600 dark:text-white/60 hover:bg-gray-200 dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white/90 transition-colors active:scale-95 border-x border-gray-200 dark:border-white/[0.06] uppercase tracking-wider">Today</button>
-              <button onClick={() => shiftDate(1)} className="px-3 py-1.5 text-gray-500 dark:text-white/50 hover:bg-gray-200 dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white/90 rounded-r-lg transition-colors active:scale-95">▶</button>
+            <div className={`flex items-center rounded-lg w-fit border shrink-0 transition-colors ${isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-200"}`}>
+              <button onClick={() => shiftDate(-1)} className={`px-3 py-1.5 rounded-l-lg transition-colors active:scale-95 ${isDarkMode ? "text-gray-500 hover:bg-[#1a1a1a] hover:text-white" : "text-gray-500 hover:bg-gray-200 hover:text-gray-900"}`}>◀</button>
+              <button onClick={jumpToToday} className={`px-3 py-1.5 text-xs font-bold transition-colors active:scale-95 border-x uppercase tracking-wider ${isDarkMode ? "text-gray-400 hover:bg-[#1a1a1a] hover:text-white border-gray-800" : "text-gray-600 hover:bg-gray-200 hover:text-gray-900 border-gray-200"}`}>Today</button>
+              <button onClick={() => shiftDate(1)} className={`px-3 py-1.5 rounded-r-lg transition-colors active:scale-95 ${isDarkMode ? "text-gray-500 hover:bg-[#1a1a1a] hover:text-white" : "text-gray-500 hover:bg-gray-200 hover:text-gray-900"}`}>▶</button>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500 dark:text-white/50">
+          <div className={`flex flex-wrap items-center justify-between gap-3 text-xs transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
             <div className="flex items-center gap-3">
               <span>
                 {selectedRange === "today" ? "Live performance metrics" : selectedRange === "yesterday" ? "Past flow review" : "Macro behavioral trends"}
               </span>
 
               {selectedRange === "today" && yestTotalSessions > 0 && (
-                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${scoreDiff >= 0 ? "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400" : "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400"}`}>
+                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${scoreDiff >= 0 ? (isDarkMode ? "bg-emerald-950/30 text-emerald-400" : "bg-green-100 text-green-700") : (isDarkMode ? "bg-red-950/30 text-red-400" : "bg-red-100 text-red-700")}`}>
                   <TrendingUp size={10} className={`inline mr-1 ${scoreDiff < 0 ? "rotate-180" : ""}`} />
-                  vs Yest: <span className="text-gray-800 dark:text-white/80 ml-1">{scoreDiff >= 0 ? "+" : ""}{scoreDiff}%</span>
+                  vs Yest: <span className={`ml-1 ${isDarkMode ? "text-white" : "text-gray-800"}`}>{scoreDiff >= 0 ? "+" : ""}{scoreDiff}%</span>
                 </span>
               )}
             </div>
@@ -471,15 +481,17 @@ export default function FocusStatsCard() {
           </div>
 
           {/* RANGE SELECTOR */}
-          <div className="flex gap-1 overflow-x-auto bg-gray-50 dark:bg-white/[0.02] p-1 rounded-xl w-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] border border-gray-200 dark:border-white/[0.06]">
+          <div className={`flex gap-1 overflow-x-auto p-1 rounded-xl w-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] border transition-colors ${
+            isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-200"
+          }`}>
             {(["today", "yesterday", "week", "month", "year", "custom"] as DateRange[]).map((range) => (
               <button
                 key={range}
                 onClick={() => setSelectedRange(range)}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all flex-1 sm:flex-none text-center border ${
                   selectedRange === range
-                    ? "bg-white text-blue-700 border-gray-200 shadow-sm dark:bg-orange-500/10 dark:text-orange-500 dark:border-orange-500/20 dark:shadow-[0_0_15px_rgba(249,115,22,0.1)]"
-                    : "text-gray-500 border-transparent hover:text-gray-900 hover:bg-gray-200/50 dark:text-white/50 dark:hover:text-white/90 dark:hover:bg-white/[0.04]"
+                    ? (isDarkMode ? "bg-[#1a1a1a] text-orange-400 border-gray-700 shadow-inner" : "bg-white text-blue-700 border-gray-200 shadow-sm")
+                    : (isDarkMode ? "text-gray-500 border-transparent hover:text-white hover:bg-[#1a1a1a]" : "text-gray-500 border-transparent hover:text-gray-900 hover:bg-gray-200/50")
                 }`}
               >
                 {range === "week" ? "7 Days" : range.charAt(0).toUpperCase() + range.slice(1)}
@@ -490,36 +502,38 @@ export default function FocusStatsCard() {
 
         {/* WEEKLY CHART */}
         {selectedRange === "week" && (
-          <div className="mt-8 mb-4 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-all duration-300 p-4 -mx-4 rounded-2xl">
-            <h3 className="text-[10px] font-bold text-gray-400 dark:text-white/40 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Activity size={14} className="text-blue-500 dark:text-orange-500" /> Weekly Quality Breakdown
+          <div className={`mt-8 mb-4 transition-all duration-300 p-4 -mx-4 rounded-2xl ${isDarkMode ? "hover:bg-[#111111]" : "hover:bg-gray-50"}`}>
+            <h3 className={`text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+              <Activity size={14} className={isDarkMode ? "text-orange-500" : "text-blue-500"} /> Weekly Quality Breakdown
             </h3>
-            <div className="relative flex items-end justify-between h-36 gap-2 w-full pt-6 border-b border-gray-200 dark:border-white/[0.06]">
-               <div className="absolute inset-0 flex flex-col justify-between text-[10px] font-medium text-gray-400 dark:text-white/20 pb-6 pointer-events-none z-0">
-                  <div className="w-full border-b border-dashed border-gray-200 dark:border-white/[0.06] flex items-center justify-end pr-1 h-0"><span className="-translate-y-1/2 bg-white dark:bg-black pl-2">100%</span></div>
-                  <div className="w-full border-b border-dashed border-gray-200 dark:border-white/[0.06] flex items-center justify-end pr-1 h-0"><span className="-translate-y-1/2 bg-white dark:bg-black pl-2">50%</span></div>
-                  <div className="w-full flex items-center justify-end pr-1 h-0"><span className="-translate-y-1/2 bg-white dark:bg-black pl-2">0%</span></div>
+            <div className={`relative flex items-end justify-between h-36 gap-2 w-full pt-6 border-b transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-200"}`}>
+               <div className={`absolute inset-0 flex flex-col justify-between text-[10px] font-medium pb-6 pointer-events-none z-0 transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
+                  <div className={`w-full border-b border-dashed flex items-center justify-end pr-1 h-0 transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-200"}`}><span className={`-translate-y-1/2 pl-2 transition-colors ${isDarkMode ? "bg-black" : "bg-white"}`}>100%</span></div>
+                  <div className={`w-full border-b border-dashed flex items-center justify-end pr-1 h-0 transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-200"}`}><span className={`-translate-y-1/2 pl-2 transition-colors ${isDarkMode ? "bg-black" : "bg-white"}`}>50%</span></div>
+                  <div className="w-full flex items-center justify-end pr-1 h-0"><span className={`-translate-y-1/2 pl-2 transition-colors ${isDarkMode ? "bg-black" : "bg-white"}`}>0%</span></div>
                </div>
                
                <div className="relative z-10 flex items-end justify-between w-full h-full pb-6 px-1 lg:px-4">
                  {weeklyData.data.map((day, i) => {
-                   const barColor = day.dayScore >= 80 ? 'bg-green-500' : day.dayScore >= 50 ? 'bg-blue-500 dark:bg-orange-500' : 'bg-red-500';
+                   const barColor = day.dayScore >= 80 ? 'bg-green-500' : day.dayScore >= 50 ? (isDarkMode ? 'bg-orange-500' : 'bg-blue-500') : 'bg-red-500';
                    const isBestDay = weeklyData.bestDayObj.date === day.dateStr && day.dayScore > 0;
                    return (
                      <div key={i} className="flex flex-col items-center flex-1 group relative h-full justify-end cursor-crosshair">
                        {isBestDay && (
-                         <span className="text-[10px] text-purple-600 dark:text-purple-400 absolute -top-5 font-bold whitespace-nowrap dark:drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]">Best Day</span>
+                         <span className={`text-[10px] absolute -top-5 font-bold whitespace-nowrap transition-colors ${isDarkMode ? "text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" : "text-purple-600"}`}>Best Day</span>
                        )}
-                       <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-12 text-[10px] font-bold bg-gray-900 dark:bg-[#070707] dark:border border-white/[0.06] text-white dark:text-white/90 px-2 py-1 rounded shadow-lg whitespace-nowrap pointer-events-none z-20">
+                       <div className={`opacity-0 group-hover:opacity-100 transition-opacity absolute -top-12 text-[10px] font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap pointer-events-none z-20 transition-colors ${
+                         isDarkMode ? "bg-[#111111] border border-gray-800 text-white" : "bg-gray-900 text-white"
+                       }`}>
                          {day.dayScore}% • {formatHrsMins(day.dayTime)}
                        </div>
                        <div className="w-full px-1 flex items-end h-full">
                          <div 
-                           className={`w-full rounded-t-md shadow-sm transition-all duration-300 origin-bottom group-hover:scale-105 ${day.dayScore === 0 ? 'bg-gray-100 dark:bg-white/[0.04] min-h-[4px]' : barColor}`}
+                           className={`w-full rounded-t-md shadow-sm transition-all duration-300 origin-bottom group-hover:scale-105 ${day.dayScore === 0 ? (isDarkMode ? 'bg-[#111111] min-h-[4px]' : 'bg-gray-100 min-h-[4px]') : barColor}`}
                            style={{ height: `${Math.max(2, day.dayScore)}%` }}
                          />
                        </div>
-                       <span className="text-[10px] font-semibold text-gray-500 dark:text-white/40 mt-2 absolute -bottom-6">{day.dayName}</span>
+                       <span className={`text-[10px] font-semibold mt-2 absolute -bottom-6 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>{day.dayName}</span>
                      </div>
                    );
                  })}
@@ -533,30 +547,30 @@ export default function FocusStatsCard() {
           
           {/* 🔥 1. LIVE FOCUS SIGNAL BLOCK */}
           {isActive && (
-            <div className="bg-white dark:bg-[#070707] border border-gray-200 dark:border-white/[0.06] rounded-2xl p-5 shadow-sm relative overflow-hidden">
+            <div className={`border rounded-2xl p-5 shadow-sm relative overflow-hidden transition-colors duration-300 ${isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"}`}>
               
               {/* Overlay for Paused State */}
               {isPaused && (
-                <div className="absolute inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-[2px] flex items-center justify-center z-20 rounded-2xl">
-                  <span className="text-xs font-semibold text-gray-800 dark:text-white/80 flex items-center gap-2">
-                    <Pause size={14} className="text-yellow-600 dark:text-yellow-500" /> Monitoring Paused
+                <div className={`absolute inset-0 backdrop-blur-[2px] flex items-center justify-center z-20 rounded-2xl transition-colors ${isDarkMode ? "bg-black/60" : "bg-white/60"}`}>
+                  <span className={`text-xs font-semibold flex items-center gap-2 transition-colors ${isDarkMode ? "text-white" : "text-gray-800"}`}>
+                    <Pause size={14} className={isDarkMode ? "text-yellow-500" : "text-yellow-600"} /> Monitoring Paused
                   </span>
                 </div>
               )}
 
               <div className="flex justify-between items-start mb-3">
-                <div className={`text-[10px] uppercase font-bold flex items-center gap-1.5 ${isPaused ? 'text-gray-400 dark:text-white/40' : 'text-gray-500 dark:text-white/60'}`}>
-                  <Activity size={14} className={isPaused ? "text-gray-300 dark:text-white/20" : "text-blue-500 dark:text-orange-500 transition-opacity duration-1000"} /> 
+                <div className={`text-[10px] uppercase font-bold flex items-center gap-1.5 transition-colors ${isPaused ? (isDarkMode ? 'text-gray-500' : 'text-gray-400') : (isDarkMode ? 'text-gray-400' : 'text-gray-500')}`}>
+                  <Activity size={14} className={isPaused ? (isDarkMode ? "text-gray-600" : "text-gray-300") : (isDarkMode ? "text-orange-500 transition-opacity duration-1000" : "text-blue-500 transition-opacity duration-1000")} /> 
                   {isPaused ? "Monitoring Paused" : "Live Focus Signal"}
                 </div>
                 {recentDistraction && !isPaused && (
-                  <span className="text-[10px] text-red-500 dark:text-red-400 font-bold animate-pulse">
+                  <span className={`text-[10px] font-bold animate-pulse transition-colors ${isDarkMode ? "text-red-400" : "text-red-500"}`}>
                     ⚠ Distraction detected
                   </span>
                 )}
               </div>
 
-              <div className={`relative flex items-end gap-[2px] px-[2px] h-20 w-full z-10 border-b border-gray-100 dark:border-white/[0.06] ${isPaused ? "opacity-60" : ""}`}>
+              <div className={`relative flex items-end gap-[2px] px-[2px] h-20 w-full z-10 border-b transition-colors ${isPaused ? "opacity-60" : ""} ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
                 {currentSession?.distractions?.map((d: DistractionEvent, idx: number) => {
                   const ageSeconds = (Date.now() - d.timestamp) / 1000;
                   if (ageSeconds > 40) return null;
@@ -564,7 +578,7 @@ export default function FocusStatsCard() {
                   return (
                     <div
                       key={idx}
-                      className="absolute bottom-0 w-[2px] bg-red-400 dark:bg-red-500 h-full opacity-40 z-0 dark:shadow-[0_0_8px_rgba(239,68,68,0.6)]"
+                      className={`absolute bottom-0 w-[2px] h-full opacity-40 z-0 transition-colors ${isDarkMode ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" : "bg-red-400"}`}
                       style={{ right: `${rightPct}%` }}
                     />
                   );
@@ -575,7 +589,7 @@ export default function FocusStatsCard() {
                   const isBlueOrOrange = val > 40 && val <= 70;
                   const isYellow = val > 20 && val <= 40;
                   
-                  const colorClass = isGreen ? "bg-green-500" : isBlueOrOrange ? "bg-blue-500 dark:bg-orange-500" : isYellow ? "bg-orange-400 dark:bg-yellow-500" : "bg-red-500";
+                  const colorClass = isGreen ? "bg-green-500" : isBlueOrOrange ? (isDarkMode ? "bg-orange-500" : "bg-blue-500") : isYellow ? (isDarkMode ? "bg-yellow-500" : "bg-orange-400") : "bg-red-500";
                   const glowClass = isGreen ? "shadow-[0_0_6px_rgba(34,197,94,0.4)]" : "";
 
                   return (
@@ -591,9 +605,9 @@ export default function FocusStatsCard() {
               <div className="text-[11px] font-bold mt-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className={
-                    currentSignal > 70 ? "text-green-600 dark:text-green-400" :
-                    currentSignal > 40 ? "text-blue-600 dark:text-orange-400" :
-                    currentSignal > 20 ? "text-orange-500 dark:text-yellow-400" : "text-red-600 dark:text-red-400"
+                    currentSignal > 70 ? (isDarkMode ? "text-green-400" : "text-green-600") :
+                    currentSignal > 40 ? (isDarkMode ? "text-orange-400" : "text-blue-600") :
+                    currentSignal > 20 ? (isDarkMode ? "text-yellow-400" : "text-orange-500") : (isDarkMode ? "text-red-400" : "text-red-600")
                   }>
                     {currentSignal > 70 ? "Locked In" :
                      currentSignal > 40 ? "On Track" :
@@ -601,57 +615,59 @@ export default function FocusStatsCard() {
                   </span>
                   
                   {!isPaused && (
-                    <span className="text-[10px] text-gray-500 dark:text-white/50 font-medium">
+                    <span className={`text-[10px] font-medium transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
                       {trend > 0 ? "↑ Improving" : trend < 0 ? "↓ Dropping" : "→ Stable"}
                     </span>
                   )}
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="text-[9px] text-gray-400 dark:text-white/40 uppercase tracking-wider">Live Monitoring</span>
-                  <span className="text-[8px] text-gray-300 dark:text-white/30">Approximate signal</span>
+                  <span className={`text-[9px] uppercase tracking-wider transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Live Monitoring</span>
+                  <span className={`text-[8px] transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}>Approximate signal</span>
                 </div>
               </div>
-              <div className="text-[9px] text-gray-400 dark:text-white/30 mt-1.5">
+              <div className={`text-[9px] mt-1.5 transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
                 Based on activity + interruptions
               </div>
             </div>
           )}
 
           {/* 🥇 LEVEL 1: HERO METRIC */}
-          <div className="bg-white dark:bg-[#070707] hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-all duration-300 border border-gray-200 dark:border-white/[0.06] p-6 rounded-2xl shadow-sm relative overflow-hidden">
-            <div className="text-[10px] text-gray-500 dark:text-white/40 font-bold uppercase tracking-wider flex justify-between items-center">
+          <div className={`transition-all duration-300 border p-6 rounded-2xl shadow-sm relative overflow-hidden ${
+            isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-200"
+          }`}>
+            <div className={`text-[10px] font-bold uppercase tracking-wider flex justify-between items-center transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
               <span>{selectedRange} Focus Time</span>
-              {flowRatio > 0 && <span className="text-purple-600 dark:text-purple-400 flex items-center gap-1"><Zap size={12}/> {flowRatio}% Flow</span>}
+              {flowRatio > 0 && <span className={`flex items-center gap-1 transition-colors ${isDarkMode ? "text-purple-400" : "text-purple-600"}`}><Zap size={12}/> {flowRatio}% Flow</span>}
             </div>
             
-            <div className="text-5xl sm:text-6xl font-[520] tracking-[-0.03em] text-gray-900 dark:text-white/90 dark:drop-shadow-[0_0_24px_rgba(255,255,255,0.04)] mt-2">
+            <div className={`text-5xl sm:text-6xl font-[520] tracking-[-0.03em] mt-2 transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>
               {formatHrsMins(totalFocusSeconds)}
             </div>
             
-            <div className="text-xs text-gray-500 dark:text-white/50 mt-2 font-medium flex items-center gap-1.5">
-              <Clock size={12} className="text-blue-500 dark:text-orange-500" /> Extra: <span className="text-purple-600 dark:text-purple-400 font-bold">+{formatHrsMins(totalExtraSeconds)}</span>
+            <div className={`text-xs mt-2 font-medium flex items-center gap-1.5 transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              <Clock size={12} className={isDarkMode ? "text-orange-500" : "text-blue-500"} /> Extra: <span className={`font-bold transition-colors ${isDarkMode ? "text-purple-400" : "text-purple-600"}`}>+{formatHrsMins(totalExtraSeconds)}</span>
             </div>
 
-            <div className="text-[11px] text-gray-400 dark:text-white/40 mt-1 font-bold uppercase tracking-wider">
+            <div className={`text-[11px] mt-1 font-bold uppercase tracking-wider transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
               Total Execution: {formatHrsMins(totalActualFocus)}
             </div>
             
-            <div className="mt-5 h-2 bg-gray-100 dark:bg-white/[0.04] rounded-full overflow-hidden">
+            <div className={`mt-5 h-2 rounded-full overflow-hidden transition-colors ${isDarkMode ? "bg-[#1a1a1a]" : "bg-gray-100"}`}>
               <div 
                 className={`h-full transition-all duration-1000 ease-out ${
                   goalProgress >= 100
-                    ? "bg-purple-500 dark:shadow-[0_0_12px_rgba(168,85,247,0.5)]"
-                    : "bg-gradient-to-r from-blue-500 to-green-500 dark:from-white/10 dark:to-orange-500"
+                    ? (isDarkMode ? "bg-purple-500 shadow-[0_0_12px_rgba(168,85,247,0.5)]" : "bg-purple-500")
+                    : (isDarkMode ? "bg-gradient-to-r from-gray-700 to-orange-500" : "bg-gradient-to-r from-blue-500 to-green-500")
                 }`}
                 style={{ width: `${goalProgress}%` }}
               />
             </div>
             
             <div className="flex justify-between items-center mt-3 text-[11px] font-bold">
-              <span className={goalProgress >= 100 ? "text-purple-600 dark:text-purple-400" : goalProgress >= 50 ? "text-blue-600 dark:text-orange-400" : "text-gray-500 dark:text-white/60"}>
+              <span className={goalProgress >= 100 ? (isDarkMode ? "text-purple-400" : "text-purple-600") : goalProgress >= 50 ? (isDarkMode ? "text-orange-400" : "text-blue-600") : (isDarkMode ? "text-gray-500" : "text-gray-500")}>
                 {Math.round(goalProgress)}% achieved
               </span>
-              <span className="text-gray-500 dark:text-white/50">
+              <span className={`transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
                 {formatHrsMins(goalTarget)} Target
               </span>
             </div>
@@ -659,7 +675,9 @@ export default function FocusStatsCard() {
 
           <div className={`md:hidden ${showMobileDetails ? 'hidden' : 'block'}`}>
              <button 
-                className="w-full text-center text-xs text-gray-600 dark:text-white/60 font-semibold py-3 bg-gray-50 dark:bg-[#070707] border border-gray-200 dark:border-white/[0.06] rounded-xl hover:bg-gray-100 dark:hover:bg-white/[0.03] transition-colors flex items-center justify-center gap-2"
+                className={`w-full text-center text-xs font-semibold py-3 border rounded-xl transition-colors flex items-center justify-center gap-2 ${
+                  isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800 text-gray-400" : "bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-600"
+                }`}
                 onClick={() => setShowMobileDetails(true)}
               >
                 View deeper insights <ChevronRight size={14} />
@@ -669,36 +687,40 @@ export default function FocusStatsCard() {
           {/* 🥈 LEVEL 2: SECONDARY METRICS */}
           <div className={`grid grid-cols-2 md:grid-cols-2 gap-4 ${showMobileDetails ? 'block' : 'hidden md:grid'}`}>
             
-            <div className="p-5 bg-white dark:bg-[#070707] hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-all duration-300 border border-gray-200 dark:border-white/[0.06] rounded-2xl shadow-sm flex flex-col justify-center items-center text-center">
+            <div className={`p-5 transition-all duration-300 border rounded-2xl shadow-sm flex flex-col justify-center items-center text-center ${
+              isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-200"
+            }`}>
               <div 
                 className="relative w-20 h-20 mx-auto flex-shrink-0 rounded-full flex items-center justify-center"
                 style={{
-                  background: `conic-gradient(${avgScore >= 80 ? '#22c55e' : avgScore >= 50 ? '#3b82f6' : '#ef4444'} ${avgScore}%, rgba(156,163,175,0.2) ${avgScore}%)` // using a neutral gray fallback
+                  background: `conic-gradient(${avgScore >= 80 ? '#22c55e' : avgScore >= 50 ? '#3b82f6' : '#ef4444'} ${avgScore}%, rgba(156,163,175,0.2) ${avgScore}%)` 
                 }}
               >
-                <div className="w-16 h-16 bg-white dark:bg-black rounded-full flex items-center justify-center absolute">
-                  <span className="text-base font-bold text-gray-900 dark:text-white/90">{avgScore}%</span>
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center absolute transition-colors ${isDarkMode ? "bg-[#111111]" : "bg-white"}`}>
+                  <span className={`text-base font-bold transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>{avgScore}%</span>
                 </div>
               </div>
-              <div className="text-[10px] text-gray-400 dark:text-white/40 font-bold uppercase tracking-wider mt-4">Avg Quality</div>
+              <div className={`text-[10px] font-bold uppercase tracking-wider mt-4 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Avg Quality</div>
             </div>
 
-            <div className="p-5 bg-white dark:bg-[#070707] hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-all duration-300 border border-gray-200 dark:border-white/[0.06] rounded-2xl shadow-sm flex flex-col justify-center">
-              <div className="flex justify-between text-[10px] font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider mb-2">
+            <div className={`p-5 transition-all duration-300 border rounded-2xl shadow-sm flex flex-col justify-center ${
+              isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-200"
+            }`}>
+              <div className={`flex justify-between text-[10px] font-bold uppercase tracking-wider mb-2 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
                 <span>Sessions</span>
                 <span>Breaks</span>
               </div>
               <div className="flex justify-between items-center px-2 mt-2">
                 <div className="flex items-center gap-2">
-                  <Activity size={16} className="text-blue-500 dark:text-orange-500" />
-                  <span className="text-3xl font-bold text-gray-900 dark:text-white/90">{totalSessions}</span>
+                  <Activity size={16} className={isDarkMode ? "text-orange-500" : "text-blue-500"} />
+                  <span className={`text-3xl font-bold transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>{totalSessions}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <AlertTriangle size={16} className="text-red-500" />
-                  <span className="text-3xl font-bold text-red-500 dark:text-red-400">{totalDistractions}</span>
+                  <span className={`text-3xl font-bold transition-colors ${isDarkMode ? "text-red-400" : "text-red-500"}`}>{totalDistractions}</span>
                 </div>
               </div>
-              <div className="mt-4 text-[9px] text-gray-400 dark:text-white/40 text-center uppercase tracking-wider font-semibold border-t border-gray-100 dark:border-white/[0.06] pt-3">
+              <div className={`mt-4 text-[9px] text-center uppercase tracking-wider font-semibold border-t pt-3 transition-colors ${isDarkMode ? "text-gray-500 border-gray-800" : "text-gray-400 border-gray-100"}`}>
                 Work vs Interruptions
               </div>
             </div>
@@ -707,32 +729,34 @@ export default function FocusStatsCard() {
           {/* NEW CHARTS GRID */}
           <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 ${showMobileDetails ? 'block' : 'hidden md:grid'}`}>
             
-            <div className="bg-white dark:bg-[#070707] hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-all duration-300 border border-gray-200 dark:border-white/[0.06] rounded-2xl p-5 shadow-sm flex flex-col justify-center">
-              <h3 className="text-[10px] font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider mb-4 flex items-center gap-1.5">
-                <Activity size={14} className="text-blue-500 dark:text-orange-500" /> Focus vs Distractions
+            <div className={`transition-all duration-300 border rounded-2xl p-5 shadow-sm flex flex-col justify-center ${
+              isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-200"
+            }`}>
+              <h3 className={`text-[10px] font-bold uppercase tracking-wider mb-4 flex items-center gap-1.5 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+                <Activity size={14} className={isDarkMode ? "text-orange-500" : "text-blue-500"} /> Focus vs Distractions
               </h3>
 
               <div className="flex flex-col gap-3 mt-1">
                 <div>
-                  <div className="flex justify-between text-[10px] text-gray-500 dark:text-white/50 mb-1.5 font-semibold">
+                  <div className={`flex justify-between text-[10px] mb-1.5 font-semibold transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                     <span>Focus Time</span>
-                    <span className="text-blue-600 dark:text-orange-400 font-bold">{formatHrsMins(totalFocusSeconds)}</span>
+                    <span className={`font-bold transition-colors ${isDarkMode ? "text-orange-400" : "text-blue-600"}`}>{formatHrsMins(totalFocusSeconds)}</span>
                   </div>
-                  <div className="h-2.5 bg-gray-100 dark:bg-white/[0.04] rounded-full overflow-hidden shadow-inner">
+                  <div className={`h-2.5 rounded-full overflow-hidden shadow-inner transition-colors ${isDarkMode ? "bg-[#1a1a1a]" : "bg-gray-100"}`}>
                     <div
-                      className="h-full bg-blue-500 dark:bg-orange-500 transition-all duration-500 rounded-full"
+                      className={`h-full transition-all duration-500 rounded-full ${isDarkMode ? "bg-orange-500" : "bg-blue-500"}`}
                       style={{ width: `${totalFocusSeconds === 0 ? 0 : (totalFocusSeconds / Math.max(1, totalFocusSeconds + totalDistractions * 60)) * 100}%` }} 
                     />
                   </div>
                 </div>
                 <div className="mt-2">
-                  <div className="flex justify-between text-[10px] text-gray-500 dark:text-white/50 mb-1.5 font-semibold">
+                  <div className={`flex justify-between text-[10px] mb-1.5 font-semibold transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                     <span>Interruptions</span>
-                    <span className="text-red-500 dark:text-red-400 font-bold">{totalDistractions}</span>
+                    <span className={`font-bold transition-colors ${isDarkMode ? "text-red-400" : "text-red-500"}`}>{totalDistractions}</span>
                   </div>
-                  <div className="h-2.5 bg-gray-100 dark:bg-white/[0.04] rounded-full overflow-hidden shadow-inner">
+                  <div className={`h-2.5 rounded-full overflow-hidden shadow-inner transition-colors ${isDarkMode ? "bg-[#1a1a1a]" : "bg-gray-100"}`}>
                     <div
-                      className="h-full bg-red-500 transition-all duration-500 rounded-full dark:shadow-[0_0_8px_rgba(239,68,68,0.5)]"
+                      className={`h-full bg-red-500 transition-all duration-500 rounded-full ${isDarkMode ? "shadow-[0_0_8px_rgba(239,68,68,0.5)]" : ""}`}
                       style={{ width: `${totalFocusSeconds === 0 && totalDistractions === 0 ? 0 : ((totalDistractions * 60) / Math.max(1, totalFocusSeconds + totalDistractions * 60)) * 100}%` }}
                     />
                   </div>
@@ -740,26 +764,28 @@ export default function FocusStatsCard() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-[#070707] hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-all duration-300 border border-gray-200 dark:border-white/[0.06] rounded-2xl p-5 shadow-sm flex flex-col justify-center">
-              <h3 className="text-[10px] font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider mb-4 flex items-center gap-1.5">
-                <Clock size={14} className="text-purple-600 dark:text-purple-400" /> Session Trend
+            <div className={`transition-all duration-300 border rounded-2xl p-5 shadow-sm flex flex-col justify-center ${
+              isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-200"
+            }`}>
+              <h3 className={`text-[10px] font-bold uppercase tracking-wider mb-4 flex items-center gap-1.5 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+                <Clock size={14} className={isDarkMode ? "text-purple-400" : "text-purple-600"} /> Session Trend
               </h3>
 
               <div className="flex items-end gap-3 h-[72px] mt-2">
                 {last3Sessions.length > 0 ? last3Sessions.slice().reverse().map((s, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group cursor-crosshair">
                     <div
-                      className="w-full bg-blue-500 dark:bg-purple-500 rounded-t-md transition-all duration-500 group-hover:bg-blue-400 dark:group-hover:bg-purple-400 shadow-sm"
+                      className={`w-full rounded-t-md transition-all duration-500 shadow-sm ${isDarkMode ? "bg-purple-500 group-hover:bg-purple-400" : "bg-blue-500 group-hover:bg-blue-400"}`}
                       style={{
                         height: `${Math.max(5, Math.min(100, (s.durationSeconds / 3600) * 100))}%`
                       }}
                     />
-                    <span className="text-[10px] font-bold text-gray-500 dark:text-white/50 mt-2">
+                    <span className={`text-[10px] font-bold mt-2 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
                       {formatHrsMins(s.durationSeconds)}
                     </span>
                   </div>
                 )) : (
-                  <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 dark:text-white/40 font-medium">No recent sessions</div>
+                  <div className={`w-full h-full flex items-center justify-center text-[10px] font-medium transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>No recent sessions</div>
                 )}
               </div>
             </div>
@@ -772,63 +798,67 @@ export default function FocusStatsCard() {
         </div>
 
         {/* 🧠 LEVEL 3: INTELLIGENCE PANEL */}
-        <div className="mt-6 bg-white dark:bg-[#070707] hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-all duration-300 p-6 rounded-2xl border border-gray-200 dark:border-white/[0.06] shadow-sm flex flex-col md:flex-row gap-6">
+        <div className={`mt-6 transition-all duration-300 p-6 rounded-2xl border shadow-sm flex flex-col md:flex-row gap-6 ${
+          isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-200"
+        }`}>
           <div className="flex-1 flex flex-col justify-between">
             <div>
               {isInFlow && (
-                <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                <div className={`text-[10px] font-bold mb-2 uppercase tracking-wider flex items-center gap-1.5 transition-colors ${isDarkMode ? "text-purple-400" : "text-purple-600"}`}>
                   <Zap size={12} /> Flow State Active
                 </div>
               )}
-              <div className="text-sm font-bold text-gray-900 dark:text-white/90 mb-2">{insight.summary}</div>
-              <div className="text-xs text-gray-600 dark:text-white/60 font-medium mb-4 md:mb-0 leading-relaxed">
-                <span className="text-gray-400 dark:text-white/40">Analysis:</span> {insight.issue}
+              <div className={`text-sm font-bold mb-2 transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>{insight.summary}</div>
+              <div className={`text-xs font-medium mb-4 md:mb-0 leading-relaxed transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                <span className={`transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Analysis:</span> {insight.issue}
               </div>
               
               <button
                 onClick={handleQuickAction}
-                className="mt-4 px-4 py-2 w-fit text-sm font-semibold text-gray-900 dark:text-orange-500 bg-white dark:bg-orange-500/10 border border-gray-200 dark:border-orange-500/20 rounded-lg hover:border-blue-500 hover:text-blue-600 dark:hover:border-orange-500/40 dark:hover:bg-orange-500/20 transition-colors"
+                className={`mt-4 px-4 py-2 w-fit text-sm font-semibold rounded-lg transition-colors border ${
+                  isDarkMode ? "bg-orange-950/30 border-orange-900/50 text-orange-400 hover:border-orange-500 hover:bg-orange-900/40" : "bg-white border-gray-200 text-gray-900 hover:border-blue-500 hover:text-blue-600"
+                }`}
               >
                 {insight.actionText}
               </button>
             </div>
             
-            <div className="mt-auto pt-5 border-t border-gray-100 dark:border-white/[0.06] flex flex-col gap-3">
+            <div className={`mt-auto pt-5 border-t flex flex-col gap-3 transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
 
-              <span className="text-[10px] text-gray-500 dark:text-white/40 uppercase tracking-wider font-bold">
+              <span className={`text-[10px] uppercase tracking-wider font-bold transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
                 Focus DNA
               </span>
 
               <div className="grid grid-cols-2 gap-3 text-[11px]">
 
-                <div className="bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/[0.06] rounded-lg p-2">
-                  <div className="text-gray-400 dark:text-white/40 text-[9px] uppercase">Pattern</div>
-                  <div className="font-bold text-gray-800 dark:text-white/80">
+                <div className={`border rounded-lg p-2 transition-colors ${isDarkMode ? "bg-black border-gray-800" : "bg-gray-50 border-gray-200"}`}>
+                  <div className={`text-[9px] uppercase transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Pattern</div>
+                  <div className={`font-bold transition-colors ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>
                     {flowRatio > 30 ? "Deep Flow Builder" :
                      totalDistractions > 5 ? "Interrupt Driven" :
                      "Structured Executor"}
                   </div>
                 </div>
 
-                <div className="bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/[0.06] rounded-lg p-2">
-                  <div className="text-gray-400 dark:text-white/40 text-[9px] uppercase">Energy</div>
-                  <div className="font-bold text-gray-800 dark:text-white/80">
+                <div className={`border rounded-lg p-2 transition-colors ${isDarkMode ? "bg-black border-gray-800" : "bg-gray-50 border-gray-200"}`}>
+                  <div className={`text-[9px] uppercase transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Energy</div>
+                  <div className={`font-bold transition-colors ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>
                     {avgScore >= 80 ? "High Stability" :
                      avgScore >= 50 ? "Moderate" :
                      "Unstable"}
                   </div>
                 </div>
 
-                <div className="bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/[0.06] rounded-lg p-2">
-                  <div className="text-gray-400 dark:text-white/40 text-[9px] uppercase">Flow Behavior</div>
-                  <div className="font-bold text-gray-800 dark:text-white/80">
+                <div className={`border rounded-lg p-2 transition-colors ${isDarkMode ? "bg-black border-gray-800" : "bg-gray-50 border-gray-200"}`}>
+                  <div className={`text-[9px] uppercase transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Flow Behavior</div>
+                  <div className={`font-bold transition-colors ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>
                     {totalExtraSeconds > 0 ? "Extends Sessions" : "Stops on Timer"}
                   </div>
                 </div>
 
-                <div className="bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/[0.06] rounded-lg p-2">
-                  <div className="text-gray-400 dark:text-white/40 text-[9px] uppercase">Risk</div>
-                  <div className="font-bold text-red-500 dark:text-red-400">
+                <div className={`border rounded-lg p-2 transition-colors ${isDarkMode ? "bg-black border-gray-800" : "bg-gray-50 border-gray-200"}`}>
+                  <div className={`text-[9px] uppercase transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Risk</div>
+                  <div className={`font-bold transition-colors ${isDarkMode ? "text-red-400" : "text-red-500"}`}>
                     {topIssue !== "None" ? topIssue : "Low"}
                   </div>
                 </div>
@@ -837,23 +867,23 @@ export default function FocusStatsCard() {
             </div>
           </div>
 
-          <div className={`${showMobileDetails ? 'block' : 'hidden'} md:block md:w-[40%] md:border-l md:border-gray-100 dark:md:border-white/[0.06] md:pl-6 mt-4 md:mt-0`}>
-            <div className="text-[10px] font-bold text-gray-400 dark:text-white/40 uppercase tracking-wider mb-4 flex items-center gap-1.5">
-              <Target size={14} className="text-gray-400 dark:text-white/40" /> Pattern Preview
+          <div className={`${showMobileDetails ? 'block' : 'hidden'} md:block md:w-[40%] md:border-l md:pl-6 mt-4 md:mt-0 transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+            <div className={`text-[10px] font-bold uppercase tracking-wider mb-4 flex items-center gap-1.5 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+              <Target size={14} className={isDarkMode ? "text-gray-600" : "text-gray-400"} /> Pattern Preview
             </div>
             {last3Sessions.length === 0 ? (
-              <div className="text-xs text-gray-400 dark:text-white/30 italic">No history to analyze.</div>
+              <div className={`text-xs italic transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>No history to analyze.</div>
             ) : (
               <div className="space-y-4">
                 {last3Sessions.map((s, i) => {
-                  const barColor = s.score >= 80 ? 'bg-green-500' : s.score >= 50 ? 'bg-blue-500 dark:bg-orange-500' : 'bg-red-500';
-                  const textColor = s.score >= 80 ? 'text-green-600 dark:text-green-400' : s.score >= 50 ? 'text-blue-600 dark:text-orange-400' : 'text-red-600 dark:text-red-400';
+                  const barColor = s.score >= 80 ? 'bg-green-500' : s.score >= 50 ? (isDarkMode ? 'bg-orange-500' : 'bg-blue-500') : 'bg-red-500';
+                  const textColor = s.score >= 80 ? (isDarkMode ? 'text-green-400' : 'text-green-600') : s.score >= 50 ? (isDarkMode ? 'text-orange-400' : 'text-blue-600') : (isDarkMode ? 'text-red-400' : 'text-red-600');
                   return (
                     <div key={i} className="flex justify-between items-center text-[11px]">
-                      <span className="text-gray-600 dark:text-white/60 font-bold whitespace-nowrap min-w-[32px]">
+                      <span className={`font-bold whitespace-nowrap min-w-[32px] transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                         {formatHrsMins(s.durationSeconds + (s.extraDuration || 0))}
                       </span>
-                      <div className="flex-1 mx-3 bg-gray-100 dark:bg-white/[0.04] h-1.5 rounded-full overflow-hidden shadow-inner">
+                      <div className={`flex-1 mx-3 h-1.5 rounded-full overflow-hidden shadow-inner transition-colors ${isDarkMode ? "bg-[#1a1a1a]" : "bg-gray-100"}`}>
                         <div className={`h-full ${barColor}`} style={{ width: `${s.score}%` }} />
                       </div>
                       <span className={`font-bold ${textColor}`}>{s.score}%</span>
@@ -867,7 +897,9 @@ export default function FocusStatsCard() {
 
         {showMobileDetails && (
            <button 
-            className="md:hidden w-full text-center text-xs text-gray-500 dark:text-white/50 font-semibold py-3 mt-4 border border-gray-200 dark:border-white/[0.06] rounded-xl hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors shadow-sm"
+            className={`md:hidden w-full text-center text-xs font-semibold py-3 mt-4 border rounded-xl transition-colors shadow-sm ${
+              isDarkMode ? "text-gray-500 border-gray-800 hover:bg-[#111111]" : "text-gray-500 border-gray-200 hover:bg-gray-50"
+            }`}
             onClick={() => setShowMobileDetails(false)}
           >
             Hide extra insights
