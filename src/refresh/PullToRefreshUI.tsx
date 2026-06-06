@@ -1,85 +1,105 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { ArrowDown, Loader2 } from "lucide-react";
+import { ArrowDown, Loader2, Check } from "lucide-react";
 import { useGlobalRefresh } from "@/refresh/engine/useGlobalRefresh"; 
 import { usePullToRefresh } from "./engine/usePullToRefresh";
 
 export default function PullToRefreshUI() {
   const { refreshPage } = useGlobalRefresh();
-  const { pullDistance, readyToRefresh, isRefreshing } = usePullToRefresh(() => {
-    refreshPage();
+  
+  const { 
+    pullDistance, 
+    isDragging, 
+    readyToRefresh, 
+    isRefreshing, 
+    isSuccess 
+  } = usePullToRefresh(async () => {
+    await refreshPage();
   });
 
   // Haptic feedback trigger when the release threshold is met
   useEffect(() => {
-    if (readyToRefresh && typeof navigator !== "undefined" && navigator.vibrate) {
+    if (readyToRefresh && typeof navigator !== "undefined" && navigator.vibrate && !isRefreshing && !isSuccess) {
       navigator.vibrate(10);
     }
-  }, [readyToRefresh]);
+  }, [readyToRefresh, isRefreshing, isSuccess]);
 
-  if (pullDistance <= 0 && !isRefreshing) return null;
+  // Keep DOM clean when completely idle
+  if (pullDistance <= 0 && !isRefreshing && !isSuccess) return null;
 
-  // Calculate circular progress (0 to 100)
-  const progress = Math.min((pullDistance / 70) * 100, 100);
-  const radius = 10;
-  const circumference = 2 * Math.PI * radius; // ~62.8
+  const REFRESH_THRESHOLD = 35;
+  const progress = Math.min((pullDistance / REFRESH_THRESHOLD) * 100, 100);
+  
+  const radius = 16;
+  const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+  // When actively dragging, follow finger. 
+  // When refreshing/success, lock at 60px.
+  const translateY = isRefreshing || isSuccess ? 60 : Math.min(pullDistance * 1.2, 80);
+  const isVisible = pullDistance > 0 || isRefreshing || isSuccess;
 
   return (
     <div
-      className="fixed top-3 left-0 w-full flex justify-center z-[9999] pointer-events-none transition-transform duration-200 ease-out"
+      className="fixed top-0 left-0 w-full flex justify-center z-[9999] pointer-events-none"
       style={{
-        // Elastic drag formula + Subtle scale-up for responsiveness
-        transform: `translateY(${
-          isRefreshing ? 70 : Math.min(pullDistance * 0.65, 90)
-        }px) scale(${Math.min(0.9 + pullDistance / 150, 1)})`,
+        transform: `translateY(${translateY}px) scale(${isVisible ? 1 : 0.8})`,
+        opacity: isVisible ? 1 : 0,
+        // Disable transitions while finger is down. Enable spring when finger releases.
+        transition: isDragging 
+          ? "none" 
+          : "transform 300ms cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms ease",
       }}
     >
       <div 
-        className={`px-4 py-2.5 rounded-full bg-[var(--surface)]/80 backdrop-blur-xl border border-[var(--border)] shadow-[0_8px_30px_rgba(0,0,0,0.08)] flex items-center gap-3 text-xs font-semibold transition-all duration-300 ${
-          isRefreshing ? "shadow-[0_0_20px_rgba(59,130,246,0.15)] animate-pulse" : ""
+        className={`relative flex items-center justify-center h-10 rounded-full bg-[var(--surface)] border border-[var(--border)] shadow-md text-[var(--foreground)] transition-all duration-300 overflow-hidden ${
+          isRefreshing || isSuccess ? "w-auto px-4 gap-2" : "w-10 px-0"
         }`}
       >
-        {isRefreshing ? (
+        {isSuccess ? (
           <>
-            <Loader2 size={16} className="animate-spin text-blue-500" />
-            <span className="text-[var(--foreground)]">Syncing your system...</span>
+            <Check size={16} className="text-emerald-500 shrink-0 animate-in zoom-in duration-200" />
+            <span className="text-xs font-bold text-[var(--foreground)] pr-1 animate-in fade-in slide-in-from-right-4 duration-300">
+              Updated
+            </span>
+          </>
+        ) : isRefreshing ? (
+          <>
+            <Loader2 size={16} className="animate-spin text-blue-500 shrink-0" />
+            <span className="text-xs font-bold text-[var(--foreground)] pr-1 animate-in fade-in slide-in-from-right-4 duration-300">
+              Syncing...
+            </span>
           </>
         ) : (
           <>
-            {/* SVG Progress Ring + Arrow */}
-            <div className="relative flex items-center justify-center w-5 h-5">
-              <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 24 24">
-                {/* Background Track */}
-                <circle 
-                  cx="12" cy="12" r={radius} 
-                  stroke="currentColor" 
-                  strokeWidth="2.5" 
-                  fill="none" 
-                  className="text-[var(--border)] opacity-50" 
-                />
-                {/* Fill Track */}
-                <circle 
-                  cx="12" cy="12" r={radius} 
-                  stroke="currentColor" 
-                  strokeWidth="2.5" 
-                  fill="none" 
-                  strokeDasharray={circumference} 
-                  strokeDashoffset={strokeDashoffset} 
-                  className="text-blue-500 transition-all duration-75 ease-out" 
-                />
-              </svg>
-              <ArrowDown
-                size={10}
-                className={`transition-transform duration-300 ${
-                  readyToRefresh ? "rotate-180 scale-125 text-[var(--foreground)]" : "text-[var(--muted)]"
-                }`}
+            {/* SVG Progress Ring */}
+            <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 40 40">
+              <circle 
+                cx="20" cy="20" r={radius} 
+                stroke="currentColor" 
+                strokeWidth="2.5" 
+                fill="none" 
+                className="text-[var(--border)] opacity-30" 
               />
-            </div>
-            <span className={readyToRefresh ? "text-[var(--foreground)]" : "text-[var(--muted)]"}>
-              {readyToRefresh ? "Release to update" : "Pull to sync"}
-            </span>
+              <circle 
+                cx="20" cy="20" r={radius} 
+                stroke="currentColor" 
+                strokeWidth="2.5" 
+                fill="none" 
+                strokeDasharray={circumference} 
+                strokeDashoffset={strokeDashoffset} 
+                className="text-blue-500 transition-all duration-75 ease-out" 
+              />
+            </svg>
+            
+            {/* Inner Arrow */}
+            <ArrowDown
+              size={16}
+              className={`transition-transform duration-300 ${
+                readyToRefresh ? "rotate-180 text-blue-500" : "text-[var(--muted)]"
+              }`}
+            />
           </>
         )}
       </div>

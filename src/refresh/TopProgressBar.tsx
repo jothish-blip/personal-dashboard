@@ -75,7 +75,7 @@ function ProgressBarContent() {
         style={{
           width: `${progress}%`,
           opacity,
-          background: "linear-gradient(90deg, #fb923c, #f97316)",
+          background: "linear-gradient(90deg, #ffb86b, #ff7a00, #ff5a00)",
         }}
       >
         {/* Premium shimmer/pulse effect */}

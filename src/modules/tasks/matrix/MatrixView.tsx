@@ -15,7 +15,6 @@ import {
 } from "./utils";
 
 import Header from "./components/Header/Header";
-import Decisions from "./components/Decisions/Decisions";
 import Grid from "./components/Grid/Grid";
 import Sidebar from "./components/Sidebar/Sidebar";
 
@@ -425,13 +424,6 @@ export default function MatrixView({
 
       <div className={`flex-1 flex flex-col xl:flex-row mx-auto w-full gap-6 transition-all duration-500 ${isFocusMode ? 'max-w-[900px] p-2 md:p-4 justify-center' : 'max-w-[1700px] p-4 md:p-8'}`}>
         <div className="flex-1 flex flex-col gap-6 overflow-hidden">
-          
-          {!isFocusMode && (
-            <Decisions
-              tasks={activeTasks}
-              currentStreak={currentStreak}
-            />
-          )}
 
           {!isLoaded ? (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 animate-pulse min-h-[400px] shadow-sm hover:border-orange-400/30 transition-all duration-200">

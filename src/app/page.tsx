@@ -4,21 +4,33 @@ import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/theme/ThemeProvider";
 
+// 🔥 FIX: Alias the import to 'nextDynamic' to avoid colliding with 'export const dynamic'
+import nextDynamic from "next/dynamic";
+
 // Tasks Engine
 import { useNexCore } from "@/modules/tasks/engine/useNexCore";
 
 // Supabase
 import { supabase } from "@/lib/supabase";
 
-// 🔥 IMPORTANT: This MUST import the wrapper file above!
 import Navbar from "@/navigation/Navbar"; 
 import FeedbackPopup from "@/settings/components/FeedbackPopup/FeedbackPopup";
 
 // Tasks Module Components
 import Tabs from "@/modules/tasks/Tabs";
-import MatrixView from "@/modules/tasks/matrix/MatrixView";
-import AnalyticsView from "@/modules/tasks/analytics/AnalyticsView";
-import AuditView from "@/modules/tasks/audit/AuditView";
+
+// 🔥 OPTIMIZATION: Use the aliased 'nextDynamic'
+const MatrixView = nextDynamic(() => import("@/modules/tasks/matrix/MatrixView"), { 
+  ssr: false, 
+  loading: () => <div className="h-64 flex items-center justify-center text-gray-400 animate-pulse">Loading Matrix...</div> 
+});
+const AnalyticsView = nextDynamic(() => import("@/modules/tasks/analytics/AnalyticsView"), { 
+  ssr: false,
+  loading: () => <div className="h-64 flex items-center justify-center text-gray-400 animate-pulse">Loading Analytics...</div>
+});
+const AuditView = nextDynamic(() => import("@/modules/tasks/audit/AuditView"), { 
+  ssr: false 
+});
 
 // Focus Engine
 import { useFocusSystem } from "@/modules/focus/engine/useFocusSystem";
@@ -163,7 +175,6 @@ export default function Home() {
     !isFocusLoaded;
 
   if (shouldBlockRender) {
-    // Only show the loading spinner ONCE per session
     if (!hasSessionLoaded) {
       return (
         <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${
@@ -177,8 +188,6 @@ export default function Home() {
         </div>
       );
     }
-
-    // After the first load, don't show the spinner again to prevent flashes
     return null;
   }
 
@@ -187,7 +196,6 @@ export default function Home() {
       isDarkMode ? "bg-[#050505]" : "bg-[#F9FAFB]"
     }`}>
 
-      {/* 🔥 Rendering the Navbar Wrapper */}
       <Navbar
         meta={state.meta}
         setMonthYear={setMonthYear}
@@ -230,6 +238,7 @@ export default function Home() {
               <AuditView
                 logs={state.logs}
                 meta={state.meta}
+                taskCount={state.tasks.length}
                 clearLogs={() => {}}
                 deleteLog={() => {}}
               />

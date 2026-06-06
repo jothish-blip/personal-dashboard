@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Clock, AlertTriangle, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Task, Meta } from "../types/index";
 import { useTheme } from "@/theme/ThemeProvider";
 
@@ -22,6 +21,7 @@ type ExtendedFilteredData = Omit<FilteredData, "stats"> & {
     consistencyDelta: number;
     activeDelta: number;
     avgDelta: number;
+    completionPercentChange: number;
   };
 };
 
@@ -189,6 +189,10 @@ export default function AnalyticsView({
     const totalCompletions = taskTotals.reduce((a, b) => a + b, 0);
     const delta = totalCompletions - prevTotalCompletions;
 
+    const completionPercentChange = prevTotalCompletions === 0 
+      ? (totalCompletions > 0 ? 100 : 0) 
+      : Math.round(((totalCompletions - prevTotalCompletions) / prevTotalCompletions) * 100);
+
     const peakVolume = Math.max(...(volumeData.length ? volumeData : [0]));
     const peakIndex = volumeData.indexOf(peakVolume);
     const peakLabel = timelineLabels[peakIndex] || "";
@@ -291,6 +295,7 @@ export default function AnalyticsView({
         consistencyDelta,
         activeDelta,
         avgDelta,
+        completionPercentChange,
       },
     } as ExtendedFilteredData;
   }, [
@@ -302,112 +307,23 @@ export default function AnalyticsView({
     targetGoal,
   ]);
 
-  const momentum = useMemo(() => {
-    if (!tasks.length) return 0;
-
-    const todayCount = tasks.filter(
-      (task) => task.history?.[actualToday]
-    ).length;
-
-    const date = new Date(actualToday);
-    date.setDate(date.getDate() - 1);
-
-    const yesterday = getLocalDate(date);
-    const yesterdayCount = tasks.filter(
-      (task) => task.history?.[yesterday]
-    ).length;
-
-    return todayCount - yesterdayCount;
-  }, [tasks, actualToday]);
-
-  const systemStatus = useMemo(() => {
-    if (momentum < 0) return "Degrading";
-    if (momentum > 0) return "Improving";
-    return "Stable";
-  }, [momentum]);
-
-  const anomaly = useMemo(() => {
-    const recentDrop =
-      filteredData.dailyDeltas.length >= 3 &&
-      filteredData.dailyDeltas.slice(-3).every((delta) => delta < 0);
-
-    if (recentDrop) return "3-day performance drop";
-    if (filteredData.stats.zeroDays >= 3) return "Multiple inactivity days";
-    if (momentum < 0) return "Recent performance decline";
-
-    return null;
-  }, [filteredData.dailyDeltas, filteredData.stats.zeroDays, momentum]);
-
-  const statusConfig = {
-    Improving: { icon: TrendingUp, text: isDarkMode ? "text-emerald-400" : "text-emerald-500" },
-    Degrading: { icon: TrendingDown, text: isDarkMode ? "text-rose-400" : "text-rose-500" },
-    Stable: { icon: Minus, text: isDarkMode ? "text-white/55" : "text-slate-500" },
-  }[systemStatus];
-
-  const StatusIcon = statusConfig.icon;
   const textPrimaryClass = isDarkMode ? "text-white" : "text-slate-900";
   const textMutedClass = isDarkMode ? "text-white/55" : "text-slate-500";
+
+  const getPeriodLabel = () => {
+    if (filterType === "month") {
+      const [y, m] = selectedMonth.split("-");
+      const date = new Date(parseInt(y), parseInt(m) - 1, 1);
+      return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    }
+    if (filterType === "year") return selectedYear;
+    return "Custom Range";
+  };
 
   return (
     <div className="flex-1 overflow-y-auto bg-[var(--background)] text-[var(--foreground)] p-4 md:p-8 transition-colors duration-300 font-sans">
       <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-5 md:gap-6 pb-24">
-        
-        {/* Analytics Overview Hero */}
-        <div 
-          className={`rounded-[24px] border p-6 md:p-8 shadow-[0_14px_40px_rgba(0,0,0,0.06)] transition-all ${
-            isDarkMode 
-              ? "bg-black/[0.72] border-white/[0.04] backdrop-blur-[24px]" 
-              : "bg-white/[0.75] border-black/[0.04] backdrop-blur-[24px]"
-          }`}
-        >
-          <div className="flex flex-col gap-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h1 className={`text-[2rem] font-semibold tracking-[-0.04em] ${textPrimaryClass}`}>
-                Analytics Overview
-              </h1>
-              {anomaly && (
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 border border-rose-500/10 backdrop-blur-[18px] px-3 py-1 text-xs font-medium text-rose-500">
-                  <AlertTriangle size={14} />
-                  <span>⚠ {anomaly}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-5 md:gap-6">
-              <div className="flex flex-col gap-1.5">
-                <span className={`text-[2rem] font-semibold tracking-[-0.04em] leading-none ${textPrimaryClass}`}>
-                  {filteredData.netPerformance > 0 ? `+${filteredData.netPerformance}` : filteredData.netPerformance}
-                </span>
-                <span className={`text-sm font-medium ${textMutedClass}`}>Momentum</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className={`text-[2rem] font-semibold tracking-[-0.04em] leading-none ${textPrimaryClass}`}>
-                  {filteredData.stats.consistencyPercent}%
-                </span>
-                <span className={`text-sm font-medium ${textMutedClass}`}>Consistency</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className={`text-[2rem] font-semibold tracking-[-0.04em] leading-none ${textPrimaryClass}`}>
-                  {filteredData.stats.activeDays}
-                </span>
-                <span className={`text-sm font-medium ${textMutedClass}`}>Active Days</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className={`text-[2rem] font-semibold tracking-[-0.04em] leading-none ${textPrimaryClass}`}>
-                  {filteredData.stats.avgPerDay}
-                </span>
-                <span className={`text-sm font-medium ${textMutedClass}`}>Avg/Day</span>
-              </div>
-              <div className="flex flex-col gap-1 md:items-end justify-center pt-2 md:pt-0">
-                <div className={`flex items-center gap-2 ${statusConfig.text}`}>
-                  <StatusIcon size={20} />
-                  <span className="text-sm font-semibold tracking-wide">{systemStatus}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
+      
         {/* Inline Segmented Filter Bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div 
@@ -489,6 +405,54 @@ export default function AnalyticsView({
                 />
               </div>
             )}
+          </div>
+        </div>
+
+        {/* FACT-BASED DATA HERO */}
+        <div className="flex flex-col md:flex-row gap-8 mb-4 mt-2 items-end">
+          <div className="flex-1 space-y-4">
+            <p className={`text-xs uppercase tracking-[0.22em] font-medium ${isDarkMode ? "text-orange-400" : "text-orange-500"}`}>
+              {getPeriodLabel()}
+            </p>
+
+            <h1 className={`text-[2.6rem] md:text-[3.4rem] font-semibold tracking-[-0.06em] leading-none ${textPrimaryClass}`}>
+              {filteredData.stats.totalCompletions} <span className="text-[1.2rem] md:text-[1.5rem] font-medium opacity-60 tracking-normal">completions</span>
+            </h1>
+
+            <div className={`max-w-xl text-[15px] leading-relaxed ${isDarkMode ? "text-white/72" : "text-slate-600"}`}>
+              Tracked across <span className="font-semibold">{tasks.length} objectives</span> over <span className="font-semibold">{filteredData.stats.activeDays} active days</span>.
+            </div>
+          </div>
+
+          {/* Right Side Stats Grid */}
+          <div className="grid grid-cols-2 gap-4 w-full md:min-w-[380px] md:w-auto">
+            <div className={`rounded-2xl p-4 border ${isDarkMode ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.02] border-black/[0.04]"}`}>
+              <div className={`text-[1.8rem] font-semibold tracking-tight ${textPrimaryClass}`}>
+                {tasks.length}
+              </div>
+              <div className={`text-sm ${textMutedClass}`}>Objectives</div>
+            </div>
+
+            <div className={`rounded-2xl p-4 border ${isDarkMode ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.02] border-black/[0.04]"}`}>
+              <div className={`text-[1.8rem] font-semibold tracking-tight ${textPrimaryClass}`}>
+                {filteredData.stats.activeDays}
+              </div>
+              <div className={`text-sm ${textMutedClass}`}>Active Days</div>
+            </div>
+
+            <div className={`rounded-2xl p-4 border ${isDarkMode ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.02] border-black/[0.04]"}`}>
+              <div className={`text-[1.8rem] font-semibold tracking-tight ${filteredData.stats.completionPercentChange >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                {filteredData.stats.completionPercentChange > 0 ? `+${filteredData.stats.completionPercentChange}%` : `${filteredData.stats.completionPercentChange}%`}
+              </div>
+              <div className={`text-sm ${textMutedClass}`}>Vs Previous Period</div>
+            </div>
+
+            <div className={`rounded-2xl p-4 border ${isDarkMode ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.02] border-black/[0.04]"}`}>
+              <div className={`text-[1.8rem] font-semibold tracking-tight ${textPrimaryClass}`}>
+                {filteredData.stats.avgPerDay}
+              </div>
+              <div className={`text-sm ${textMutedClass}`}>Daily Average</div>
+            </div>
           </div>
         </div>
 

@@ -59,35 +59,15 @@ body {
   transform: translateZ(0);
 }
 
-/* GLOBAL SMOOTH THEME TRANSITION */
-*,
-*::before,
-*::after {
-  transition-property: 
-    background-color,
-    color,
-    border-color,
-    fill,
-    stroke,
-    opacity,
-    box-shadow,
-    transform,
-    backdrop-filter;
-    
+/* GLOBAL SMOOTH THEME TRANSITION (Optimized) */
+/* Only animate the major structural backgrounds to avoid DOM freezing */
+body, main, aside, nav, header, .theme-transition {
+  transition-property: background-color, color, border-color;
   transition-duration: 300ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Special class for iOS-level smooth fade triggered via JS */
-.theme-transition *,
-.theme-transition *::before,
-.theme-transition *::after {
-  transition-duration: 350ms !important;
-}
-
-/* 2. Global Dark Mode Overrides 
-   (Removed !important so the global transition engine can smoothly animate these) */
-
+/* 2. Global Dark Mode Overrides */
 .dark [class*="bg-gray-"],
 .dark [class*="bg-white"] {
   background-color: #000000;
