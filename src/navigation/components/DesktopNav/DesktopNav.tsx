@@ -11,7 +11,6 @@ import {
   CalendarDays,
   PanelLeftClose,
   PanelLeftOpen,
-  Bell,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -19,67 +18,28 @@ import {
 import ThemeToggle from "@/theme/ThemeToggle";
 import { useTheme } from "@/theme/ThemeProvider";
 
-import NotificationCenter from "@/notifications/NotificationCenter";
-import { NexNotification } from "@/notifications/types/types";
 import ProfileStreakSwitcher from "@/navigation/components/ProfileStreakSwitcher/ProfileStreakSwitcher";
 
 interface DesktopNavProps {
   activePaths?: Record<string, boolean> | null;
   handleNav?: (path: string) => void;
-  notifications?: NexNotification[];
-  unreadCount?: number;
-  markAsRead?: (id: string) => void;
-  clearAll?: () => void;
-  isNoteOpen?: boolean;
-  setIsNoteOpen?: (v: boolean) => void;
   handleLogout?: () => void;
   userProfile?: any;
   currentStreak?: number;
 }
 
 const DEFAULT_NAV_ITEMS = [
-  {
-    label: "Tasks",
-    icon: LayoutGrid,
-    path: "/",
-    key: "isTasks",
-  },
-  {
-    label: "Focus",
-    icon: Brain,
-    path: "/focus",
-    key: "isFocus",
-  },
-  {
-    label: "Planner",
-    icon: CalendarDays,
-    path: "/Planner",
-    key: "isCalendar",
-  },
-  {
-    label: "Diary",
-    icon: BookOpen,
-    path: "/diary",
-    key: "isDiary",
-  },
-  {
-    label: "Workspace",
-    icon: ListTodo,
-    path: "/Workspace",
-    key: "isMini",
-  },
+  { label: "Tasks", icon: LayoutGrid, path: "/", key: "isTasks" },
+  { label: "Focus", icon: Brain, path: "/focus", key: "isFocus" },
+  { label: "Planner", icon: CalendarDays, path: "/Planner", key: "isCalendar" },
+  { label: "Diary", icon: BookOpen, path: "/diary", key: "isDiary" },
+  { label: "Workspace", icon: ListTodo, path: "/Workspace", key: "isMini" },
 ];
 
 export default function DesktopNav(props: DesktopNavProps) {
   const {
     activePaths = {},
     handleNav = () => {},
-    notifications = [],
-    unreadCount = 0,
-    markAsRead = () => {},
-    clearAll = () => {},
-    isNoteOpen = false,
-    setIsNoteOpen = () => {},
     handleLogout = () => {},
     userProfile = null,
     currentStreak = 0,
@@ -110,17 +70,10 @@ export default function DesktopNav(props: DesktopNavProps) {
 
   return (
     <>
-      {isNoteOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/10 backdrop-blur-sm"
-          onClick={() => setIsNoteOpen(false)}
-        />
-      )}
-
       {/* FLOATING TRANSPARENT GLASS NAVBAR (DESKTOP ONLY) */}
-      {/* <div className="hidden md:block fixed top-3 left-0 right-0 z-50 px-4 lg:px-6"> When you want stick use this Note: Not now*/}
-      <div className="hidden md:block w-full px-4 lg:px-6 mt-3">
-        <div className="hidden md:block fixed top-3 left-0 right-0 z-50 px-4 lg:px-6"></div>
+      {/* FIX: Added relative z-[999] so nothing on the page overlaps the nav */}
+      <div className="hidden md:block w-full px-4 lg:px-6 mt-3 relative z-[999]">
+        <div className="hidden md:block fixed top-3 left-0 right-0 z-[99990] px-4 lg:px-6"></div>
         <div
           className={`w-full max-w-[1800px] mx-auto rounded-[28px] border backdrop-blur-2xl transition-all duration-500 ${
             isDarkMode
@@ -129,7 +82,6 @@ export default function DesktopNav(props: DesktopNavProps) {
           }`}
         >
           <div className="relative h-[68px] px-4 lg:px-6 flex items-center justify-between">
-            
             {/* BRAND */}
             <div className="flex items-center gap-2.5 flex-shrink-0 min-w-0">
               <div
@@ -212,35 +164,6 @@ export default function DesktopNav(props: DesktopNavProps) {
             <div className="flex items-center gap-1.5 md:gap-3 flex-shrink-0">
               <ThemeToggle />
 
-              {/* Notifications */}
-              {unreadCount > 0 && (
-                <div className="relative flex items-center">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setIsNoteOpen(!isNoteOpen);
-                    }}
-                    className={`relative p-2 rounded-full transition-all duration-300 ${
-                      isDarkMode
-                        ? "text-orange-400 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20"
-                        : "text-orange-500 bg-orange-50 hover:bg-orange-100 border border-orange-200"
-                    }`}
-                  >
-                    <Bell size={18} />
-                  </button>
-
-                  <NotificationCenter
-                    isOpen={isNoteOpen}
-                    onClose={() => setIsNoteOpen(false)}
-                    notifications={notifications}
-                    unreadCount={unreadCount}
-                    markAsRead={markAsRead}
-                    clearAll={clearAll}
-                  />
-                </div>
-              )}
-
               {/* Profile */}
               <div className="relative">
                 <button
@@ -267,34 +190,54 @@ export default function DesktopNav(props: DesktopNavProps) {
                 {isProfileOpen && (
                   <>
                     <div
-                      className="fixed inset-0 z-40"
+                      className="fixed inset-0 z-[99998]"
                       onClick={() => setIsProfileOpen(false)}
                     />
 
                     <div
-                      className={`absolute right-0 mt-3 w-56 border rounded-xl shadow-2xl py-2 z-50 ${
-                        isDarkMode
-                          ? "bg-black border-white/[0.08]"
-                          : "bg-white border-gray-100"
-                      }`}
+                      className={`
+                        fixed 
+                        top-[78px] 
+                        right-6 
+                        w-56 
+                        rounded-2xl 
+                        border 
+                        shadow-2xl 
+                        py-2 
+                        z-[99999] 
+                        animate-in fade-in zoom-in-95 duration-200
+                        ${
+                          isDarkMode
+                            ? "bg-black border-white/10"
+                            : "bg-white border-gray-200"
+                        }
+                      `}
                     >
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           handleNav("/settings");
                           setIsProfileOpen(false);
                         }}
-                        className="w-full px-4 py-2.5 text-sm text-left flex items-center gap-3"
+                        className={`w-full px-4 py-2.5 text-sm text-left flex items-center gap-3 transition-colors ${
+                          isDarkMode ? "hover:bg-white/5" : "hover:bg-gray-50"
+                        }`}
                       >
                         <Settings size={15} />
                         Settings
                       </button>
 
+                      {/* FIX: Prevent default and propagation to ensure handleLogout executes without interruption */}
                       <button
-                        onClick={() => {
-                          handleLogout();
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           setIsProfileOpen(false);
+                          if (handleLogout) handleLogout();
                         }}
-                        className="w-full px-4 py-2.5 text-sm text-left flex items-center gap-3 text-red-500"
+                        className={`w-full px-4 py-2.5 text-sm text-left flex items-center gap-3 text-red-500 transition-colors ${
+                          isDarkMode ? "hover:bg-red-500/10" : "hover:bg-red-50"
+                        }`}
                       >
                         <LogOut size={15} />
                         Logout

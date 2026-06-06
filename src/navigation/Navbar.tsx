@@ -1,33 +1,20 @@
 "use client";
 
-import React, {
-  useMemo,
-  useState,
-  useEffect,
-} from "react";
-
-import {
-  useRouter,
-  usePathname,
-} from "next/navigation";
+import React, { useMemo, useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 
 import DesktopNav from "@/navigation/components/DesktopNav/DesktopNav";
 import MobileNav from "@/navigation/components/MobileNav/MobileNav";
 
-import { useNotificationSystem } from "@/notifications/engine/useNotificationSystem";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useFocusSystem } from "@/modules/focus/engine/useFocusSystem";
 import { useNexCore } from "@/modules/tasks/engine/useNexCore";
 
 export interface NavbarProps {
   meta?: any;
-  setMonthYear?: (
-    val: string
-  ) => void;
+  setMonthYear?: (val: string) => void;
   exportData?: () => void;
-  importData?: (
-    file?: any
-  ) => void;
+  importData?: (file?: any) => void;
 }
 
 export default function Navbar({
@@ -37,139 +24,78 @@ export default function Navbar({
   importData,
 }: NavbarProps) {
   const router = useRouter();
+  const pathname = usePathname() || "";
+  const supabase = getSupabaseClient();
+  const { currentUser } = useFocusSystem();
+  const { currentStreak } = useNexCore();
 
-  const pathname =
-    usePathname() || "";
-
-  const supabase =
-    getSupabaseClient();
-
-  const { currentUser } =
-    useFocusSystem();
-
-  const { currentStreak } =
-    useNexCore();
-
-  const [
-    userProfile,
-    setUserProfile,
-  ] = useState<any>(null);
-
-  const {
-    notifications,
-    unreadCount,
-    markAsRead,
-    clearAll,
-  } =
-    useNotificationSystem(
-      currentUser?.id
-    );
-
-  const [
-    isNoteOpen,
-    setIsNoteOpen,
-  ] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(currentUser || null);
 
   useEffect(() => {
-    let isMounted = true;
+    if (!supabase || !currentUser?.id) return;
 
-    const fetchProfile =
-      async () => {
-        if (
-          !supabase ||
-          !currentUser?.id
-        ) {
-          if (isMounted) {
-            setUserProfile(
-              null
-            );
-          }
-          return;
-        }
+    let ignore = false;
 
-        const { data } =
-          await supabase
-            .from(
-              "profiles"
-            )
-            .select("*")
-            .eq(
-              "id",
-              currentUser.id
-            )
-            .maybeSingle();
+    const loadProfile = async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .single();
 
-        if (
-          data &&
-          isMounted
-        ) {
-          setUserProfile(
-            data
-          );
-        }
-      };
-
-    fetchProfile();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [
-    supabase,
-    currentUser,
-  ]);
-
-  const handleLogout =
-    async () => {
-      if (supabase) {
-        await supabase.auth.signOut();
-
-        window.location.href =
-          "/login";
+      if (!ignore && data) {
+        setUserProfile(data);
+        localStorage.setItem("nextask_profile", JSON.stringify(data));
       }
     };
 
-  const handleNav = (
-    path: string
-  ) => {
+    const cached = localStorage.getItem("nextask_profile");
+
+    if (cached) {
+      try {
+        setUserProfile(JSON.parse(cached));
+      } catch {}
+    }
+
+    loadProfile();
+
+    return () => {
+      ignore = true;
+    };
+  }, [supabase, currentUser]);
+
+  const handleLogout = async () => {
+    try {
+      if (!supabase) return;
+
+      await supabase.auth.signOut();
+
+      router.replace("/login");
+      router.refresh();
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
+  const handleNav = (path: string) => {
     router.push(path);
   };
 
-  const activePaths =
-    useMemo(
-      () => ({
-        isTasks:
-          pathname === "/",
-
-        isFocus:
-          pathname ===
-          "/focus",
-
-        isCalendar:
-          pathname ===
-          "/Planner",
-
-        isDiary:
-          pathname ===
-          "/diary",
-
-        isMini:
-          pathname ===
-          "/Workspace",
-      }),
-      [pathname]
-    );
+  const activePaths = useMemo(
+    () => ({
+      isTasks: pathname === "/",
+      isFocus: pathname === "/focus",
+      isCalendar: pathname === "/Planner",
+      isDiary: pathname === "/diary",
+      isMini: pathname === "/Workspace",
+    }),
+    [pathname]
+  );
 
   const navProps = {
     activePaths,
     handleNav,
     handleLogout,
-    notifications,
-    unreadCount,
-    markAsRead,
-    clearAll,
-    isNoteOpen,
-    setIsNoteOpen,
     userProfile,
     currentStreak,
   };
@@ -177,14 +103,10 @@ export default function Navbar({
   return (
     <>
       {/* Desktop Navbar */}
-      <DesktopNav
-        {...navProps}
-      />
+      <DesktopNav {...navProps} />
 
       {/* Mobile Navbar */}
-      <MobileNav
-        {...navProps}
-      />
+      <MobileNav {...navProps} />
     </>
   );
 }

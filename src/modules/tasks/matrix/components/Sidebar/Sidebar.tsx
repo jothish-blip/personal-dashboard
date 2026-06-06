@@ -19,10 +19,12 @@ interface Task {
 
 interface SidebarProps {
   tasks: Task[];
+  userName?: string | null; // Added userName to props
 }
 
 export default function Sidebar({
   tasks = [],
+  userName = null,
 }: SidebarProps) {
   const { isDarkMode } = useTheme();
   const [activeTab, setActiveTab] = useState<"pending" | "completed" | "history">("pending");
@@ -104,11 +106,14 @@ export default function Sidebar({
   const textPrimary = isDarkMode ? "text-slate-100" : "text-slate-900";
   const textMuted = isDarkMode ? "text-slate-400/80" : "text-slate-500";
 
-  // Dynamic Greetings
+  // Dynamic Greetings Setup
+  // Extracts the first name if available, otherwise defaults to "there"
+  const firstName = userName ? userName.split(" ")[0] : "there";
+
   const greetings = {
-    morning: { title: "Good morning, Jothish", sub: "Let's build momentum today." },
-    afternoon: { title: "Good afternoon, Jothish", sub: "Keep the pace steady." },
-    night: { title: "Good evening, Jothish", sub: "Close the day strong." }
+    morning: { title: `Good morning, ${firstName}`, sub: "Let's build momentum today." },
+    afternoon: { title: `Good afternoon, ${firstName}`, sub: "Keep the pace steady." },
+    night: { title: `Good evening, ${firstName}`, sub: "Close the day strong." }
   };
 
   return (

@@ -30,6 +30,7 @@ interface MatrixProps {
   lockToday: () => void | Promise<void>;
   setMonthYear: (value: string) => void | Promise<void>;
   isLoaded?: boolean;
+  userName?: string | null; // <-- ADDED: User name prop
 }
 
 type ErrorType = 'lock' | 'future' | 'system' | '';
@@ -38,7 +39,8 @@ export default function MatrixView({
   tasks, meta, addTask, deleteTask, toggleTask, 
   renameTask = () => console.warn("renameTask missing in parent"), 
   renameGroup = () => console.warn("renameGroup missing in parent"), 
-  lockToday, setMonthYear, isLoaded = true 
+  lockToday, setMonthYear, isLoaded = true,
+  userName = null // <-- ADDED: Destructured from props
 }: MatrixProps) {
   
   const actualToday = getLocalDate(new Date()); 
@@ -520,7 +522,8 @@ export default function MatrixView({
               xl:overflow-hidden
             "
           >
-            <Sidebar tasks={activeTasks} />
+            {/* ADDED: Passing userName down to Sidebar */}
+            <Sidebar tasks={activeTasks} userName={userName} />
           </div>
         )}
       </div>
