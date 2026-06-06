@@ -25,7 +25,7 @@ const ARTICLES: Article[] = [
     id: "what-is-discipline-engine",
     title: "What is the Discipline Engine?",
     teaser:
-      "Learn how Nextask tracks consistency and behavioral growth.",
+      "Learn how NexSpace tracks consistency and behavioral growth.",
     readTime: "2 min",
     keywords: [
       "discipline",
@@ -206,7 +206,7 @@ export default function DisciplineEnginePage() {
               <div className="text-center mb-10">
                 <Image
                   src="/favicon.ico"
-                  alt="Nextask"
+                  alt="NexSpace"
                   width={54}
                   height={54}
                   className="mx-auto rounded-2xl mb-5"

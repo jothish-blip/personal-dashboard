@@ -67,7 +67,7 @@ export default function TermsPage() {
         <section id="acceptance" className={`space-y-3 md:space-y-4 pb-6 border-b last:border-none scroll-mt-32 ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
           <h2 className={`text-base font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-black"}`}>1. Acceptance of Terms</h2>
           <p>
-            By accessing or using NexTask, you agree to be bound by these Terms & Conditions. 
+            By accessing or using NexSpace, you agree to be bound by these Terms & Conditions. 
             If you do not agree, you must not use the service.
           </p>
         </section>
@@ -122,7 +122,7 @@ export default function TermsPage() {
             <ul className="list-disc ml-5 space-y-2 mt-2">
               <li>You authorize us to access basic profile info (name, email, avatar).</li>
               <li>We do <strong>NOT</strong> store your passwords. Authentication is handled securely by the provider.</li>
-              <li><strong>Deleting your NexTask account does not automatically delete your account with Google, GitHub, or Facebook.</strong></li>
+              <li><strong>Deleting your NexSpace account does not automatically delete your account with Google, GitHub, or Facebook.</strong></li>
             </ul>
             
             <p className={`mt-4 font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>Your use of these services is also governed by their respective policies:</p>
@@ -143,7 +143,7 @@ export default function TermsPage() {
             </p>
             
             <p className={`mt-2 text-xs italic leading-snug ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
-              If you delete your NexTask account, your connection with Google, GitHub, or Facebook will be removed. 
+              If you delete your NexSpace account, your connection with Google, GitHub, or Facebook will be removed. 
               However, you may need to manage or revoke access permissions directly from your respective provider account settings.
             </p>
           </div>
@@ -155,7 +155,7 @@ export default function TermsPage() {
           <ul className="list-disc ml-5 space-y-2">
             <li><strong>You retain full ownership</strong> of all content you create (tasks, notes, files, diary entries).</li>
             <li>We do not claim ownership, copyright, or exclusive rights over your personal data.</li>
-            <li>You grant us a limited permission to store, process, and display your data <strong>only</strong> to provide you with the NexTask service.</li>
+            <li>You grant us a limited permission to store, process, and display your data <strong>only</strong> to provide you with the NexSpace service.</li>
           </ul>
         </section>
 
@@ -190,7 +190,7 @@ export default function TermsPage() {
               9. Data Usage & Privacy
             </h2>
             <ul className={`list-disc ml-5 space-y-2 ${isDarkMode ? "text-blue-200/80" : "text-blue-800/80"}`}>
-              <li>Your data is used <strong>strictly</strong> to operate and improve your NexTask experience.</li>
+              <li>Your data is used <strong>strictly</strong> to operate and improve your NexSpace experience.</li>
               <li>We do <strong>NOT</strong> and will never sell your personal data or notes to third-party marketers.</li>
               <li>Data handling is explained in full detail in our Privacy Policy.</li>
             </ul>
@@ -244,7 +244,7 @@ export default function TermsPage() {
               <AlertTriangle size={18} className={isDarkMode ? "text-red-500" : "text-red-600"} />
               14. Limitation of Liability
             </h2>
-            <p className={isDarkMode ? "text-red-200/80" : "text-red-800/80"}>To the maximum extent permitted by law, NexTask and its creators shall not be liable for any:</p>
+            <p className={isDarkMode ? "text-red-200/80" : "text-red-800/80"}>To the maximum extent permitted by law, NexSpace and its creators shall not be liable for any:</p>
             <ul className={`list-disc ml-5 space-y-2 ${isDarkMode ? "text-red-200/80" : "text-red-800/80"}`}>
               <li>Loss of data, notes, or uploaded files.</li>
               <li>Loss of business, productivity, or revenue.</li>
@@ -257,7 +257,7 @@ export default function TermsPage() {
         <section id="ip" className={`space-y-3 md:space-y-4 pb-6 border-b last:border-none scroll-mt-32 ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
           <h2 className={`text-base font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-black"}`}>15. Intellectual Property</h2>
           <p>
-            While you own your content, the NexTask application itself—including its design, code, architecture, and UI/UX—belongs to the application owner. 
+            While you own your content, the NexSpace application itself—including its design, code, architecture, and UI/UX—belongs to the application owner. 
             You may not copy, reproduce, reverse engineer, or distribute our platform's code or design without explicit written permission.
           </p>
         </section>

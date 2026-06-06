@@ -25,7 +25,7 @@ const ARTICLES: Article[] = [
     id: "what-is-failure-system",
     title: "What is the Failure & Recovery System?",
     teaser:
-      "Understand how Nextask handles failure without breaking momentum.",
+      "Understand how NexSpace handles failure without breaking momentum.",
     readTime: "2 min",
     keywords: [
       "failure",
@@ -37,7 +37,7 @@ const ARTICLES: Article[] = [
     content: (
       <div className="space-y-5">
         <p>
-          Failure in Nextask is not treated as punishment.
+          Failure in NexSpace is not treated as punishment.
           It is treated as behavioral feedback.
         </p>
 
@@ -49,7 +49,7 @@ const ARTICLES: Article[] = [
 
         <p>
           Instead of instantly destroying progress,
-          Nextask measures recovery ability and
+          NexSpace measures recovery ability and
           comeback strength.
         </p>
       </div>
@@ -116,7 +116,7 @@ const ARTICLES: Article[] = [
         </p>
 
         <p>
-          Instead of forcing perfection, Nextask
+          Instead of forcing perfection, NexSpace
           prioritizes rebuilding consistency through
           small wins.
         </p>
@@ -289,7 +289,7 @@ export default function FailureRecoveryPage() {
               <div className="text-center mb-10">
                 <Image
                   src="/favicon.ico"
-                  alt="Nextask"
+                  alt="NexSpace"
                   width={54}
                   height={54}
                   className="mx-auto rounded-2xl mb-5"

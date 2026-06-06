@@ -17,7 +17,7 @@ import {
   Menu
 } from "lucide-react";
 
-// Grouped Pages with Nextask-specific Shortcuts
+// Grouped Pages with NexSpace-specific Shortcuts
 const systemPages = [
   { title: "Gamification System", href: "/help?page=gamification-system", icon: Trophy, shortcut: "ALT 1" }, 
   { title: "Discipline Engine", href: "/help?page=discipline-engine", icon: BrainCircuit, shortcut: "ALT 2" },
@@ -166,7 +166,7 @@ export default function HelpSidebar() {
           <Menu size={20} />
         </button>
         <span className={`font-semibold text-sm tracking-wide ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-          Nextask Help
+          NexSpace Help
         </span>
         <div className="w-8" /> {/* Optical centering spacer */}
       </header>
@@ -216,7 +216,7 @@ export default function HelpSidebar() {
           >
             <Image 
               src="/favicon.ico" 
-              alt="Nextask Logo" 
+              alt="NexSpace Logo" 
               width={20} 
               height={20} 
               className="rounded-md"
@@ -226,7 +226,7 @@ export default function HelpSidebar() {
 
           <div className={`flex flex-col justify-center transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] opacity-100 translate-x-0 ml-3.5 max-w-[200px] ${textVisibilityClasses}`}>
             <h1 className={`font-bold text-base lg:text-sm leading-tight tracking-wide transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              Nextask
+              NexSpace
             </h1>
             <p className={`text-[11px] lg:text-[10px] uppercase tracking-[0.1em] mt-0.5 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
               Help Center

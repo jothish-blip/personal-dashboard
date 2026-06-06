@@ -123,7 +123,7 @@ function LandingExperience() {
     return (
       <div className={`min-h-screen flex flex-col items-center justify-center transition-colors duration-300 select-none ${isDarkMode ? "bg-[#000000] text-white" : "bg-[#FAFAFA] text-zinc-900"}`}>
         <div className={`w-12 h-12 border rounded-xl flex items-center justify-center mb-6 shadow-sm animate-pulse ${isDarkMode ? "bg-white/[0.02] border-white/[0.05]" : "bg-white border-zinc-200"}`}>
-          <img src="/favicon.ico" alt="NexTask" className="w-6 h-6 object-contain" />
+          <img src="/favicon.ico" alt="NexSpace" className="w-6 h-6 object-contain" />
         </div>
       </div>
     );
@@ -193,7 +193,7 @@ function LandingExperience() {
 
           <img
             src="/favicon.ico"
-            alt="NexTask"
+            alt="NexSpace"
             className="relative z-10 w-4 h-4 sm:w-5 sm:h-5 object-contain"
           />
         </div>
@@ -204,7 +204,7 @@ function LandingExperience() {
               isDarkMode ? "text-white" : "text-zinc-900"
             }`}
           >
-            NexTask
+            NexSpace
           </span>
 
           <span
@@ -589,7 +589,7 @@ function LandingExperience() {
 </section>
 
 {/* ========================================================= */}
-{/* 3. WHY NEXTASK WORKS */}
+{/* 3. WHY NEXSPACE WORKS */}
 {/* ========================================================= */}
 <section
   id="problem"
@@ -649,7 +649,7 @@ function LandingExperience() {
           places where tasks go to die.
           They help you plan, but they do not
           help you execute, focus or reflect.
-          Nextask is designed to close that gap.
+          NexSpace is designed to close that gap.
         </p>
       </div>
     </Reveal>
@@ -719,7 +719,7 @@ function LandingExperience() {
                 : "text-zinc-500"
             }`}
           >
-            Nextask bridges the gap between
+            NexSpace bridges the gap between
             planning and action —
             helping intention become
             completion.
@@ -786,7 +786,7 @@ function LandingExperience() {
                 : "text-zinc-500"
             }`}
           >
-            Nextask creates repeatable
+            NexSpace creates repeatable
             systems that pull you back
             into focused work —
             even on difficult days.
@@ -853,7 +853,7 @@ function LandingExperience() {
                 : "text-zinc-500"
             }`}
           >
-            Nextask keeps planning,
+            NexSpace keeps planning,
             focus, execution and reflection
             connected inside one
             unified system.
@@ -926,7 +926,7 @@ function LandingExperience() {
               : "text-zinc-500"
           }`}
         >
-          Nextask is built around execution —
+          NexSpace is built around execution —
           helping you prioritize what matters,
           stay consistent and actually finish
           meaningful work every day.
@@ -1414,7 +1414,7 @@ function LandingExperience() {
               : "text-zinc-500"
           }`}
         >
-          Nextask creates a dedicated
+          NexSpace creates a dedicated
           environment for uninterrupted work —
           helping you stay locked in,
           protect focus and finish meaningful
@@ -1554,7 +1554,7 @@ function LandingExperience() {
               : "text-zinc-500"
           }`}
         >
-          Nextask helps you intentionally
+          NexSpace helps you intentionally
           structure your time — plan priorities,
           reduce decision fatigue and build
           calmer, more predictable workdays.
@@ -1868,7 +1868,7 @@ function LandingExperience() {
               : "text-zinc-500"
           }`}
         >
-          Nextask helps you reflect on wins,
+          NexSpace helps you reflect on wins,
           failures, emotions and patterns —
           building awareness that compounds
           every single day.
@@ -2047,7 +2047,7 @@ function LandingExperience() {
               : "text-zinc-500"
           }`}
         >
-          Nextask keeps files, thoughts,
+          NexSpace keeps files, thoughts,
           resources and work connected —
           reducing friction between
           thinking and execution.
@@ -2240,7 +2240,7 @@ function LandingExperience() {
         >
           Motivation fades.
           Systems stay.
-          Nextask helps you build
+          NexSpace helps you build
           a rhythm that compounds —
           helping you intentionally plan,
           execute deeply and improve
@@ -2483,7 +2483,7 @@ function LandingExperience() {
             <div className="flex items-center gap-3 mb-5">
               <img
                 src="/favicon.ico"
-                alt="NexTask"
+                alt="NexSpace"
                 className="w-6 h-6 object-contain"
               />
 
@@ -2494,7 +2494,7 @@ function LandingExperience() {
                     : "text-zinc-900"
                 }`}
               >
-                NexTask
+                NexSpace
               </span>
             </div>
 
@@ -2581,7 +2581,7 @@ function LandingExperience() {
 
               {[
                 {
-                  label: "Why Nextask",
+                  label: "Why NexSpace?",
                   id: "problem",
                 },
                 {
@@ -2654,7 +2654,7 @@ function LandingExperience() {
           }`}
         >
           <span>
-            © 2026 NexTask. All rights reserved.
+            © 2026 NexSpace. All rights reserved.
           </span>
 
           <span>

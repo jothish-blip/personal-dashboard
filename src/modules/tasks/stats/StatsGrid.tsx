@@ -43,7 +43,7 @@ export default function StatsGrid({ tasks, meta }: StatsProps) {
   ];
 
   useEffect(() => {
-    const hasInitialized = localStorage.getItem('nextask_onboarding_seen');
+    const hasInitialized = localStorage.getItem('nexspace_onboarding_seen');
     if (!hasInitialized) setShowOnboarding(true);
   }, []);
 

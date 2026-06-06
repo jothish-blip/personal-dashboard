@@ -66,7 +66,7 @@ export default function PrivacyPage() {
         <section className={`space-y-3 pb-6 border-b last:border-none ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
           <h2 className={`text-base font-semibold ${isDarkMode ? "text-gray-200" : "text-black"}`}>1. Introduction</h2>
           <p>
-            This Privacy Policy explains how NexTask collects, uses, and protects your information 
+            This Privacy Policy explains how NexSpace collects, uses, and protects your information 
             when you use the platform, including tasks, notes, files, diary, and planner features.
           </p>
         </section>

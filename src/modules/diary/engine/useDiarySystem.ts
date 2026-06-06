@@ -31,7 +31,7 @@ const truncateStr = (str: string) =>
   str?.length > MAX_LENGTH ? str.slice(0, MAX_LENGTH) : str;
 
 const getCacheKey = (dateStr: string, userId: string) =>
-  `nextask_diary_${userId}_${dateStr}`;
+  `nexspace_diary_${userId}_${dateStr}`;
 
 type DBDiaryEntry = {
   id?: string;
@@ -545,7 +545,7 @@ export function useDiarySystem() {
     isInitializing.current = currentUser.id;
 
     const initDiary = async () => {
-      const storedTasks = safeParse(localStorage.getItem("nextask_tasks"));
+      const storedTasks = safeParse(localStorage.getItem("nexspace_tasks"));
       if (storedTasks) setTasks(storedTasks);
 
       let entriesMap: Record<string, DiaryEntry> = {};

@@ -276,7 +276,7 @@ export default function ProfilePage() {
                 Complete your setup
               </h3>
               <p className={`text-xs mt-1 transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                Personalize Nextask for a better experience.
+                Personalize NexSpace for a better experience.
               </p>
               
               <div className="flex items-center gap-3 mt-3">
@@ -422,7 +422,7 @@ export default function ProfilePage() {
             />
           </div>
 
-          {/* NEXTASK SYSTEM PREFERENCES (Progressive Onboarding Fields) */}
+          {/* NEXSPACE SYSTEM PREFERENCES (Progressive Onboarding Fields) */}
           <div className="space-y-6">
             <h2 className={`text-[11px] font-bold uppercase tracking-widest transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
               System Preferences

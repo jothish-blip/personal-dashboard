@@ -99,7 +99,7 @@ export default function LoginPage() {
         >
           <img src="/favicon.ico" className="w-8 h-8 group-hover:scale-105 transition-transform duration-500 ease-out" />
           <div className="hidden sm:block">
-            <div className="font-semibold text-[14px] tracking-tight leading-tight">NexTask</div>
+            <div className="font-semibold text-[14px] tracking-tight leading-tight">NexSpace</div>
             <div className="text-[11px] text-zinc-500 font-medium tracking-wide">Build consistency</div>
           </div>
         </div>
@@ -180,7 +180,7 @@ export default function LoginPage() {
             
             <div className="mb-6 text-center lg:text-left flex flex-col items-center lg:items-start">
               <h3 className={`text-[16px] font-medium tracking-tight ${isDarkMode ? "text-zinc-300" : "text-zinc-700"}`}>
-                Continue to NexTask
+                Continue to NexSpace with your preferred account.
               </h3>
               <p className={`text-[13px] mt-1 ${isDarkMode ? "text-zinc-500" : "text-zinc-400"}`}>
                 Restore your tasks, focus sessions and planning history.
@@ -273,7 +273,7 @@ export default function LoginPage() {
             <div className={`mt-10 ${loadingProvider ? 'hidden' : 'block'}`}>
               <div className="text-center flex flex-col sm:flex-row items-center justify-center gap-2">
                 <span className={`text-[14px] ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>
-                  New to NexTask?
+                  New to NexSpace?
                 </span>
                 <button
                   onClick={() => router.push("/register")}

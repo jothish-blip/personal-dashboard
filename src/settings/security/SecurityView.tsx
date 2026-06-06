@@ -136,7 +136,7 @@ export default function SecurityPage() {
           </span>.
           If you selected a Google account while logging in to GitHub or Discord,
           you may still see your Google email or account name here. This is normal —
-          your connected providers are securely linked to the same Nextask account.
+          your connected providers are securely linked to the same NexSpace account.
         </p>
       </div>
 

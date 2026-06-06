@@ -25,7 +25,7 @@ const ARTICLES: Article[] = [
     id: "what-is-gamification-system",
     title: "What is the Gamification System?",
     teaser:
-      "Understand how Nextask turns discipline into an engaging experience.",
+      "Understand how NexSpace turns discipline into an engaging experience.",
     readTime: "2 min",
     keywords: [
       "gamification",
@@ -43,7 +43,7 @@ const ARTICLES: Article[] = [
 
         <p>
           Instead of forcing productivity,
-          Nextask creates behavioral loops
+          NexSpace creates behavioral loops
           that encourage discipline through
           progress, identity and momentum.
         </p>
@@ -77,7 +77,7 @@ const ARTICLES: Article[] = [
         </p>
 
         <p>
-          Nextask solves this by making
+          NexSpace solves this by making
           progress visible and emotionally
           rewarding.
         </p>
@@ -107,7 +107,7 @@ const ARTICLES: Article[] = [
     content: (
       <div className="space-y-5">
         <p>
-          Nextask rewards who users are
+          NexSpace rewards who users are
           becoming, not only what they
           complete.
         </p>
@@ -357,7 +357,7 @@ export default function GamificationSystemPage() {
               <div className="text-center mb-10">
                 <Image
                   src="/favicon.ico"
-                  alt="Nextask"
+                  alt="NexSpace"
                   width={54}
                   height={54}
                   className="mx-auto rounded-2xl mb-5"

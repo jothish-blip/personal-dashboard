@@ -19,7 +19,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingProps) {
 
   useEffect(() => {
     // 🔥 Fast synchronous check to prevent multiple popups / flashes
-    const localSeen = localStorage.getItem("nextask_onboarding_seen");
+    const localSeen = localStorage.getItem("nexspace_onboarding_seen");
     if (localSeen === "true") {
       onComplete();
       return;
@@ -45,7 +45,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingProps) {
         .single();
 
       if (data?.onboarding_seen) {
-        localStorage.setItem("nextask_onboarding_seen", "true");
+        localStorage.setItem("nexspace_onboarding_seen", "true");
         onComplete();
       } else {
         setIsVisible(true);
@@ -57,7 +57,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingProps) {
 
   const handleComplete = async () => {
     // 🔥 Immediately save locally so it never shows again on this device
-    localStorage.setItem("nextask_onboarding_seen", "true");
+    localStorage.setItem("nexspace_onboarding_seen", "true");
     setIsVisible(false);
     onComplete();
 
@@ -92,7 +92,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingProps) {
         <div className={`px-6 py-6 border-b flex justify-between items-center ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
           <div>
             <h2 className={`text-xl md:text-2xl font-bold flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              <BrainCircuit className="text-orange-400" /> NexTask OS
+              <BrainCircuit className="text-orange-400" /> NexSpace OS
             </h2>
             <p className={`text-[10px] uppercase tracking-widest mt-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
               System Initialization

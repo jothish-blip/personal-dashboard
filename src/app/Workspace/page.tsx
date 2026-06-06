@@ -19,7 +19,7 @@ import GlobalSearch from "@/modules/workspace/components/GlobalSearch/GlobalSear
 
 const SIDEBAR_WIDTH = 300;
 
-export default function NexTaskWorkspace() {
+export default function NexSpaceWorkspace() {
   const { state, setMonthYear } = useNexCore();
   const system = useWorkspaceSystem();
 

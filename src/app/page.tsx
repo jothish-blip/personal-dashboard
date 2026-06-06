@@ -153,7 +153,7 @@ export default function Home() {
   // SESSION MEMORY GATE
   useEffect(() => {
     if (mounted && isStateLoaded && isFocusLoaded && isAuthenticated) {
-      sessionStorage.setItem("nextask_session_loaded", "true");
+      sessionStorage.setItem("nexspace_session_loaded", "true");
     }
   }, [mounted, isStateLoaded, isFocusLoaded, isAuthenticated]);
 
@@ -164,7 +164,7 @@ export default function Home() {
 
   const hasSessionLoaded =
     typeof window !== "undefined"
-      ? sessionStorage.getItem("nextask_session_loaded") === "true"
+      ? sessionStorage.getItem("nexspace_session_loaded") === "true"
       : false;
 
   const shouldBlockRender =

@@ -14,7 +14,7 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
-const THEME_STORAGE_KEY = "nextask_theme";
+const THEME_STORAGE_KEY = "nexspace_theme";
 
 // Extracted DOM manipulation for reuse
 function applyThemeToDOM(theme: Theme) {

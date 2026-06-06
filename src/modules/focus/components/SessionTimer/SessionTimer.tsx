@@ -143,11 +143,11 @@ export default function SessionTimer() {
             ? (isDarkMode ? "bg-gradient-to-b from-black to-red-950/20 border-red-900/30 shadow-[0_0_50px_rgba(239,68,68,0.15)]" : "bg-red-50/30 border-red-200 shadow-[0_0_50px_rgba(239,68,68,0.15)]")
             : isActive && !isPaused
             ? (isDarkMode ? "bg-gradient-to-b from-black to-emerald-950/20 border-emerald-900/30 shadow-[0_0_40px_rgba(16,185,129,0.05)]" : "bg-emerald-50/30 border-emerald-200 shadow-[0_0_40px_rgba(16,185,129,0.05)]")
-            : (isDarkMode ? "bg-black border-gray-800 shadow-none" : "bg-white border-gray-200 shadow-sm")
+            : (isDarkMode ? "bg-black border-white/[0.04] shadow-none" : "bg-white border-gray-200 shadow-sm")
         }`}
       >
         <div className={`absolute top-5 md:top-6 text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-          <span className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive && !isPaused ? (isDarkMode ? 'bg-emerald-500 animate-pulse' : 'bg-orange-500 animate-pulse') : (isDarkMode ? 'bg-gray-700' : 'bg-gray-300')}`}></span>
+          <span className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive && !isPaused ? (isDarkMode ? 'bg-emerald-500 animate-pulse' : 'bg-orange-500 animate-pulse') : (isDarkMode ? 'bg-white/[0.06]' : 'bg-gray-300')}`}></span>
           {getModeLabel()}
         </div>
 
@@ -201,7 +201,7 @@ export default function SessionTimer() {
               strokeWidth="6"
               fill="transparent"
               stroke="currentColor"
-              className={`transition-colors ${isDarkMode ? "text-gray-800/60" : "text-gray-100"}`}
+              className={`transition-colors ${isDarkMode ? "text-white/[0.04]" : "text-gray-100"}`}
             />
 
             {/* Active Progress Circle */}
@@ -239,7 +239,7 @@ export default function SessionTimer() {
             )}
 
             <div className={`text-[11px] sm:text-xs font-medium mt-4 flex items-center justify-center gap-2 px-3 py-1.5 rounded-full border shadow-sm transition-colors ${
-              isDarkMode ? "bg-[#111111] border-gray-800 text-gray-400" : "bg-neutral-50 border-neutral-200 text-gray-600"
+              isDarkMode ? "bg-black border-white/[0.04] text-gray-400" : "bg-neutral-50 border-neutral-200 text-gray-600"
             }`}>
               <span
                 className={`w-2 h-2 rounded-full transition-colors duration-300 ${
@@ -266,7 +266,7 @@ export default function SessionTimer() {
               <button
                 onClick={() => setActiveModal("endExtra")}
                 className={`w-full sm:w-auto px-10 py-3.5 flex items-center justify-center gap-2 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] ${
-                  isDarkMode ? "bg-white text-black hover:bg-gray-200" : "bg-gray-900 text-white hover:bg-black"
+                  isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
                 }`}
               >
                 <Check size={18} /> Complete Session
@@ -278,7 +278,7 @@ export default function SessionTimer() {
                 <button
                   onClick={isPaused ? handleResume : startSession}
                   className={`w-full sm:w-auto px-10 py-3.5 flex items-center justify-center gap-2 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] ${
-                    isDarkMode ? "bg-white text-black hover:bg-gray-200" : "bg-gray-900 text-white hover:bg-black"
+                    isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
                   }`}
                 >
                   <Play size={18} className="fill-current" /> {isPaused || isInterrupted ? "Resume Focus" : "Start Session"}
@@ -287,7 +287,7 @@ export default function SessionTimer() {
                 <button
                   onClick={handlePause}
                   className={`w-full sm:w-auto px-10 py-3.5 border flex items-center justify-center gap-2 font-semibold rounded-xl transition-all active:scale-[0.98] ${
-                    isDarkMode ? "bg-[#111111] border-gray-800 text-gray-300 hover:bg-[#1a1a1a]" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                    isDarkMode ? "bg-black border-white/[0.04] text-gray-300 hover:bg-white/[0.03]" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   <Pause size={18} className="fill-current" /> Pause
@@ -299,7 +299,7 @@ export default function SessionTimer() {
                   <button
                     onClick={() => setActiveModal("endNormal")}
                     className={`flex-1 sm:flex-none px-6 py-3.5 border flex items-center justify-center gap-2 font-semibold rounded-xl transition-all active:scale-[0.98] ${
-                      isDarkMode ? "bg-red-950/20 border-red-900/40 text-red-400 hover:bg-red-900/50" : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
+                      isDarkMode ? "bg-red-500/15 border-red-500/40 text-red-400 hover:bg-red-500/25" : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
                     }`}
                   >
                     <Square size={16} className="fill-current" /> End
@@ -313,7 +313,7 @@ export default function SessionTimer() {
         <div className={`hidden sm:block absolute bottom-4 text-[10px] font-medium z-10 transition-colors opacity-50 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
           Press{" "}
           <kbd className={`px-1.5 py-0.5 border rounded font-mono shadow-sm mx-0.5 transition-colors ${
-            isDarkMode ? "bg-[#111111] border-gray-800 text-gray-400" : "bg-gray-100 border-gray-200 text-gray-500"
+            isDarkMode ? "bg-black border-white/[0.04] text-gray-400" : "bg-gray-100 border-gray-200 text-gray-500"
           }`}>
             Space
           </kbd>{" "}
@@ -322,16 +322,14 @@ export default function SessionTimer() {
       </div>
 
       {/* =======================================================================
-          UPGRADED GLASSMORPHISM MODALS
+          UPGRADED GLASSMORPHISM MODALS (BLACK-OUT ISOLATED OVERLAYS)
       ========================================================================*/}
 
       {/* 1. Pause Modal */}
       {activeModal === "pause" && (
-        <div className={`fixed inset-0 z-[100] backdrop-blur-md flex flex-col items-center justify-center p-6 animate-in fade-in duration-200 ${
-          isDarkMode ? "bg-black/60" : "bg-white/60"
-        }`}>
+        <div className="fixed inset-0 z-[999999] bg-black flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
           <div className={`max-w-md w-full border shadow-2xl rounded-3xl p-8 text-center flex flex-col items-center animate-in zoom-in-95 duration-200 ${
-            isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-200"
+            isDarkMode ? "bg-black border-white/[0.04]" : "bg-white border-gray-200"
           }`}>
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors ${
               isDarkMode ? "bg-orange-500/10 text-orange-500" : "bg-orange-100 text-orange-600"
@@ -349,7 +347,7 @@ export default function SessionTimer() {
               <button
                 onClick={handleResume}
                 className={`w-full px-6 py-4 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] text-base flex items-center justify-center gap-2 ${
-                  isDarkMode ? "bg-white text-black hover:bg-gray-200" : "bg-gray-900 text-white hover:bg-black"
+                  isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
                 }`}
               >
                 <Play size={18} className="fill-current" /> Resume Focus
@@ -360,7 +358,7 @@ export default function SessionTimer() {
                   stopSession(false);
                 }}
                 className={`w-full px-6 py-4 border font-semibold rounded-xl transition-all active:scale-[0.98] ${
-                  isDarkMode ? "bg-[#111111] border-gray-800 text-gray-300 hover:bg-[#1a1a1a]" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                  isDarkMode ? "bg-black border-white/[0.04] text-gray-300 hover:bg-white/[0.03]" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
                 }`}
               >
                 End Session Early
@@ -372,11 +370,9 @@ export default function SessionTimer() {
 
       {/* 2. End Normal Session Modal */}
       {activeModal === "endNormal" && (
-        <div className={`fixed inset-0 z-[100] backdrop-blur-md flex flex-col items-center justify-center p-6 animate-in fade-in duration-200 ${
-          isDarkMode ? "bg-black/60" : "bg-white/60"
-        }`}>
+        <div className="fixed inset-0 z-[999999] bg-black flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
           <div className={`max-w-md w-full border shadow-2xl rounded-3xl p-8 text-center flex flex-col items-center animate-in zoom-in-95 duration-200 ${
-            isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-200"
+            isDarkMode ? "bg-black border-white/[0.04]" : "bg-white border-gray-200"
           }`}>
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors ${
               isDarkMode ? "bg-red-500/10 text-red-500" : "bg-red-50 text-red-600"
@@ -397,7 +393,7 @@ export default function SessionTimer() {
                   stopSession(false);
                 }}
                 className={`w-full px-6 py-4 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] text-base border ${
-                  isDarkMode ? "bg-red-950/40 border-red-900/50 text-red-400 hover:bg-red-900/50" : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
+                  isDarkMode ? "bg-red-500/15 border-red-500/40 text-red-400 hover:bg-red-500/25" : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
                 }`}
               >
                 Yes, End Session
@@ -405,7 +401,7 @@ export default function SessionTimer() {
               <button
                 onClick={() => setActiveModal(null)}
                 className={`w-full px-6 py-4 border font-semibold rounded-xl transition-all active:scale-[0.98] ${
-                  isDarkMode ? "bg-white text-black hover:bg-gray-200" : "bg-gray-900 text-white hover:bg-black"
+                  isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
                 }`}
               >
                 Cancel & Continue
@@ -417,11 +413,9 @@ export default function SessionTimer() {
 
       {/* 3. End Extra Focus Modal */}
       {activeModal === "endExtra" && (
-        <div className={`fixed inset-0 z-[100] backdrop-blur-md flex flex-col items-center justify-center p-6 animate-in fade-in duration-200 ${
-          isDarkMode ? "bg-black/60" : "bg-white/60"
-        }`}>
+        <div className="fixed inset-0 z-[999999] bg-black flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
           <div className={`max-w-md w-full border shadow-2xl rounded-3xl p-8 text-center flex flex-col items-center animate-in zoom-in-95 duration-200 ${
-            isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-white border-gray-200"
+            isDarkMode ? "bg-black border-white/[0.04]" : "bg-white border-gray-200"
           }`}>
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors ${
               isDarkMode ? "bg-purple-500/10 text-purple-400" : "bg-purple-100 text-purple-600"
@@ -436,17 +430,17 @@ export default function SessionTimer() {
             </p>
 
             <div className={`rounded-2xl p-5 w-full mb-8 flex flex-col gap-3 text-left shadow-inner border transition-colors ${
-              isDarkMode ? "bg-[#111111] border-gray-800 shadow-none" : "bg-gray-50 border-gray-200"
+              isDarkMode ? "bg-black border-white/[0.04] shadow-none" : "bg-gray-50 border-gray-200"
             }`}>
               <div className="flex justify-between items-center text-sm font-medium">
-                <span className={`transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>Target Goal:</span>
+                <span className="text-gray-500">Target Goal:</span>
                 <span className={`transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>{Math.floor(initialSessionTime / 60)} min</span>
               </div>
               <div className="flex justify-between items-center text-sm font-semibold">
                 <span className={`transition-colors ${isDarkMode ? "text-purple-400" : "text-purple-600"}`}>Extra Focus:</span>
                 <span className={`transition-colors ${isDarkMode ? "text-purple-400" : "text-purple-600"}`}>+{formatTime(extraTime)}</span>
               </div>
-              <div className={`h-px w-full my-1 transition-colors ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}></div>
+              <div className={`h-px w-full my-1 transition-colors ${isDarkMode ? "bg-white/[0.04]" : "bg-gray-200"}`}></div>
               <div className="flex justify-between items-center text-base font-bold">
                 <span className={`transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>Total Time:</span>
                 <span className={`transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>{formatTime(initialSessionTime + extraTime)}</span>
@@ -460,7 +454,7 @@ export default function SessionTimer() {
                   stopSession(true);
                 }}
                 className={`w-full px-6 py-4 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] text-base ${
-                  isDarkMode ? "bg-white text-black hover:bg-gray-200" : "bg-gray-900 text-white hover:bg-black"
+                  isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
                 }`}
               >
                 Save Total Time & End
@@ -471,7 +465,7 @@ export default function SessionTimer() {
                   stopSession(false); 
                 }}
                 className={`w-full px-6 py-4 border font-semibold rounded-xl transition-all active:scale-[0.98] ${
-                  isDarkMode ? "bg-[#111111] border-gray-800 text-gray-400 hover:bg-[#1a1a1a]" : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                  isDarkMode ? "bg-black border-white/[0.04] text-gray-400 hover:bg-white/[0.03]" : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                 }`}
               >
                 Discard Extra Time

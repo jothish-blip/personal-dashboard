@@ -28,9 +28,9 @@ export default function TopBar() {
   const getStatus = () => {
     if (!isActive) return { 
       label: "Idle", 
-      iconColor: isDarkMode ? "text-gray-600" : "text-gray-400", 
-      text: isDarkMode ? "text-gray-500" : "text-gray-500", 
-      pill: isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-200" 
+      iconColor: isDarkMode ? "text-zinc-600" : "text-gray-400", 
+      text: isDarkMode ? "text-zinc-500" : "text-gray-500", 
+      pill: isDarkMode ? "bg-black border-white/[0.05]" : "bg-gray-50 border-gray-200" 
     };
     if (isActive && isPaused) return { 
       label: "Paused", 
@@ -76,7 +76,7 @@ export default function TopBar() {
 
   return (
     <div className={`border rounded-2xl transition-colors duration-300 relative overflow-hidden mx-1 sm:mx-0 ${
-      isDarkMode ? "bg-[#050505] border-gray-800 shadow-none" : "bg-white border-gray-200 shadow-sm"
+      isDarkMode ? "bg-[#050505] border-white/[0.04] shadow-none" : "bg-white border-gray-200 shadow-sm"
     }`}>
       
       <div className="p-3 sm:p-4 md:p-5">
@@ -89,7 +89,7 @@ export default function TopBar() {
             
             {/* Mode Selector */}
             <div className={`grid grid-cols-3 p-1 rounded-xl w-full sm:w-fit transition-colors duration-300 ${
-              isDarkMode ? "bg-[#111111] border border-gray-800" : "bg-gray-100 border border-transparent"
+              isDarkMode ? "bg-black border border-white/[0.04]" : "bg-gray-100 border border-transparent"
             }`}>
               {MODES.map((m) => {
                 const isSelected = mode === m.key;
@@ -102,10 +102,10 @@ export default function TopBar() {
                       px-2 sm:px-4 py-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all tracking-wide
                       ${isSelected 
                         ? (isDarkMode 
-                            ? "bg-[#1a1a1a] text-orange-400 border border-gray-700 shadow-inner" 
+                            ? "bg-white/[0.04] text-orange-400 border border-white/[0.06] shadow-inner" 
                             : "bg-white text-blue-700 shadow-sm border border-blue-200") 
                         : (isDarkMode 
-                            ? "text-gray-500 hover:text-gray-300 hover:bg-[#1a1a1a]" 
+                            ? "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.03]" 
                             : "text-gray-600 hover:text-blue-600 hover:bg-gray-200/50")}
                       ${isActive && !isSelected ? "opacity-40 cursor-not-allowed" : ""}
                       ${!isActive ? "active:scale-95" : ""}
@@ -120,7 +120,7 @@ export default function TopBar() {
             {/* Custom Mode Time Input */}
             {mode === "custom" && !isActive && (
               <div className={`flex items-center gap-2 px-2 py-1.5 rounded-xl animate-in fade-in slide-in-from-left-2 duration-200 transition-colors ${
-                isDarkMode ? "bg-[#111111] border border-gray-800" : "bg-gray-50 border border-gray-200"
+                isDarkMode ? "bg-black border border-white/[0.04]" : "bg-gray-50 border border-gray-200"
               }`}>
                 <input
                   type="number"
@@ -128,15 +128,15 @@ export default function TopBar() {
                   onChange={handleCustomTimeChange}
                   placeholder="0"
                   className={`w-10 bg-transparent text-sm font-bold text-center focus:outline-none transition-colors ${
-                    isDarkMode ? "text-white placeholder:text-gray-600" : "text-gray-900 placeholder:text-gray-300"
+                    isDarkMode ? "text-white placeholder:text-zinc-600" : "text-gray-900 placeholder:text-gray-300"
                   }`}
                 />
                 <span className={`text-[10px] uppercase font-bold tracking-wider transition-colors ${
-                  isDarkMode ? "text-gray-500" : "text-gray-400"
+                  isDarkMode ? "text-zinc-500" : "text-gray-400"
                 }`}>min</span>
                 
                 <div className={`flex gap-1 ml-1 pl-2 border-l transition-colors ${
-                  isDarkMode ? "border-gray-800" : "border-gray-200"
+                  isDarkMode ? "border-white/[0.05]" : "border-gray-200"
                 }`}>
                   {PRESETS.map(p => (
                     <button
@@ -148,7 +148,7 @@ export default function TopBar() {
                       }}
                       className={`text-[10px] font-bold px-2 py-1 rounded-lg transition-transform duration-150 active:scale-95 hover:scale-[1.05] shadow-sm border ${
                         isDarkMode 
-                          ? "bg-[#1a1a1a] border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white" 
+                          ? "bg-black border-white/[0.05] text-zinc-400 hover:bg-white/[0.05] hover:text-white" 
                           : "bg-white border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                       }`}
                     >
@@ -165,7 +165,7 @@ export default function TopBar() {
           ========================================== */}
           <div className="text-center order-1 lg:order-2 flex flex-col justify-center w-full">
             <div className={`text-[10px] uppercase font-extrabold tracking-widest mb-1 transition-colors ${
-              isDarkMode ? "text-gray-500" : "text-gray-400"
+              isDarkMode ? "text-zinc-500" : "text-gray-400"
             }`}>
               Current Focus
             </div>
@@ -174,7 +174,7 @@ export default function TopBar() {
                 ? (isDarkMode ? "text-emerald-400" : "text-emerald-700")
                 : activeTaskId 
                   ? (isDarkMode ? "text-white" : "text-gray-900")
-                  : (isDarkMode ? "text-gray-500" : "text-gray-500")
+                  : (isDarkMode ? "text-zinc-500" : "text-gray-500")
             }`}>
               {displayTask}
             </div>

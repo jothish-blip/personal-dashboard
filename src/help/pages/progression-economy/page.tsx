@@ -25,7 +25,7 @@ const ARTICLES: Article[] = [
     id: "what-are-rewards-badges",
     title: "What are Rewards & Badges?",
     teaser:
-      "Understand how Nextask rewards consistency and meaningful growth.",
+      "Understand how NexSpace rewards consistency and meaningful growth.",
     readTime: "2 min",
     keywords: [
       "badges",
@@ -43,7 +43,7 @@ const ARTICLES: Article[] = [
 
         <p>
           Instead of rewarding random
-          activity, Nextask rewards
+          activity, NexSpace rewards
           meaningful consistency,
           discipline and recovery.
         </p>
@@ -77,7 +77,7 @@ const ARTICLES: Article[] = [
         </p>
 
         <p>
-          Nextask solves this by celebrating
+          NexSpace solves this by celebrating
           meaningful milestones and
           behavioral wins.
         </p>
@@ -129,7 +129,7 @@ const ARTICLES: Article[] = [
     id: "types-of-badges",
     title: "What types of badges exist?",
     teaser:
-      "Explore the different badge categories inside Nextask.",
+      "Explore the different badge categories inside NexSpace.",
     readTime: "4 min",
     keywords: [
       "categories",
@@ -382,7 +382,7 @@ export default function RewardsBadgesPage() {
               <div className="text-center mb-10">
                 <Image
                   src="/favicon.ico"
-                  alt="Nextask"
+                  alt="NexSpace"
                   width={54}
                   height={54}
                   className="mx-auto rounded-2xl mb-5"

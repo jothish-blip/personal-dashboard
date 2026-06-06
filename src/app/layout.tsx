@@ -22,8 +22,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | Nextask",
-    default: "Nextask",
+    template: "%s | NexSpace",
+    default: "NexSpace",
   },
   description: "Execution system for focus, tasks and planning",
   manifest: "/manifest.json",
@@ -34,9 +34,9 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Nextask",
+    title: "NexSpace",
   },
-  applicationName: "Nextask",
+  applicationName: "NexSpace",
   formatDetection: {
     telephone: false,
   },
@@ -60,7 +60,7 @@ export default function RootLayout({
             __html: `
               (function () {
                 try {
-                  var stored = localStorage.getItem('nextask_theme');
+                  var stored = localStorage.getItem('nexspace _theme');
                   var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
                   
                   var finalTheme = stored ? stored : (systemDark ? 'dark' : 'light');

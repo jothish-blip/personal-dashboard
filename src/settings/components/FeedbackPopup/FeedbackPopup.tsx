@@ -144,7 +144,7 @@ export default function FeedbackPopup({
                 </div>
               </div>
               <h1 className="text-lg font-bold text-gray-900">Thanks! 🙌</h1>
-              <p className="text-xs text-gray-500 mt-1 font-medium">Your feedback makes NexTask better.</p>
+              <p className="text-xs text-gray-500 mt-1 font-medium">Your feedback makes NexSpace better.</p>
             </div>
           ) : showPlea ? (
             /* Emotional Plea State */

@@ -23,9 +23,9 @@ type Article = {
 const ARTICLES: Article[] = [
   {
     id: "roadmap-overview",
-    title: "What is the Nextask Roadmap?",
+    title: "What is the NexSpace Roadmap?",
     teaser:
-      "Understand how Nextask evolves from productivity app to discipline platform.",
+      "Understand how NexSpace evolves from productivity app to discipline platform.",
     readTime: "2 min",
     keywords: [
       "roadmap",
@@ -37,7 +37,7 @@ const ARTICLES: Article[] = [
     content: (
       <div className="space-y-5">
         <p>
-          The Nextask roadmap defines how
+          The NexSpace roadmap defines how
           the platform evolves over time.
         </p>
 
@@ -203,9 +203,9 @@ const ARTICLES: Article[] = [
 
   {
     id: "phase-5-ecosystem",
-    title: "Phase 5 — Nextask Ecosystem",
+    title: "Phase 5 — NexSpace Ecosystem",
     teaser:
-      "Transforming Nextask into a full discipline platform.",
+      "Transforming NexSpace into a full discipline platform.",
     readTime: "3 min",
     keywords: [
       "phase 5",
@@ -218,7 +218,7 @@ const ARTICLES: Article[] = [
       <div className="space-y-5">
         <p>
           The final phase expands
-          Nextask into a larger ecosystem.
+          NexSpace into a larger ecosystem.
         </p>
 
         <p>
@@ -355,7 +355,7 @@ export default function RoadmapPage() {
               <div className="text-center mb-10">
                 <Image
                   src="/favicon.ico"
-                  alt="Nextask"
+                  alt="NexSpace"
                   width={54}
                   height={54}
                   className="mx-auto rounded-2xl mb-5"

@@ -726,10 +726,10 @@ export function useWorkspaceSystem() {
   useEffect(() => {
     if (!currentUser) return; 
 
-    const hasSeenPopup = sessionStorage.getItem('nextask_workspace_wip_seen');
+    const hasSeenPopup = sessionStorage.getItem('nexspace_workspace_wip_seen');
     if (!hasSeenPopup) {
       setShowWipPopup(true);
-      sessionStorage.setItem('nextask_workspace_wip_seen', 'true');
+      sessionStorage.setItem('nexspace_workspace_wip_seen', 'true');
     }
 
     const initWorkspace = async () => {
@@ -852,8 +852,8 @@ export function useWorkspaceSystem() {
     if (!firstLoadDone.current || activeDocuments.length === 0 || !userRef.current) return;
     
     const timer = setTimeout(() => {
-      const storageKey = `nextask-${userRef.current.id}-workspace`;
-      const mediaKey = `nextask-${userRef.current.id}-media`;
+      const storageKey = `nexspace-${userRef.current.id}-workspace`;
+      const mediaKey = `nexspace-${userRef.current.id}-media`;
       localStorage.setItem(storageKey, JSON.stringify({ documents: activeDocuments, folders: activeFolders }));
       localStorage.setItem(mediaKey, JSON.stringify(activeMedia));
       handleWorkspaceAction(addNotification, 'save');

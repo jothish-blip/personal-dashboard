@@ -255,7 +255,7 @@ export default function FocusStatsCard() {
   };
 
   const getFocusBadge = () => {
-    if (totalSessions === 0) return { label: "Idle", style: isDarkMode ? "bg-[#111111] text-gray-400 border border-gray-800" : "bg-gray-100 text-gray-500 border border-transparent" };
+    if (totalSessions === 0) return { label: "Idle", style: isDarkMode ? "bg-black text-gray-400 border border-white/[0.04]" : "bg-gray-100 text-gray-500 border border-transparent" };
     if (isInFlow) return { label: "Flow State", style: isDarkMode ? "bg-purple-950/30 text-purple-400 border border-purple-900/50" : "bg-purple-100 text-purple-700 border border-transparent" };
     if (avgScore >= 80) return { label: "Deep Focus", style: isDarkMode ? "bg-emerald-950/30 text-emerald-400 border border-emerald-900/50" : "bg-green-100 text-green-700 border border-transparent" };
     if (avgScore >= 50) return { label: "Stable", style: isDarkMode ? "bg-blue-950/30 text-blue-400 border border-blue-900/50" : "bg-blue-100 text-blue-700 border border-transparent" };
@@ -349,7 +349,7 @@ export default function FocusStatsCard() {
         .filter(s => getDateStr(s.startTime) === dStr)
         .reduce<number>((acc, s) => acc + s.durationSeconds + (s.extraDuration || 0), 0);
       
-      let colorClass = isDarkMode ? "bg-[#111111]" : "bg-gray-100";
+      let colorClass = isDarkMode ? "bg-black" : "bg-gray-100";
       if (daySeconds > 0) colorClass = isDarkMode ? "bg-orange-950/40" : "bg-green-100";
       if (daySeconds > 3600) colorClass = isDarkMode ? "bg-orange-500/40" : "bg-green-300";
       if (daySeconds > 7200) colorClass = isDarkMode ? "bg-orange-500/70" : "bg-green-500";
@@ -365,18 +365,18 @@ export default function FocusStatsCard() {
     }
 
     return (
-      <div className={`mt-6 border-t pt-5 animate-in fade-in zoom-in-95 transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+      <div className={`mt-6 border-t pt-5 animate-in fade-in zoom-in-95 transition-colors ${isDarkMode ? "border-white/[0.04]" : "border-gray-100"}`}>
         <h3 className={`text-[10px] font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
           <Activity size={14} className={isDarkMode ? "text-orange-500" : "text-blue-500"} /> Focus Intensity Map
         </h3>
         <div className={`flex flex-wrap gap-1 md:gap-1.5 p-4 rounded-xl overflow-y-auto max-h-[160px] custom-scrollbar shadow-sm transition-colors duration-300 border ${
-          isDarkMode ? "bg-[#111111] border-gray-800 hover:bg-[#1a1a1a]" : "bg-white border-gray-200 hover:bg-gray-50"
+          isDarkMode ? "bg-black border-white/[0.04] hover:bg-white/[0.02]" : "bg-white border-gray-200 hover:bg-gray-50"
         }`}>
           {days}
         </div>
         <div className="flex justify-end items-center gap-1.5 mt-3">
           <span className={`text-[10px] font-medium mr-1 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Less</span>
-          <div className={`w-2.5 h-2.5 rounded-[2px] ${isDarkMode ? "bg-[#111111]" : "bg-gray-100"}`}></div>
+          <div className={`w-2.5 h-2.5 rounded-[2px] ${isDarkMode ? "bg-black" : "bg-gray-100"}`}></div>
           <div className={`w-2.5 h-2.5 rounded-[2px] ${isDarkMode ? "bg-orange-950/40" : "bg-green-100"}`}></div>
           <div className={`w-2.5 h-2.5 rounded-[2px] ${isDarkMode ? "bg-orange-500/40" : "bg-green-300"}`}></div>
           <div className={`w-2.5 h-2.5 rounded-[2px] ${isDarkMode ? "bg-orange-500/70" : "bg-green-500"}`}></div>
@@ -394,7 +394,7 @@ export default function FocusStatsCard() {
   if (!isLoaded) {
     return (
       <div className={`flex justify-center items-center h-64 w-full max-w-[580px] rounded-2xl shadow-sm animate-pulse mb-4 md:mb-0 border transition-colors ${
-        isDarkMode ? "bg-black border-gray-800 text-gray-500" : "bg-white border-gray-200 text-gray-400"
+        isDarkMode ? "bg-black border-white/[0.04] text-gray-500" : "bg-white border-gray-200 text-gray-400"
       }`}>
          <div className="text-sm font-bold flex items-center gap-2">
            <Activity size={18} className="animate-spin" />
@@ -407,7 +407,7 @@ export default function FocusStatsCard() {
   if (isLoaded && typedSessions.length === 0) {
     return (
       <div className={`flex flex-col items-center justify-center p-12 w-full max-w-[580px] rounded-2xl shadow-sm text-center mb-4 md:mb-0 transition-colors duration-300 border ${
-        isDarkMode ? "bg-black border-gray-800 hover:bg-[#0a0a0a]" : "bg-white border-gray-200 hover:bg-gray-50"
+        isDarkMode ? "bg-black border-white/[0.04] hover:bg-white/[0.02]" : "bg-white border-gray-200 hover:bg-gray-50"
       }`}>
         <Inbox size={48} className={`mx-auto mb-4 stroke-[1px] ${isDarkMode ? "text-gray-600" : "text-gray-300"}`} />
         <h3 className={`text-lg font-bold transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>No Data Collected</h3>
@@ -421,7 +421,7 @@ export default function FocusStatsCard() {
   return (
     <div className={`flex justify-center lg:justify-end w-full font-sans transition-colors duration-300 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
       <div className={`p-6 rounded-2xl shadow-sm w-full max-w-[520px] xl:max-w-[580px] animate-in fade-in duration-300 mb-4 md:mb-0 border transition-colors ${
-        isDarkMode ? "bg-black border-gray-800" : "bg-white border-gray-200"
+        isDarkMode ? "bg-black border-white/[0.04]" : "bg-white border-gray-200"
       }`}>
         
         {/* HEADER ARCHITECTURE */}
@@ -447,10 +447,10 @@ export default function FocusStatsCard() {
             </div>
 
             {/* DATE NAVIGATION */}
-            <div className={`flex items-center rounded-lg w-fit border shrink-0 transition-colors ${isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-200"}`}>
-              <button onClick={() => shiftDate(-1)} className={`px-3 py-1.5 rounded-l-lg transition-colors active:scale-95 ${isDarkMode ? "text-gray-500 hover:bg-[#1a1a1a] hover:text-white" : "text-gray-500 hover:bg-gray-200 hover:text-gray-900"}`}>◀</button>
-              <button onClick={jumpToToday} className={`px-3 py-1.5 text-xs font-bold transition-colors active:scale-95 border-x uppercase tracking-wider ${isDarkMode ? "text-gray-400 hover:bg-[#1a1a1a] hover:text-white border-gray-800" : "text-gray-600 hover:bg-gray-200 hover:text-gray-900 border-gray-200"}`}>Today</button>
-              <button onClick={() => shiftDate(1)} className={`px-3 py-1.5 rounded-r-lg transition-colors active:scale-95 ${isDarkMode ? "text-gray-500 hover:bg-[#1a1a1a] hover:text-white" : "text-gray-500 hover:bg-gray-200 hover:text-gray-900"}`}>▶</button>
+            <div className={`flex items-center rounded-lg w-fit border shrink-0 transition-colors ${isDarkMode ? "bg-black border-white/[0.04]" : "bg-gray-50 border-gray-200"}`}>
+              <button onClick={() => shiftDate(-1)} className={`px-3 py-1.5 rounded-l-lg transition-colors active:scale-95 ${isDarkMode ? "text-gray-500 hover:bg-white/[0.04] hover:text-white" : "text-gray-500 hover:bg-gray-200 hover:text-gray-900"}`}>◀</button>
+              <button onClick={jumpToToday} className={`px-3 py-1.5 text-xs font-bold transition-colors active:scale-95 border-x uppercase tracking-wider ${isDarkMode ? "text-gray-400 hover:bg-white/[0.04] hover:text-white border-white/[0.04]" : "text-gray-600 hover:bg-gray-200 hover:text-gray-900 border-gray-200"}`}>Today</button>
+              <button onClick={() => shiftDate(1)} className={`px-3 py-1.5 rounded-r-lg transition-colors active:scale-95 ${isDarkMode ? "text-gray-500 hover:bg-white/[0.04] hover:text-white" : "text-gray-500 hover:bg-gray-200 hover:text-gray-900"}`}>▶</button>
             </div>
           </div>
 
@@ -482,7 +482,7 @@ export default function FocusStatsCard() {
 
           {/* RANGE SELECTOR */}
           <div className={`flex gap-1 overflow-x-auto p-1 rounded-xl w-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] border transition-colors ${
-            isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-200"
+            isDarkMode ? "bg-black border-white/[0.04]" : "bg-gray-50 border-gray-200"
           }`}>
             {(["today", "yesterday", "week", "month", "year", "custom"] as DateRange[]).map((range) => (
               <button
@@ -490,8 +490,8 @@ export default function FocusStatsCard() {
                 onClick={() => setSelectedRange(range)}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all flex-1 sm:flex-none text-center border ${
                   selectedRange === range
-                    ? (isDarkMode ? "bg-[#1a1a1a] text-orange-400 border-gray-700 shadow-inner" : "bg-white text-blue-700 border-gray-200 shadow-sm")
-                    : (isDarkMode ? "text-gray-500 border-transparent hover:text-white hover:bg-[#1a1a1a]" : "text-gray-500 border-transparent hover:text-gray-900 hover:bg-gray-200/50")
+                    ? (isDarkMode ? "bg-white/[0.04] text-orange-400 border-white/[0.06] shadow-inner" : "bg-white text-blue-700 border-gray-200 shadow-sm")
+                    : (isDarkMode ? "text-gray-500 border-transparent hover:text-white hover:bg-white/[0.02]" : "text-gray-500 border-transparent hover:text-gray-900 hover:bg-gray-200/50")
                 }`}
               >
                 {range === "week" ? "7 Days" : range.charAt(0).toUpperCase() + range.slice(1)}
@@ -502,14 +502,14 @@ export default function FocusStatsCard() {
 
         {/* WEEKLY CHART */}
         {selectedRange === "week" && (
-          <div className={`mt-8 mb-4 transition-all duration-300 p-4 -mx-4 rounded-2xl ${isDarkMode ? "hover:bg-[#111111]" : "hover:bg-gray-50"}`}>
+          <div className={`mt-8 mb-4 transition-all duration-300 p-4 -mx-4 rounded-2xl ${isDarkMode ? "hover:bg-white/[0.02]" : "hover:bg-gray-50"}`}>
             <h3 className={`text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
               <Activity size={14} className={isDarkMode ? "text-orange-500" : "text-blue-500"} /> Weekly Quality Breakdown
             </h3>
-            <div className={`relative flex items-end justify-between h-36 gap-2 w-full pt-6 border-b transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-200"}`}>
+            <div className={`relative flex items-end justify-between h-36 gap-2 w-full pt-6 border-b transition-colors ${isDarkMode ? "border-white/[0.04]" : "border-gray-200"}`}>
                <div className={`absolute inset-0 flex flex-col justify-between text-[10px] font-medium pb-6 pointer-events-none z-0 transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
-                  <div className={`w-full border-b border-dashed flex items-center justify-end pr-1 h-0 transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-200"}`}><span className={`-translate-y-1/2 pl-2 transition-colors ${isDarkMode ? "bg-black" : "bg-white"}`}>100%</span></div>
-                  <div className={`w-full border-b border-dashed flex items-center justify-end pr-1 h-0 transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-200"}`}><span className={`-translate-y-1/2 pl-2 transition-colors ${isDarkMode ? "bg-black" : "bg-white"}`}>50%</span></div>
+                  <div className={`w-full border-b border-dashed flex items-center justify-end pr-1 h-0 transition-colors ${isDarkMode ? "border-white/[0.04]" : "border-gray-200"}`}><span className={`-translate-y-1/2 pl-2 transition-colors ${isDarkMode ? "bg-black" : "bg-white"}`}>100%</span></div>
+                  <div className={`w-full border-b border-dashed flex items-center justify-end pr-1 h-0 transition-colors ${isDarkMode ? "border-white/[0.04]" : "border-gray-200"}`}><span className={`-translate-y-1/2 pl-2 transition-colors ${isDarkMode ? "bg-black" : "bg-white"}`}>50%</span></div>
                   <div className="w-full flex items-center justify-end pr-1 h-0"><span className={`-translate-y-1/2 pl-2 transition-colors ${isDarkMode ? "bg-black" : "bg-white"}`}>0%</span></div>
                </div>
                
@@ -523,13 +523,13 @@ export default function FocusStatsCard() {
                          <span className={`text-[10px] absolute -top-5 font-bold whitespace-nowrap transition-colors ${isDarkMode ? "text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" : "text-purple-600"}`}>Best Day</span>
                        )}
                        <div className={`opacity-0 group-hover:opacity-100 transition-opacity absolute -top-12 text-[10px] font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap pointer-events-none z-20 transition-colors ${
-                         isDarkMode ? "bg-[#111111] border border-gray-800 text-white" : "bg-gray-900 text-white"
+                         isDarkMode ? "bg-black border border-white/[0.04] text-white" : "bg-gray-900 text-white"
                        }`}>
                          {day.dayScore}% • {formatHrsMins(day.dayTime)}
                        </div>
                        <div className="w-full px-1 flex items-end h-full">
                          <div 
-                           className={`w-full rounded-t-md shadow-sm transition-all duration-300 origin-bottom group-hover:scale-105 ${day.dayScore === 0 ? (isDarkMode ? 'bg-[#111111] min-h-[4px]' : 'bg-gray-100 min-h-[4px]') : barColor}`}
+                           className={`w-full rounded-t-md shadow-sm transition-all duration-300 origin-bottom group-hover:scale-105 ${day.dayScore === 0 ? (isDarkMode ? 'bg-black min-h-[4px]' : 'bg-gray-100 min-h-[4px]') : barColor}`}
                            style={{ height: `${Math.max(2, day.dayScore)}%` }}
                          />
                        </div>
@@ -547,7 +547,7 @@ export default function FocusStatsCard() {
           
           {/* 🔥 1. LIVE FOCUS SIGNAL BLOCK */}
           {isActive && (
-            <div className={`border rounded-2xl p-5 shadow-sm relative overflow-hidden transition-colors duration-300 ${isDarkMode ? "bg-[#111111] border-gray-800" : "bg-white border-gray-200"}`}>
+            <div className={`border rounded-2xl p-5 shadow-sm relative overflow-hidden transition-colors duration-300 ${isDarkMode ? "bg-black border-white/[0.04]" : "bg-white border-gray-200"}`}>
               
               {/* Overlay for Paused State */}
               {isPaused && (
@@ -570,7 +570,7 @@ export default function FocusStatsCard() {
                 )}
               </div>
 
-              <div className={`relative flex items-end gap-[2px] px-[2px] h-20 w-full z-10 border-b transition-colors ${isPaused ? "opacity-60" : ""} ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+              <div className={`relative flex items-end gap-[2px] px-[2px] h-20 w-full z-10 border-b transition-colors ${isPaused ? "opacity-60" : ""} ${isDarkMode ? "border-white/[0.04]" : "border-gray-100"}`}>
                 {currentSession?.distractions?.map((d: DistractionEvent, idx: number) => {
                   const ageSeconds = (Date.now() - d.timestamp) / 1000;
                   if (ageSeconds > 40) return null;
@@ -633,7 +633,7 @@ export default function FocusStatsCard() {
 
           {/* 🥇 LEVEL 1: HERO METRIC */}
           <div className={`transition-all duration-300 border p-6 rounded-2xl shadow-sm relative overflow-hidden ${
-            isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-200"
+            isDarkMode ? "bg-black hover:bg-white/[0.02] border-white/[0.04]" : "bg-white hover:bg-gray-50 border-gray-200"
           }`}>
             <div className={`text-[10px] font-bold uppercase tracking-wider flex justify-between items-center transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
               <span>{selectedRange} Focus Time</span>
@@ -652,7 +652,7 @@ export default function FocusStatsCard() {
               Total Execution: {formatHrsMins(totalActualFocus)}
             </div>
             
-            <div className={`mt-5 h-2 rounded-full overflow-hidden transition-colors ${isDarkMode ? "bg-[#1a1a1a]" : "bg-gray-100"}`}>
+            <div className={`mt-5 h-2 rounded-full overflow-hidden transition-colors ${isDarkMode ? "bg-white/[0.03]" : "bg-gray-100"}`}>
               <div 
                 className={`h-full transition-all duration-1000 ease-out ${
                   goalProgress >= 100
@@ -676,7 +676,7 @@ export default function FocusStatsCard() {
           <div className={`md:hidden ${showMobileDetails ? 'hidden' : 'block'}`}>
              <button 
                 className={`w-full text-center text-xs font-semibold py-3 border rounded-xl transition-colors flex items-center justify-center gap-2 ${
-                  isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800 text-gray-400" : "bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-600"
+                  isDarkMode ? "bg-black hover:bg-white/[0.02] border-white/[0.04] text-gray-400" : "bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-600"
                 }`}
                 onClick={() => setShowMobileDetails(true)}
               >
@@ -688,7 +688,7 @@ export default function FocusStatsCard() {
           <div className={`grid grid-cols-2 md:grid-cols-2 gap-4 ${showMobileDetails ? 'block' : 'hidden md:grid'}`}>
             
             <div className={`p-5 transition-all duration-300 border rounded-2xl shadow-sm flex flex-col justify-center items-center text-center ${
-              isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-200"
+              isDarkMode ? "bg-black hover:bg-white/[0.02] border-white/[0.04]" : "bg-white hover:bg-gray-50 border-gray-200"
             }`}>
               <div 
                 className="relative w-20 h-20 mx-auto flex-shrink-0 rounded-full flex items-center justify-center"
@@ -696,7 +696,7 @@ export default function FocusStatsCard() {
                   background: `conic-gradient(${avgScore >= 80 ? '#22c55e' : avgScore >= 50 ? '#3b82f6' : '#ef4444'} ${avgScore}%, rgba(156,163,175,0.2) ${avgScore}%)` 
                 }}
               >
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center absolute transition-colors ${isDarkMode ? "bg-[#111111]" : "bg-white"}`}>
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center absolute transition-colors ${isDarkMode ? "bg-black" : "bg-white"}`}>
                   <span className={`text-base font-bold transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>{avgScore}%</span>
                 </div>
               </div>
@@ -704,7 +704,7 @@ export default function FocusStatsCard() {
             </div>
 
             <div className={`p-5 transition-all duration-300 border rounded-2xl shadow-sm flex flex-col justify-center ${
-              isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-200"
+              isDarkMode ? "bg-black hover:bg-white/[0.02] border-white/[0.04]" : "bg-white hover:bg-gray-50 border-gray-200"
             }`}>
               <div className={`flex justify-between text-[10px] font-bold uppercase tracking-wider mb-2 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
                 <span>Sessions</span>
@@ -720,7 +720,7 @@ export default function FocusStatsCard() {
                   <span className={`text-3xl font-bold transition-colors ${isDarkMode ? "text-red-400" : "text-red-500"}`}>{totalDistractions}</span>
                 </div>
               </div>
-              <div className={`mt-4 text-[9px] text-center uppercase tracking-wider font-semibold border-t pt-3 transition-colors ${isDarkMode ? "text-gray-500 border-gray-800" : "text-gray-400 border-gray-100"}`}>
+              <div className={`mt-4 text-[9px] text-center uppercase tracking-wider font-semibold border-t pt-3 transition-colors ${isDarkMode ? "text-gray-500 border-white/[0.04]" : "text-gray-400 border-gray-100"}`}>
                 Work vs Interruptions
               </div>
             </div>
@@ -730,7 +730,7 @@ export default function FocusStatsCard() {
           <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 ${showMobileDetails ? 'block' : 'hidden md:grid'}`}>
             
             <div className={`transition-all duration-300 border rounded-2xl p-5 shadow-sm flex flex-col justify-center ${
-              isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-200"
+              isDarkMode ? "bg-black hover:bg-white/[0.02] border-white/[0.04]" : "bg-white hover:bg-gray-50 border-gray-200"
             }`}>
               <h3 className={`text-[10px] font-bold uppercase tracking-wider mb-4 flex items-center gap-1.5 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
                 <Activity size={14} className={isDarkMode ? "text-orange-500" : "text-blue-500"} /> Focus vs Distractions
@@ -742,7 +742,7 @@ export default function FocusStatsCard() {
                     <span>Focus Time</span>
                     <span className={`font-bold transition-colors ${isDarkMode ? "text-orange-400" : "text-blue-600"}`}>{formatHrsMins(totalFocusSeconds)}</span>
                   </div>
-                  <div className={`h-2.5 rounded-full overflow-hidden shadow-inner transition-colors ${isDarkMode ? "bg-[#1a1a1a]" : "bg-gray-100"}`}>
+                  <div className={`h-2.5 rounded-full overflow-hidden shadow-inner transition-colors ${isDarkMode ? "bg-white/[0.03]" : "bg-gray-100"}`}>
                     <div
                       className={`h-full transition-all duration-500 rounded-full ${isDarkMode ? "bg-orange-500" : "bg-blue-500"}`}
                       style={{ width: `${totalFocusSeconds === 0 ? 0 : (totalFocusSeconds / Math.max(1, totalFocusSeconds + totalDistractions * 60)) * 100}%` }} 
@@ -754,7 +754,7 @@ export default function FocusStatsCard() {
                     <span>Interruptions</span>
                     <span className={`font-bold transition-colors ${isDarkMode ? "text-red-400" : "text-red-500"}`}>{totalDistractions}</span>
                   </div>
-                  <div className={`h-2.5 rounded-full overflow-hidden shadow-inner transition-colors ${isDarkMode ? "bg-[#1a1a1a]" : "bg-gray-100"}`}>
+                  <div className={`h-2.5 rounded-full overflow-hidden shadow-inner transition-colors ${isDarkMode ? "bg-white/[0.03]" : "bg-gray-100"}`}>
                     <div
                       className={`h-full bg-red-500 transition-all duration-500 rounded-full ${isDarkMode ? "shadow-[0_0_8px_rgba(239,68,68,0.5)]" : ""}`}
                       style={{ width: `${totalFocusSeconds === 0 && totalDistractions === 0 ? 0 : ((totalDistractions * 60) / Math.max(1, totalFocusSeconds + totalDistractions * 60)) * 100}%` }}
@@ -765,7 +765,7 @@ export default function FocusStatsCard() {
             </div>
 
             <div className={`transition-all duration-300 border rounded-2xl p-5 shadow-sm flex flex-col justify-center ${
-              isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-200"
+              isDarkMode ? "bg-black hover:bg-white/[0.02] border-white/[0.04]" : "bg-white hover:bg-gray-50 border-gray-200"
             }`}>
               <h3 className={`text-[10px] font-bold uppercase tracking-wider mb-4 flex items-center gap-1.5 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
                 <Clock size={14} className={isDarkMode ? "text-purple-400" : "text-purple-600"} /> Session Trend
@@ -799,7 +799,7 @@ export default function FocusStatsCard() {
 
         {/* 🧠 LEVEL 3: INTELLIGENCE PANEL */}
         <div className={`mt-6 transition-all duration-300 p-6 rounded-2xl border shadow-sm flex flex-col md:flex-row gap-6 ${
-          isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-200"
+          isDarkMode ? "bg-black hover:bg-white/[0.02] border-white/[0.04]" : "bg-white hover:bg-gray-50 border-gray-200"
         }`}>
           <div className="flex-1 flex flex-col justify-between">
             <div>
@@ -823,7 +823,7 @@ export default function FocusStatsCard() {
               </button>
             </div>
             
-            <div className={`mt-auto pt-5 border-t flex flex-col gap-3 transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+            <div className={`mt-auto pt-5 border-t flex flex-col gap-3 transition-colors ${isDarkMode ? "border-white/[0.04]" : "border-gray-100"}`}>
 
               <span className={`text-[10px] uppercase tracking-wider font-bold transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
                 Focus DNA
@@ -831,7 +831,7 @@ export default function FocusStatsCard() {
 
               <div className="grid grid-cols-2 gap-3 text-[11px]">
 
-                <div className={`border rounded-lg p-2 transition-colors ${isDarkMode ? "bg-black border-gray-800" : "bg-gray-50 border-gray-200"}`}>
+                <div className={`border rounded-lg p-2 transition-colors ${isDarkMode ? "bg-black border-white/[0.04]" : "bg-gray-50 border-gray-200"}`}>
                   <div className={`text-[9px] uppercase transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Pattern</div>
                   <div className={`font-bold transition-colors ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>
                     {flowRatio > 30 ? "Deep Flow Builder" :
@@ -840,7 +840,7 @@ export default function FocusStatsCard() {
                   </div>
                 </div>
 
-                <div className={`border rounded-lg p-2 transition-colors ${isDarkMode ? "bg-black border-gray-800" : "bg-gray-50 border-gray-200"}`}>
+                <div className={`border rounded-lg p-2 transition-colors ${isDarkMode ? "bg-black border-white/[0.04]" : "bg-gray-50 border-gray-200"}`}>
                   <div className={`text-[9px] uppercase transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Energy</div>
                   <div className={`font-bold transition-colors ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>
                     {avgScore >= 80 ? "High Stability" :
@@ -849,14 +849,14 @@ export default function FocusStatsCard() {
                   </div>
                 </div>
 
-                <div className={`border rounded-lg p-2 transition-colors ${isDarkMode ? "bg-black border-gray-800" : "bg-gray-50 border-gray-200"}`}>
+                <div className={`border rounded-lg p-2 transition-colors ${isDarkMode ? "bg-black border-white/[0.04]" : "bg-gray-50 border-gray-200"}`}>
                   <div className={`text-[9px] uppercase transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Flow Behavior</div>
                   <div className={`font-bold transition-colors ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>
                     {totalExtraSeconds > 0 ? "Extends Sessions" : "Stops on Timer"}
                   </div>
                 </div>
 
-                <div className={`border rounded-lg p-2 transition-colors ${isDarkMode ? "bg-black border-gray-800" : "bg-gray-50 border-gray-200"}`}>
+                <div className={`border rounded-lg p-2 transition-colors ${isDarkMode ? "bg-black border-white/[0.04]" : "bg-gray-50 border-gray-200"}`}>
                   <div className={`text-[9px] uppercase transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Risk</div>
                   <div className={`font-bold transition-colors ${isDarkMode ? "text-red-400" : "text-red-500"}`}>
                     {topIssue !== "None" ? topIssue : "Low"}
@@ -867,7 +867,7 @@ export default function FocusStatsCard() {
             </div>
           </div>
 
-          <div className={`${showMobileDetails ? 'block' : 'hidden'} md:block md:w-[40%] md:border-l md:pl-6 mt-4 md:mt-0 transition-colors ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+          <div className={`${showMobileDetails ? 'block' : 'hidden'} md:block md:w-[40%] md:border-l md:pl-6 mt-4 md:mt-0 transition-colors ${isDarkMode ? "border-white/[0.04]" : "border-gray-100"}`}>
             <div className={`text-[10px] font-bold uppercase tracking-wider mb-4 flex items-center gap-1.5 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
               <Target size={14} className={isDarkMode ? "text-gray-600" : "text-gray-400"} /> Pattern Preview
             </div>
@@ -883,7 +883,7 @@ export default function FocusStatsCard() {
                       <span className={`font-bold whitespace-nowrap min-w-[32px] transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                         {formatHrsMins(s.durationSeconds + (s.extraDuration || 0))}
                       </span>
-                      <div className={`flex-1 mx-3 h-1.5 rounded-full overflow-hidden shadow-inner transition-colors ${isDarkMode ? "bg-[#1a1a1a]" : "bg-gray-100"}`}>
+                      <div className={`flex-1 mx-3 h-1.5 rounded-full overflow-hidden shadow-inner transition-colors ${isDarkMode ? "bg-white/[0.03]" : "bg-gray-100"}`}>
                         <div className={`h-full ${barColor}`} style={{ width: `${s.score}%` }} />
                       </div>
                       <span className={`font-bold ${textColor}`}>{s.score}%</span>
@@ -898,7 +898,7 @@ export default function FocusStatsCard() {
         {showMobileDetails && (
            <button 
             className={`md:hidden w-full text-center text-xs font-semibold py-3 mt-4 border rounded-xl transition-colors shadow-sm ${
-              isDarkMode ? "text-gray-500 border-gray-800 hover:bg-[#111111]" : "text-gray-500 border-gray-200 hover:bg-gray-50"
+              isDarkMode ? "text-gray-500 border-white/[0.04] hover:bg-white/[0.02]" : "text-gray-500 border-gray-200 hover:bg-gray-50"
             }`}
             onClick={() => setShowMobileDetails(false)}
           >

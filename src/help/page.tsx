@@ -128,7 +128,7 @@ export default function HelpPage() {
           <div className={`p-1 rounded-2xl border shadow-sm ${isDarkMode ? "bg-black border-zinc-800" : "bg-white border-gray-200"}`}>
             <Image 
               src="/favicon.ico" 
-              alt="Nextask" 
+              alt="NexSpace Logo"
               width={48} 
               height={48} 
               className="w-10 h-10 md:w-12 md:h-12 rounded-xl"
@@ -137,7 +137,7 @@ export default function HelpPage() {
           </div>
           <div>
             <h1 className={`text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              Nextask Help Center
+              NexSpace Help Center
             </h1>
             <p className={`text-base md:text-lg max-w-md md:max-w-xl mx-auto ${isDarkMode ? "text-zinc-400" : "text-gray-500"}`}>
               Explore systems, mechanics, discipline intelligence, and platform architecture.

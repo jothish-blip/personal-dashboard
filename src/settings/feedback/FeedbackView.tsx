@@ -208,7 +208,7 @@ export default function FeedbackPage({ onClose }: { onClose?: () => void }) {
                 Thanks{userName ? `, ${userName}` : ""}! 🙌
               </h1>
               <p className="text-sm text-gray-500 mt-2 font-medium">
-                You just helped improve NexTask 🚀
+                You just helped improve NexSpace 🚀
               </p>
             </div>
           ) : showPlea ? (
@@ -221,7 +221,7 @@ export default function FeedbackPage({ onClose }: { onClose?: () => void }) {
               </div>
               <h3 className="text-xl font-bold text-gray-900">Wait, please? 🥺</h3>
               <p className="text-sm text-gray-500 mt-3 leading-relaxed">
-                Your feedback is the heartbeat of NexTask. It only takes a few seconds, but it helps us tremendously to build a better experience for you.
+                Your feedback is the heartbeat of NexSpace. It only takes a few seconds, but it helps us tremendously to build a better experience for you.
               </p>
               <div className="mt-8 flex flex-col gap-3">
                 <button

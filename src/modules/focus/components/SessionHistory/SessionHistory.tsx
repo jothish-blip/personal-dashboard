@@ -207,7 +207,7 @@ export default function SessionHistory() {
 
   return (
     <div className={`p-5 rounded-xl h-full max-h-[700px] flex flex-col font-sans transition-colors duration-300 border ${
-      isDarkMode ? "bg-black border-gray-800 text-white/90" : "bg-white border-gray-200 text-gray-900"
+      isDarkMode ? "bg-black border-white/[0.04] text-white/90" : "bg-white border-gray-200 text-gray-900"
     }`}>
       
       <div className="flex items-center justify-between mb-5 shrink-0">
@@ -226,7 +226,7 @@ export default function SessionHistory() {
                       ? "bg-orange-950/30 text-orange-400 border-orange-500/20 shadow-[0_0_15px_rgba(249,115,22,0.1)]" 
                       : "bg-gray-900 text-white border-transparent shadow-sm")
                   : (isDarkMode 
-                      ? "bg-[#111111] text-gray-400 hover:text-gray-300 hover:bg-[#1a1a1a] border-transparent" 
+                      ? "bg-black text-gray-400 hover:text-gray-300 hover:bg-white/[0.03] border-transparent" 
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent")
               }`}
             >
@@ -241,7 +241,7 @@ export default function SessionHistory() {
               type="date"
               className={`px-3 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-2 transition-colors duration-300 border ${
                 isDarkMode 
-                  ? "bg-[#111111] border-gray-800 text-gray-300 focus:ring-gray-700 [color-scheme:dark]" 
+                  ? "bg-black border-white/[0.04] text-gray-300 focus:ring-white/[0.06] [color-scheme:dark]" 
                   : "bg-gray-50 border-gray-200 text-gray-700 focus:ring-blue-500/20"
               }`}
               value={getDateStr(customDate.getTime())}
@@ -258,7 +258,7 @@ export default function SessionHistory() {
 
       {dailySummary && (
         <div className={`mb-6 p-4 rounded-xl flex flex-col gap-3 shrink-0 border transition-colors ${
-          isDarkMode ? "bg-[#0a0a0a] border-gray-800" : "bg-gray-50 border-gray-200"
+          isDarkMode ? "bg-black border-white/[0.04]" : "bg-gray-50 border-gray-200"
         }`}>
           <div className="flex justify-between items-center">
             <span className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Summary Overview</span>
@@ -289,7 +289,7 @@ export default function SessionHistory() {
         
         {!isLoaded ? (
           <div className={`flex flex-col items-center justify-center py-10 h-full animate-pulse ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-            <span className={`w-5 h-5 border-2 rounded-full animate-spin mb-3 ${isDarkMode ? "border-gray-800 border-t-gray-400" : "border-gray-200 border-t-gray-500"}`}></span>
+            <span className={`w-5 h-5 border-2 rounded-full animate-spin mb-3 ${isDarkMode ? "border-white/[0.04] border-t-gray-400" : "border-gray-200 border-t-gray-500"}`}></span>
             <span className="text-xs font-medium">Loading history...</span>
           </div>
         ) : filteredSessions.length === 0 ? (
@@ -366,7 +366,7 @@ export default function SessionHistory() {
 
                       {/* Line & Dot */}
                       <div className="relative flex flex-col items-center">
-                        <div className={`w-px absolute top-3 z-0 ${isLast ? `h-full bg-gradient-to-b to-transparent ${isDarkMode ? "from-gray-800" : "from-gray-200"}` : `h-full ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}`}></div>
+                        <div className={`w-px absolute top-3 z-0 ${isLast ? `h-full bg-gradient-to-b to-transparent ${isDarkMode ? "from-white/[0.04]" : "from-gray-200"}` : `h-full ${isDarkMode ? "bg-white/[0.04]" : "bg-gray-200"}`}`}></div>
                         <div className={`w-2 h-2 rounded-full z-10 mt-2 ring-4 shadow-sm transition-transform duration-300 group-hover:scale-125 ${isDarkMode ? "ring-black" : "ring-white"} ${
                           hasExtraFlow ? 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.4)]' : 'bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.3)]'
                         }`}></div>
@@ -377,8 +377,8 @@ export default function SessionHistory() {
                         <div
                           className={`p-3.5 rounded-xl transition-all relative overflow-hidden border ${
                             isExpanded 
-                              ? (isDarkMode ? "bg-[#111111] border-gray-700 shadow-lg" : "bg-white border-blue-200 ring-1 ring-blue-50 shadow-md") 
-                              : (isDarkMode ? "bg-[#0a0a0a] border-gray-800 hover:bg-[#111111] hover:border-gray-700" : "bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300")
+                              ? (isDarkMode ? "bg-black border-white/[0.06] shadow-lg" : "bg-white border-blue-200 ring-1 ring-blue-50 shadow-md") 
+                              : (isDarkMode ? "bg-black border-white/[0.04] hover:bg-white/[0.02] hover:border-white/[0.06]" : "bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300")
                           }`}
                         >
                           {/* Top Row: Title, Badges, Percentage */}
@@ -443,7 +443,7 @@ export default function SessionHistory() {
                           </div>
 
                           {/* Visual Timeline Bar */}
-                          <div className={`w-full h-1 rounded-full overflow-hidden flex mt-3 mb-1 ${isDarkMode ? "bg-[#1a1a1a]" : "bg-gray-100"}`}>
+                          <div className={`w-full h-1 rounded-full overflow-hidden flex mt-3 mb-1 ${isDarkMode ? "bg-white/[0.03]" : "bg-gray-100"}`}>
                             <div
                               className="bg-orange-500"
                               style={{ width: `${(focusedDur / totalDuration) * 100}%` }}
@@ -477,7 +477,7 @@ export default function SessionHistory() {
                           {/* EXPANDED AREA */}
                           {isExpanded && canExpand && (
                             <div className={`mt-3 pt-4 border-t animate-in fade-in slide-in-from-top-2 duration-200 ${
-                              isDarkMode ? "border-gray-800" : "border-gray-100"
+                              isDarkMode ? "border-white/[0.04]" : "border-gray-100"
                             }`}>
                               <div className="flex flex-col gap-5">
                                 
@@ -490,17 +490,17 @@ export default function SessionHistory() {
                                       </span>
                                     </div>
                                     
-                                    <div className={`border rounded-lg p-3 ${isDarkMode ? "bg-black border-gray-800" : "bg-gray-50 border-gray-200"}`}>
+                                    <div className={`border rounded-lg p-3 ${isDarkMode ? "bg-black border-white/[0.04]" : "bg-gray-50 border-gray-200"}`}>
                                       {/* Top Issue highlight */}
                                       {getTopDistraction(dists) && (
                                         <div className={`text-xs font-medium mb-3 border-b pb-3 flex items-center justify-between ${
-                                          isDarkMode ? "text-gray-300 border-gray-800" : "text-gray-700 border-gray-200"
+                                          isDarkMode ? "text-gray-300 border-white/[0.04]" : "text-gray-700 border-gray-200"
                                         }`}>
                                           <span>
                                             Top trigger: <span className={isDarkMode ? "text-white ml-1" : "text-gray-900 ml-1"}>{getTopDistraction(dists)?.reason}</span>
                                           </span>
                                           <span className={`text-[10px] px-2 py-0.5 rounded-md ${
-                                            isDarkMode ? "text-gray-500 bg-gray-800" : "text-gray-500 bg-gray-200"
+                                            isDarkMode ? "text-gray-500 bg-white/[0.04]" : "text-gray-500 bg-gray-200"
                                           }`}>
                                             {getTopDistraction(dists)?.count} occurrences
                                           </span>
@@ -511,7 +511,7 @@ export default function SessionHistory() {
                                       <div className="flex flex-col gap-1.5">
                                         {dists.map((d: Distraction, i: number) => (
                                           <div key={d.id || i} className={`flex justify-between items-center transition-colors border px-3 py-2 rounded-lg ${
-                                            isDarkMode ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800" : "bg-white hover:bg-gray-50 border-gray-100"
+                                            isDarkMode ? "bg-black hover:bg-white/[0.02] border-white/[0.04]" : "bg-white hover:bg-gray-50 border-gray-100"
                                           }`}>
                                             <span className={`text-[11px] font-medium truncate pr-4 ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>{d.reason}</span>
                                             <span className={`text-[10px] font-mono shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
@@ -531,7 +531,7 @@ export default function SessionHistory() {
                                       <Pause size={12} /> Pause Timeline
                                     </div>
                                     
-                                    <div className={`space-y-1.5 p-2 rounded-lg border ${isDarkMode ? "bg-black border-gray-800" : "bg-gray-50 border-gray-200"}`}>
+                                    <div className={`space-y-1.5 p-2 rounded-lg border ${isDarkMode ? "bg-black border-white/[0.04]" : "bg-gray-50 border-gray-200"}`}>
                                       {[...pauseTimeline].sort((a: any, b: any) => a.start - b.start).map((seg: any, i: number) => {
                                         const start = new Date(seg.start);
                                         const end = seg.end ? new Date(seg.end) : null;
@@ -539,7 +539,7 @@ export default function SessionHistory() {
 
                                         return (
                                           <div key={i} className={`text-[10px] flex justify-between items-center px-2 py-1.5 rounded transition-colors ${
-                                            isDarkMode ? "text-gray-400 hover:bg-[#111111]" : "text-gray-600 hover:bg-white"
+                                            isDarkMode ? "text-gray-400 hover:bg-white/[0.02]" : "text-gray-600 hover:bg-white"
                                           }`}>
                                             <div className="flex items-center gap-2 font-mono">
                                               <span>{start.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: '2-digit', minute: '2-digit' })}</span>

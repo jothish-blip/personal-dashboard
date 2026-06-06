@@ -7,7 +7,7 @@ import { useNotificationSystem } from '@/notifications/engine/useNotificationSys
 import { handleTaskUpdate, handleGlobalState } from '@/notifications/engine/nexNotificationBrain';
 import { getSupabaseClient } from "@/lib/supabase";
 
-const KEY = 'NEXTASK_V12_PRO_FINAL';
+const KEY = 'NEXSPACE_V12_PRO_FINAL';
 const OFFLINE_QUEUE_KEY = "nex_offline_queue";
 
 type QueueAction =
@@ -630,7 +630,7 @@ export function useNexCore() {
     await logAction("TOGGLE", task.name, `Marked as ${status ? 'Complete' : 'Incomplete'} for ${dateStr}`);
 
     queueMicrotask(() => {
-      window.dispatchEvent(new Event("nextask-live-update"));
+      window.dispatchEvent(new Event("nexspace-live-update"));
     });
     
     if (status) handleTaskUpdate(addNotification, updatedTasksArray, dateStr); 

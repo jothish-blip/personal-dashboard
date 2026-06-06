@@ -39,7 +39,7 @@ self.addEventListener("message", (event) => {
       icon: "/favicon.ico",
       badge: "/favicon.ico",
       vibrate: [200, 100, 200],
-      tag: `nextask-${smartTag}`,
+      tag: `nexspace-${smartTag}`,
       renotify: true,
       requireInteraction: isCritical, 
       timestamp: Date.now(), 
@@ -54,7 +54,7 @@ self.addEventListener("message", (event) => {
     };
 
     event.waitUntil(
-      self.registration.showNotification(title || "NexTask", options)
+      self.registration.showNotification(title || "NexSpace", options)
         .then(() => console.log("[NexSW] Notification displayed successfully."))
         .catch(err => console.error("[NexSW] Failed to show notification:", err))
     );

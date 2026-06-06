@@ -45,11 +45,11 @@ export default function Navbar({
 
       if (!ignore && data) {
         setUserProfile(data);
-        localStorage.setItem("nextask_profile", JSON.stringify(data));
+        localStorage.setItem("nexspace_profile", JSON.stringify(data));
       }
     };
 
-    const cached = localStorage.getItem("nextask_profile");
+    const cached = localStorage.getItem("nexspace_profile");
 
     if (cached) {
       try {

@@ -25,7 +25,7 @@ const ARTICLES: Article[] = [
     id: "what-is-social-system",
     title: "What is the Social System?",
     teaser:
-      "Understand how Nextask builds accountability through identity and social visibility.",
+      "Understand how NexSpace builds accountability through identity and social visibility.",
     readTime: "2 min",
     keywords: [
       "social",
@@ -43,7 +43,7 @@ const ARTICLES: Article[] = [
 
         <p>
           Instead of users working alone,
-          Nextask helps them build
+          NexSpace helps them build
           accountability through social
           proof, profiles and consistency.
         </p>
@@ -127,7 +127,7 @@ const ARTICLES: Article[] = [
     id: "verification-system",
     title: "How does verification work?",
     teaser:
-      "Learn how trust and credibility are built inside Nextask.",
+      "Learn how trust and credibility are built inside NexSpace.",
     readTime: "3 min",
     keywords: [
       "verification",
@@ -405,7 +405,7 @@ export default function SocialSystemPage() {
               <div className="text-center mb-10">
                 <Image
                   src="/favicon.ico"
-                  alt="Nextask"
+                  alt="NexSpace"
                   width={54}
                   height={54}
                   className="mx-auto rounded-2xl mb-5"

@@ -58,6 +58,7 @@ export default function OnboardingPage() {
       if (profile) {
         // If they already completed it, kick them back to home
         if (profile.onboarding_completed) {
+          sessionStorage.removeItem("nexspace_session_loaded");
           router.replace("/");
           return;
         }
@@ -118,7 +119,7 @@ export default function OnboardingPage() {
       if (error) throw error;
       
       // Force reload the session flag and route to home
-      sessionStorage.removeItem("nextask_session_loaded");
+      sessionStorage.removeItem("nexspace_session_loaded");
       router.replace("/");
       
     } catch (error) {
@@ -239,7 +240,7 @@ export default function OnboardingPage() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight mb-2">Intentions</h1>
               <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                What brings you to Nextask?
+                What brings you to NexSpace?
               </p>
             </div>
 
@@ -347,12 +348,12 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* STEP 4: NEXTASK INTRO */}
+        {/* STEP 4: NEXSPACE INTRO */}
         {step === 4 && (
           <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
             <div className="text-center">
               <div className="w-16 h-16 bg-[#111111] border border-white/10 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
-                <img src="/favicon.ico" alt="NexTask" className="w-8 h-8 object-contain" />
+                <img src="/favicon.ico" alt="NexSpace" className="w-8 h-8 object-contain" />
               </div>
               <h1 className="text-3xl font-bold tracking-tight mb-2">Your system is ready.</h1>
               <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>

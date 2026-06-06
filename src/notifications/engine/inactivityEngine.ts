@@ -58,7 +58,7 @@ const checkInactivity = (addNotification: any) => {
   // Read tasks from local state to make the notification context-aware
   let pendingTasks = 0;
   try {
-    const stateStr = localStorage.getItem("NEXTASK_V12_PRO_FINAL");
+    const stateStr = localStorage.getItem("NEXSPACE_V12_PRO_FINAL");
     if (stateStr) {
       const state = JSON.parse(stateStr);
       const today = getTodayLocal();

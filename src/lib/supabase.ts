@@ -13,7 +13,7 @@ export const supabase = createClient<Database>(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      storageKey: "nextask-auth-token",
+      storageKey: "nexspace-auth-token",
     },
   }
 );

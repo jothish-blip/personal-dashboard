@@ -144,21 +144,21 @@ export default function TaskSelector() {
   return (
     <div className={`p-6 rounded-2xl border space-y-7 transition-colors duration-300 ${
       isDarkMode 
-        ? "bg-[#050505] border-gray-800 shadow-none" 
+        ? "bg-black border-white/[0.04] shadow-none" 
         : "bg-white border-gray-200 shadow-[0_6px_30px_rgba(0,0,0,0.05)]"
     }`}>
       
       {/* HEADER & STATUS */}
       <div className="flex justify-between items-center">
         <h2 className={`text-sm font-semibold flex items-center gap-2 transition-colors ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
-          <Target size={16} className={isDarkMode ? "text-gray-500" : "text-gray-500"} /> Current Intent
+          <Target size={16} className={isDarkMode ? "text-zinc-500" : "text-gray-500"} /> Current Intent
         </h2>
         <span className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md transition-colors duration-300 shadow-sm border ${
           isActive 
             ? isDarkMode ? "bg-orange-950/40 text-orange-400 border-orange-900/50" : "bg-orange-50 text-orange-700 border-orange-200"
             : activeTaskId 
               ? isDarkMode ? "bg-emerald-950/40 text-emerald-400 border-emerald-900/50" : "bg-emerald-50 text-emerald-700 border-emerald-200"
-              : isDarkMode ? "bg-[#111111] text-gray-400 border-gray-800" : "bg-gray-50 text-gray-500 border-gray-200"
+              : isDarkMode ? "bg-black text-zinc-400 border-white/[0.04]" : "bg-gray-50 text-gray-500 border-gray-200"
         }`}>
           {isActive ? "Locked" : activeTaskId ? "Ready" : "Pending"}
         </span>
@@ -169,8 +169,8 @@ export default function TaskSelector() {
         isActive 
           ? isDarkMode ? "bg-orange-950/20 border-orange-900/40 shadow-inner" : "bg-orange-50 border-orange-200 shadow-inner"
           : activeTaskId
-            ? isDarkMode ? "bg-[#111111] border-gray-800 shadow-sm" : "bg-gray-50 border-gray-200 shadow-sm"
-            : isDarkMode ? "bg-black border-gray-800 shadow-sm" : "bg-white border-gray-100 shadow-sm"
+            ? isDarkMode ? "bg-black border-white/[0.04] shadow-sm" : "bg-gray-50 border-gray-200 shadow-sm"
+            : isDarkMode ? "bg-black border-white/[0.04] shadow-sm" : "bg-white border-gray-100 shadow-sm"
       }`}>
         
         {/* Subtle top accent line for active tasks */}
@@ -179,7 +179,7 @@ export default function TaskSelector() {
         )}
 
         <div className="flex justify-between items-center mb-2">
-          <div className={`text-[10px] uppercase font-bold tracking-wider transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+          <div className={`text-[10px] uppercase font-bold tracking-wider transition-colors ${isDarkMode ? "text-zinc-500" : "text-gray-400"}`}>
             Active Intent
           </div>
           
@@ -195,7 +195,7 @@ export default function TaskSelector() {
             <button 
               onClick={() => setActiveTask(null)}
               className={`text-[10px] uppercase tracking-wider font-bold transition-colors ${
-                isDarkMode ? "text-gray-500 hover:text-red-400" : "text-gray-400 hover:text-red-500"
+                isDarkMode ? "text-zinc-500 hover:text-red-400" : "text-gray-400 hover:text-red-500"
               }`}
             >
               Clear
@@ -207,7 +207,7 @@ export default function TaskSelector() {
           {displayTask || "Choose what matters now"}
         </div>
         
-        <div className={`text-xs mt-2 font-medium transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+        <div className={`text-xs mt-2 font-medium transition-colors ${isDarkMode ? "text-zinc-400" : "text-gray-500"}`}>
           {isActive
             ? "Focus locked for this session."
             : "Choose one thing worth focusing on."}
@@ -228,7 +228,7 @@ export default function TaskSelector() {
               disabled={isActive}
               className={`w-full min-h-[48px] sm:flex-1 px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 shadow-sm text-sm font-medium transition-colors duration-300 ${
                 isDarkMode 
-                  ? "bg-[#111111] border-gray-800 focus:ring-orange-500/30 focus:border-orange-500/50 text-white disabled:bg-black disabled:text-gray-600 placeholder:text-gray-600" 
+                  ? "bg-black border-white/[0.04] focus:ring-orange-500/30 focus:border-orange-500/50 text-white disabled:bg-black disabled:text-zinc-600 placeholder:text-zinc-600" 
                   : "bg-white border-gray-200 focus:ring-orange-500/30 focus:border-orange-500/50 text-gray-900 disabled:bg-gray-50 disabled:text-gray-400 placeholder:text-gray-400"
               }`}
             />
@@ -243,9 +243,9 @@ export default function TaskSelector() {
 
           {/* 🎯 DAILY GOAL SETTING */}
           <div className={`flex items-center justify-between border rounded-xl px-4 py-3 shadow-sm transition-colors duration-300 ${
-            isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-200"
+            isDarkMode ? "bg-black border-white/[0.04]" : "bg-gray-50 border-gray-200"
           }`}>
-            <div className={`text-xs font-bold uppercase tracking-wider transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+            <div className={`text-xs font-bold uppercase tracking-wider transition-colors ${isDarkMode ? "text-zinc-400" : "text-gray-600"}`}>
               Daily Focus Goal
             </div>
             <div className="flex items-center gap-2">
@@ -255,13 +255,13 @@ export default function TaskSelector() {
                 onChange={(e) => updateDailyGoal(Number(e.target.value) * 3600)}
                 className={`w-14 text-center text-base font-extrabold border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${
                   isDarkMode 
-                    ? "bg-black border-gray-800 text-orange-400 focus:ring-orange-500/30" 
+                    ? "bg-black border-white/[0.04] text-orange-400 focus:ring-orange-500/30" 
                     : "bg-white border-gray-200 text-orange-600 focus:ring-orange-500/30"
                 }`}
                 min={1}
                 max={16}
               />
-              <span className={`text-xs font-bold uppercase tracking-widest transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>hrs</span>
+              <span className={`text-xs font-bold uppercase tracking-widest transition-colors ${isDarkMode ? "text-zinc-500" : "text-gray-500"}`}>hrs</span>
             </div>
           </div>
 
@@ -269,11 +269,11 @@ export default function TaskSelector() {
           {recentTasks.length > 0 && (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isDarkMode ? "text-zinc-500" : "text-gray-400"}`}>
                   Quick Start
                 </span>
                 {recentTasks.length > 3 && (
-                  <span className={`text-[10px] font-medium transition-colors ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>Last used</span>
+                  <span className={`text-[10px] font-medium transition-colors ${isDarkMode ? "text-zinc-600" : "text-gray-400"}`}>Last used</span>
                 )}
               </div>
               
@@ -291,7 +291,7 @@ export default function TaskSelector() {
                             ? "bg-orange-950/40 text-orange-400 border-orange-900/50"
                             : "bg-orange-50 text-orange-600 border-orange-200"
                           : isDarkMode 
-                            ? "bg-[#111111] text-gray-300 border-gray-800 hover:bg-[#1a1a1a] hover:border-gray-700" 
+                            ? "bg-black text-zinc-300 border-white/[0.04] hover:bg-white/[0.03] hover:border-white/[0.06]" 
                             : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
                       }`}
                     >
@@ -305,15 +305,15 @@ export default function TaskSelector() {
 
           {/* 🧠 FOCUS HISTORY */}
           {intentHistory.length > 0 && (
-            <div className={`space-y-2 mt-2 pt-5 border-t transition-colors duration-300 ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
+            <div className={`space-y-2 mt-2 pt-5 border-t transition-colors duration-300 ${isDarkMode ? "border-white/[0.04]" : "border-gray-100"}`}>
               <div className="flex justify-between items-center mb-3">
-                <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isDarkMode ? "text-zinc-500" : "text-gray-400"}`}>
                   Focus History
                 </span>
                 {intentHistory.length > 3 && (
                   <button
                     onClick={() => setShowHistory(prev => !prev)}
-                    className={`text-[10px] font-bold transition-colors ${isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-800"}`}
+                    className={`text-[10px] font-bold transition-colors ${isDarkMode ? "text-zinc-500 hover:text-zinc-300" : "text-gray-500 hover:text-gray-800"}`}
                   >
                     {showHistory ? "Hide" : "Show All"}
                   </button>
@@ -336,16 +336,16 @@ export default function TaskSelector() {
                             ? "bg-orange-950/20 border-orange-900/40"
                             : "bg-orange-50 border-orange-200"
                           : isDarkMode
-                          ? "bg-[#111111] hover:bg-[#1a1a1a] border-gray-800 hover:border-gray-700"
+                          ? "bg-black hover:bg-white/[0.02] border-white/[0.04] hover:border-white/[0.06]"
                           : "bg-white hover:bg-gray-50 border-gray-100 hover:border-gray-200"
                       }`}
                     >
                       <div className="min-w-0">
-                        <div className={`font-semibold truncate transition-colors ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+                        <div className={`font-semibold truncate transition-colors ${isDarkMode ? "text-zinc-300" : "text-gray-700"}`}>
                           {task}
                         </div>
                     
-                        <div className={`text-[10px] mt-1 transition-colors ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+                        <div className={`text-[10px] mt-1 transition-colors ${isDarkMode ? "text-zinc-500" : "text-gray-500"}`}>
                           {count} session{count !== 1 ? "s" : ""} • {getLastUsedText(latest)}
                         </div>
                       </div>
@@ -362,7 +362,7 @@ export default function TaskSelector() {
 
               {!showHistory && intentHistory.length > 3 && (
                 <div 
-                  className={`text-[10px] font-bold text-center mt-2 cursor-pointer pt-1 transition-colors ${isDarkMode ? "text-gray-600 hover:text-gray-400" : "text-gray-400 hover:text-gray-600"}`} 
+                  className={`text-[10px] font-bold text-center mt-2 cursor-pointer pt-1 transition-colors ${isDarkMode ? "text-zinc-600 hover:text-zinc-400" : "text-gray-400 hover:text-gray-600"}`} 
                   onClick={() => setShowHistory(true)}
                 >
                   +{intentHistory.length - 3} more
