@@ -99,8 +99,8 @@ export default function TopBar({
               py-3 md:py-3.5
               backdrop-blur-[28px]
               transition-all duration-300
-              flex flex-col lg:flex-row
-              items-start lg:items-center
+              flex flex-col md:flex-row
+              items-start md:items-center
               justify-between
               gap-4
               antialiased
@@ -112,7 +112,7 @@ export default function TopBar({
             `}
           >
             {/* LEFT */}
-            <div className="flex flex-col gap-2 min-w-0 flex-1">
+            <div className="flex flex-col gap-2 min-w-0 flex-1 w-full md:w-auto">
               <div className="space-y-1">
                 <h1
                   className={`
@@ -174,7 +174,7 @@ export default function TopBar({
               </div>
             </div>
 
-            {/* CENTER - NEXT OBJECTIVE */}
+            {/* CENTER - NEXT OBJECTIVE (HIDDEN ON MOBILE) */}
             <div className="hidden md:flex flex-col shrink-0 min-w-[240px]">
               <span
                 className={`
@@ -222,13 +222,13 @@ export default function TopBar({
               )}
             </div>
 
-            {/* RIGHT BUTTON */}
+            {/* RIGHT BUTTON - DESKTOP */}
             <div className="hidden md:block shrink-0">
               <button
                 onClick={onAddClick}
                 className="
                   h-10
-                  px-4.5
+                  px-4
                   rounded-[1rem]
                   bg-orange-500
                   hover:bg-orange-600
@@ -248,96 +248,21 @@ export default function TopBar({
                 Add Task
               </button>
             </div>
+
+            {/* FULL-WIDTH MOBILE BUTTON */}
+            <button
+              onClick={onAddClick}
+              className="md:hidden mt-2 w-full h-11 rounded-2xl bg-orange-500 text-white flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] shadow-[0_8px_22px_rgba(249,115,22,0.22)]"
+              style={{
+                fontWeight: 540,
+              }}
+            >
+              <Plus size={16} strokeWidth={2.6} />
+              Add Task
+            </button>
           </div>
         </div>
       </nav>
-
-      {/* MOBILE NAV */}
-      <div className="md:hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-sm font-sans">
-        <div
-          className={`
-            rounded-[2rem]
-            px-5 py-3
-            flex items-center justify-between
-            backdrop-blur-[30px]
-            shadow-lg
-            ${isDarkMode ? "bg-black/30" : "bg-white/65"}
-          `}
-        >
-          <button
-            onClick={() => setActiveTab("yesterday")}
-            className={`flex flex-col items-center gap-1 transition-all ${
-              activeTab === "yesterday"
-                ? "text-orange-500"
-                : isDarkMode
-                ? "text-white/45"
-                : "text-black/45"
-            }`}
-          >
-            <SkipBack size={18} />
-            <span className="text-[9px] font-medium">Yesterday</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("today")}
-            className={`flex flex-col items-center gap-1 transition-all ${
-              activeTab === "today"
-                ? "text-orange-500"
-                : isDarkMode
-                ? "text-white/45"
-                : "text-black/45"
-            }`}
-          >
-            <CalendarDays size={18} />
-            <span className="text-[9px] font-medium">Today</span>
-          </button>
-
-          <button
-            onClick={onAddClick}
-            className="
-              h-14 w-14
-              rounded-full
-              bg-orange-500
-              text-white
-              flex items-center justify-center
-              -mt-8
-              active:scale-90
-              transition-transform
-              shadow-[0_8px_22px_rgba(249,115,22,0.25)]
-            "
-          >
-            <Plus size={24} strokeWidth={3} />
-          </button>
-
-          <button
-            onClick={() => setActiveTab("range")}
-            className={`flex flex-col items-center gap-1 transition-all ${
-              activeTab === "range"
-                ? "text-orange-500"
-                : isDarkMode
-                ? "text-white/45"
-                : "text-black/45"
-            }`}
-          >
-            <LayoutList size={18} />
-            <span className="text-[9px] font-medium">Timeline</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("logs")}
-            className={`flex flex-col items-center gap-1 transition-all ${
-              activeTab === "logs"
-                ? "text-orange-500"
-                : isDarkMode
-                ? "text-white/45"
-                : "text-black/45"
-            }`}
-          >
-            <History size={18} />
-            <span className="text-[9px] font-medium">History</span>
-          </button>
-        </div>
-      </div>
     </>
   );
 }

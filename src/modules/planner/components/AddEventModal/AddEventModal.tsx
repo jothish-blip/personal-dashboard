@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { X, Clock } from "lucide-react";
 import { TaskType, Priority, PlannerEvent } from "../../types/types";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -13,7 +13,7 @@ interface AddEventModalProps {
   handleSave: () => void;
 }
 
-// 1. Helper to strictly get local present time for validation
+// Helper to strictly get local present time for validation
 const getNowLocal = () => {
   const now = new Date();
   
@@ -30,19 +30,37 @@ const getNowLocal = () => {
   };
 };
 
-const formatTime12Hour = (time?: string) => {
-  if (!time) return "";
+const getRelativeTimeString = (dateStr?: string, timeStr?: string) => {
+  if (!dateStr || !timeStr) return "";
 
-  const [hours, minutes] = time.split(":").map(Number);
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const target = new Date(year, month - 1, day, hours, minutes);
+  const now = new Date();
 
-  const date = new Date();
-  date.setHours(hours, minutes, 0, 0);
+  const diffMs = target.getTime() - now.getTime();
+  if (diffMs < -60000) return "Overdue";
 
-  return date.toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const remMins = diffMins % 60;
+
+  const isToday = target.toDateString() === now.toDateString();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow = target.toDateString() === tomorrow.toDateString();
+
+  const timeFormatted = target.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+
+  if (diffHours < 24 && isToday) {
+    if (diffHours === 0) return `Due in ${remMins}m`;
+    return `Due in ${diffHours}h ${remMins}m`;
+  } else if (isTomorrow) {
+    return `Tomorrow at ${timeFormatted}`;
+  } else {
+    const options: Intl.DateTimeFormatOptions = { weekday: 'long' };
+    return `Scheduled for ${target.toLocaleDateString([], options)} at ${timeFormatted}`;
+  }
 };
 
 export default function AddEventModal({
@@ -54,14 +72,13 @@ export default function AddEventModal({
 }: AddEventModalProps) {
   const { isDarkMode } = useTheme();
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const [showAllCategories, setShowAllCategories] = useState(false);
   
   // Auto-focus & preserve existing date/time for edits and reschedules
   useEffect(() => {
     if (isOpen) {
       if (!formData.id) {
         const now = getNowLocal();
-
-        // Using formData spread directly to respect the defined prop type
         setFormData({
           ...formData,
           date: formData.date || now.date,
@@ -75,6 +92,26 @@ export default function AddEventModal({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  // Lock page scrolling and handle Escape key
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") onClose();
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      
+      return () => {
+        document.body.style.overflow = "";
+        window.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -93,7 +130,6 @@ export default function AddEventModal({
       targetDate.setHours(9, 0, 0, 0); // Defaults to 9:00 AM next day
     }
 
-    // Adjust for timezone offset properly so quick preset days don't drift
     const newDate = new Date(targetDate.getTime() - targetDate.getTimezoneOffset() * 60000).toISOString().split("T")[0];
     const hours = String(targetDate.getHours()).padStart(2, "0");
     const mins = String(targetDate.getMinutes()).padStart(2, "0");
@@ -145,7 +181,7 @@ export default function AddEventModal({
     });
   };
 
-  // Block Past Planning Validation (Runs before saving)
+  // Block Past Planning Validation
   const handleValidatedSave = () => {
     if (!formData.date || !formData.time) return;
 
@@ -169,31 +205,34 @@ export default function AddEventModal({
     }
   };
 
+  const allCategories = ["Work", "Study", "Health", "Finance", "Personal", "Deep Work", "Learning", "Meeting"];
+  const visibleCategories = showAllCategories ? allCategories : ["Work", "Study", "Health", "Personal"];
+
   return (
     <div 
       onClick={onClose}
-      className={`fixed inset-0 z-[200] flex items-end md:items-center justify-center p-0 md:p-6 transition-opacity backdrop-blur-sm ${
-        isDarkMode ? "bg-black/60" : "bg-slate-900/40"
+      className={`fixed inset-0 z-[9999] flex items-end md:items-center justify-center p-0 md:p-6 transition-opacity backdrop-blur-2xl ${
+        isDarkMode ? "bg-black/75" : "bg-black/60"
       }`}
     >
       <div 
         onClick={(e) => e.stopPropagation()} 
-        className={`w-full md:max-w-xl rounded-t-[2.5rem] md:rounded-[2.5rem] p-6 md:p-7 space-y-6 animate-in slide-in-from-bottom-8 md:zoom-in-95 max-h-[90vh] overflow-y-auto scrollbar-hide font-sans ${
+        className={`relative w-full md:max-w-xl rounded-t-[2.5rem] md:rounded-[2.5rem] p-6 md:p-7 pt-4 space-y-6 animate-in slide-in-from-bottom-8 md:zoom-in-95 max-h-[96vh] flex flex-col font-sans overflow-hidden ${
           isDarkMode 
-            ? "bg-black/[0.72] backdrop-blur-[30px] shadow-[0_20px_80px_rgba(0,0,0,0.45)]" 
-            : "bg-white/[0.95] backdrop-blur-[30px] shadow-[0_20px_80px_rgba(0,0,0,0.15)]"
+            ? "bg-black/[0.72] shadow-[0_20px_80px_rgba(0,0,0,0.45)]" 
+            : "bg-white/[0.95] shadow-[0_20px_80px_rgba(0,0,0,0.15)]"
         }`}
       >
-        <div className={`w-10 h-1.5 rounded-full mx-auto mb-2 md:hidden ${isDarkMode ? "bg-white/20" : "bg-black/10"}`} />
+        <div className={`w-14 h-1.5 rounded-full mx-auto mb-4 md:hidden shrink-0 ${isDarkMode ? "bg-white/20" : "bg-black/10"}`} />
 
         {/* HEADER */}
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-start shrink-0">
           <div className="space-y-1 w-full">
             <h3 className={`text-2xl md:text-3xl font-semibold tracking-[-0.03em] ${isDarkMode ? "text-white" : "text-slate-900"}`}>
               {isEdit ? "Edit Task" : "New Task"}
             </h3>
             <p className={`text-sm font-medium tracking-tight ${isDarkMode ? "text-white/50" : "text-slate-500"}`}>
-              {isEdit ? "Update your plan." : "Plan something meaningful."}
+              {isEdit ? "Update your plan." : "What needs to be done?"}
             </p>
           </div>
           
@@ -209,21 +248,19 @@ export default function AddEventModal({
           </button>
         </div>
 
-        <div className="space-y-6">
+        {/* SCROLLABLE CONTENT */}
+        <div className="space-y-6 overflow-y-auto scrollbar-hide pb-2">
           
           {/* TITLE INPUT */}
           <div>
-            <label className={`text-[11px] font-medium uppercase tracking-[0.16em] ${isDarkMode ? "text-white/40" : "text-black/40"}`}>
-              Task Name
-            </label>
-            <div className="relative mt-2">
+            <div className="relative">
               <input
                 ref={titleInputRef}
                 type="text"
                 value={formData.title || ""}
                 onChange={handleTitleChange}
                 onKeyDown={handleKeyDown}
-                placeholder="What needs to be done?"
+                placeholder="e.g. Finish the presentation at 5pm"
                 className={`w-full p-4 rounded-2xl outline-none font-medium text-base md:text-lg transition-all ${
                   isDarkMode 
                     ? "bg-white/[0.04] hover:bg-white/[0.06] focus:bg-white/[0.07] text-white placeholder-white/30" 
@@ -233,12 +270,46 @@ export default function AddEventModal({
             </div>
           </div>
 
+          {/* QUICK TIME BUTTONS (Moved up) */}
+          <div className="space-y-2">
+            <label className={`text-[11px] font-medium uppercase tracking-[0.16em] ${isDarkMode ? "text-white/40" : "text-black/40"}`}>
+              Quick Actions
+            </label>
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+              <Clock size={14} className={`shrink-0 ${isDarkMode ? "text-white/40" : "text-slate-400"}`} />
+              
+              <button onClick={() => setQuickPreset("now")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                checkQuickTimeMatch("now") 
+                  ? "bg-orange-500 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)]" 
+                  : (isDarkMode ? "bg-white/[0.04] hover:bg-white/[0.06] text-white/60" : "bg-black/[0.03] hover:bg-black/[0.05] text-slate-600")
+              }`}>Due now</button>
+              
+              <button onClick={() => setQuickPreset("30m")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                checkQuickTimeMatch("30m") 
+                  ? "bg-orange-500 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)]" 
+                  : (isDarkMode ? "bg-white/[0.04] hover:bg-white/[0.06] text-white/60" : "bg-black/[0.03] hover:bg-black/[0.05] text-slate-600")
+              }`}>30m left</button>
+              
+              <button onClick={() => setQuickPreset("1h")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                checkQuickTimeMatch("1h") 
+                  ? "bg-orange-500 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)]" 
+                  : (isDarkMode ? "bg-white/[0.04] hover:bg-white/[0.06] text-white/60" : "bg-black/[0.03] hover:bg-black/[0.05] text-slate-600")
+              }`}>1h left</button>
+
+              <button onClick={() => setQuickPreset("tomorrow")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                checkQuickTimeMatch("tomorrow") 
+                  ? "bg-orange-500 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)]" 
+                  : (isDarkMode ? "bg-white/[0.04] hover:bg-white/[0.06] text-white/60" : "bg-black/[0.03] hover:bg-black/[0.05] text-slate-600")
+              }`}>Tomorrow</button>
+            </div>
+          </div>
+
           {/* DATE & TIME SETTINGS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <div className="flex justify-between items-center h-[18px]">
                 <label className={`text-[11px] font-medium uppercase tracking-[0.16em] ${isDarkMode ? "text-white/40" : "text-black/40"}`}>
-                  Complete By
+                  Date
                 </label>
                 <button 
                   onClick={() => setFormData({ ...formData, date: getNowLocal().date })}
@@ -263,7 +334,7 @@ export default function AddEventModal({
             <div className="space-y-2">
               <div className="flex justify-between items-center h-[18px]">
                 <label className={`text-[11px] font-medium uppercase tracking-[0.16em] ${isDarkMode ? "text-white/40" : "text-black/40"}`}>
-                  Before Time
+                  Time
                 </label>
               </div>
               <input
@@ -280,12 +351,12 @@ export default function AddEventModal({
             </div>
           </div>
 
-          {/* DEADLINE STATUS */}
+          {/* DEADLINE STATUS (Cleaned up relative time) */}
           {formData.date && formData.time && (
             <div
               className={`
                 flex items-center justify-between
-                px-4 py-3
+                px-4 py-3.5
                 rounded-2xl
                 ${
                   isDarkMode
@@ -297,88 +368,33 @@ export default function AddEventModal({
               <div>
                 <p
                   className={`
-                    text-[10px]
-                    uppercase
-                    tracking-[0.18em]
-                    font-semibold
-                    ${
-                      isDarkMode
-                        ? "text-white/40"
-                        : "text-slate-400"
-                    }
-                  `}
-                >
-                  Deadline
-                </p>
-
-                <p
-                  className={`
-                    font-semibold
+                    font-medium
                     text-sm
                     ${
                       isDarkMode
-                        ? "text-white"
+                        ? "text-white/90"
                         : "text-slate-900"
                     }
                   `}
                 >
-                  Complete before{" "}
-                  {new Date(
-                    `${formData.date}T${formData.time}`
-                  ).toLocaleString([], {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                    hour12: true,
-                  })}
+                  {getRelativeTimeString(formData.date, formData.time)}
                 </p>
               </div>
 
-              <span className="text-xs font-semibold text-orange-500">
-                Due
+              <span className="text-[10px] uppercase tracking-[0.18em] font-semibold text-orange-500/80">
+                Deadline
               </span>
             </div>
           )}
 
-          {/* QUICK TIME BUTTONS */}
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-             <Clock size={14} className={`shrink-0 ${isDarkMode ? "text-white/40" : "text-slate-400"}`} />
-             
-             <button onClick={() => setQuickPreset("now")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-medium transition-all ${
-               checkQuickTimeMatch("now") 
-                 ? "bg-orange-500 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)]" 
-                 : (isDarkMode ? "bg-white/[0.04] hover:bg-white/[0.06] text-white/60" : "bg-black/[0.03] hover:bg-black/[0.05] text-slate-600")
-             }`}>Due now</button>
-             
-             <button onClick={() => setQuickPreset("30m")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-medium transition-all ${
-               checkQuickTimeMatch("30m") 
-                 ? "bg-orange-500 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)]" 
-                 : (isDarkMode ? "bg-white/[0.04] hover:bg-white/[0.06] text-white/60" : "bg-black/[0.03] hover:bg-black/[0.05] text-slate-600")
-             }`}>30m left</button>
-             
-             <button onClick={() => setQuickPreset("1h")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-medium transition-all ${
-               checkQuickTimeMatch("1h") 
-                 ? "bg-orange-500 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)]" 
-                 : (isDarkMode ? "bg-white/[0.04] hover:bg-white/[0.06] text-white/60" : "bg-black/[0.03] hover:bg-black/[0.05] text-slate-600")
-             }`}>1h left</button>
-
-             <button onClick={() => setQuickPreset("tomorrow")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-medium transition-all ${
-               checkQuickTimeMatch("tomorrow") 
-                 ? "bg-orange-500 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)]" 
-                 : (isDarkMode ? "bg-white/[0.04] hover:bg-white/[0.06] text-white/60" : "bg-black/[0.03] hover:bg-black/[0.05] text-slate-600")
-             }`}>Tomorrow</button>
-          </div>
-
           <div className="space-y-5">
-            {/* CATEGORY */}
+            {/* CATEGORY (Progressively disclosed) */}
             <div>
               <label className={`text-[11px] font-medium uppercase tracking-[0.16em] ${isDarkMode ? "text-white/40" : "text-black/40"}`}>
                 Category
               </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
-                {["Work", "Study", "Health", "Finance", "Personal", "Deep Work", "Learning", "Meeting"].map((t) => (
+                {visibleCategories.map((t) => (
                   <button
                     key={t}
                     onClick={() => setFormData({ ...formData, type: t as TaskType })}
@@ -392,6 +408,14 @@ export default function AddEventModal({
                   </button>
                 ))}
               </div>
+              {!showAllCategories && (
+                <button 
+                  onClick={() => setShowAllCategories(true)}
+                  className={`mt-3 text-xs font-medium transition-colors ${isDarkMode ? "text-white/40 hover:text-white/70" : "text-slate-400 hover:text-slate-600"}`}
+                >
+                  + More Categories
+                </button>
+              )}
             </div>
 
             {/* PRIORITY */}
@@ -416,30 +440,30 @@ export default function AddEventModal({
               </div>
             </div>
           </div>
-
-          {/* PRIMARY ACTION BUTTON */}
-          <div className="pt-2">
-            <button
-              onClick={handleValidatedSave}
-              disabled={!formData.title?.trim() || !formData.time}
-              className={`w-full py-4 rounded-[1.4rem] text-sm md:text-base font-semibold transition-all active:scale-[0.98] ${
-                !formData.title?.trim() || !formData.time 
-                  ? (isDarkMode ? "bg-white/[0.06] text-white/30 shadow-none" : "bg-black/[0.04] text-black/30 shadow-none") 
-                  : "bg-orange-500 hover:bg-orange-600 text-white shadow-[0_12px_35px_rgba(249,115,22,0.28)]"
-              }`}
-            >
-              {!formData.title?.trim()
-                ? "Enter task name"
-                : !formData.time
-                ? "Select time"
-                : isEdit
-                ? "Save Changes"
-                : "Add Deadline"
-              }
-            </button>
-          </div>
-
         </div>
+
+        {/* PRIMARY ACTION BUTTON (Sticky Footer) */}
+        <div className={`sticky bottom-0 pt-3 pb-2 z-10 -mx-2 px-2 backdrop-blur-md ${isDarkMode ? "bg-black/95 md:bg-transparent md:backdrop-blur-none" : "bg-white/95 md:bg-transparent md:backdrop-blur-none"}`}>
+          <button
+            onClick={handleValidatedSave}
+            disabled={!formData.title?.trim() || !formData.time}
+            className={`w-full py-4 rounded-[1.4rem] text-sm md:text-base font-semibold transition-all active:scale-[0.98] ${
+              !formData.title?.trim() || !formData.time 
+                ? (isDarkMode ? "bg-white/[0.06] text-white/30 shadow-none" : "bg-black/[0.04] text-black/30 shadow-none") 
+                : "bg-orange-500 hover:bg-orange-600 text-white shadow-[0_12px_35px_rgba(249,115,22,0.28)]"
+            }`}
+          >
+            {!formData.title?.trim()
+              ? "Enter task name"
+              : !formData.time
+              ? "Select time"
+              : isEdit
+              ? "Save Changes"
+              : "Add Task"
+            }
+          </button>
+        </div>
+
       </div>
     </div>
   );
