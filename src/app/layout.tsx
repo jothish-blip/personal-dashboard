@@ -11,7 +11,6 @@ import { FocusProvider } from "@/modules/focus/engine/useFocusSystem";
 
 // ✅ Sidebar import
 import "./globals.css";
-import FloatingSidebar from "@/navigation/components/FloatingSidebar/FloatingSidebar";
 
 export const viewport: Viewport = {
   themeColor: "#FAFAFA",
@@ -81,9 +80,6 @@ export default function RootLayout({
         {/* APP LAYER */}
         <FocusProvider>
           <ClientWrapper>
-            
-            {/* ✅ Floating Sidebar */}
-            <FloatingSidebar />
 
             {/* ✅ Main App Content */}
             <main className="min-h-screen w-full">

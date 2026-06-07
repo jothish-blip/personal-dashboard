@@ -1,446 +1,151 @@
 "use client";
 
-import React, { useRef } from "react";
-import {
-  Smile,
-  Meh,
-  Frown,
-  BatteryFull,
-  BatteryMedium,
-  Battery,
-  Moon,
-  Cloud,
-  CloudRain,
-  Undo,
-  Lock,
-} from "lucide-react";
+import React from "react";
+import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { useTheme } from "@/theme/ThemeProvider";
 
-const GENTLEMAN_TAGS = [
-  "Focused",
-  "Distracted",
-  "Disciplined",
-  "Lazy",
-  "Overwhelmed",
-  "Productive",
-  "Recovery",
-  "Deep Work",
-  "Social Day",
-  "Learning",
-];
+export default function HeaderControls({ system }: any) {
+  const {
+    selectedDate,
+    actualToday,
+    setSelectedDate,
+    changeDate,
+    allEntries = {}
+  } = system;
 
-export default function BehaviorPanel({ system }: any) {
-  const { currentEntry, updateEntry, lockCurrentDay } = system;
   const { isDarkMode } = useTheme();
 
-  const lastEntryRef = useRef<any>(null);
+  // Safe Local Date Parsing
+  const [year, month, day] = (selectedDate || actualToday || "").split("-").map(Number);
+  const dateObj = new Date(year, month - 1, day);
 
-  const handleAction = (updates: any) => {
-    lastEntryRef.current = { ...currentEntry };
-    updateEntry(updates);
-  };
+  const [tYear, tMonth, tDay] = (actualToday || "").split("-").map(Number);
+  const todayObj = new Date(tYear, tMonth - 1, tDay);
 
-  const handleUndo = () => {
-    if (lastEntryRef.current) {
-      updateEntry(lastEntryRef.current);
-      lastEntryRef.current = null;
-    }
-  };
+  // Day calculations
+  const diffTime = dateObj.getTime() - todayObj.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+  const isToday = diffDays === 0;
 
-  const handleTagToggle = (tag: string) => {
-    const currentTags = currentEntry.tags || [];
-    const isSelected = currentTags.includes(tag);
+  const formattedDate = dateObj.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 
-    if (isSelected) {
-      handleAction({
-        tags: currentTags.filter((t: string) => t !== tag),
-      });
-    } else {
-      if (currentTags.length >= 3) return;
+  // Dynamic Day Context Label
+  let dayContext = "Today";
+  if (diffDays === -1) dayContext = "Yesterday";
+  else if (diffDays < -1) dayContext = `${Math.abs(diffDays)} Days Ago`;
+  else if (diffDays === 1) dayContext = "Tomorrow";
+  else if (diffDays > 1) dayContext = `In ${diffDays} Days`;
 
-      handleAction({
-        tags: [...currentTags, tag],
-      });
-    }
-  };
+  // True 9-Section Alignment Core Check
+  const entry = allEntries[selectedDate] || {};
+  const coreFields = [
+    "mood", "energy", "sleep", "biggestWin", "friction", 
+    "lesson", "tomorrowFocus", "afternoonStory", "eveningReflection"
+  ];
+  const completedCount = coreFields.filter(field => entry[field] && entry[field].toString().trim().length > 0).length;
 
-  const resizeTextarea = (el: HTMLTextAreaElement) => {
-    el.style.height = "0px";
-    el.style.height = `${Math.max(el.scrollHeight, 46)}px`;
-  };
+  // Exact Logic Driven Status
+  let statusText = "Empty";
+  let statusIcon = "○";
+  let statusColor = isDarkMode ? "text-zinc-500" : "text-gray-400";
 
-  const handleTextareaChange = (
-    e: React.ChangeEvent<HTMLTextAreaElement>,
-    updates: any
-  ) => {
-    resizeTextarea(e.target);
-    handleAction(updates);
-  };
+  if (entry.isLocked) {
+    statusText = "Finalized";
+    statusIcon = "🔒";
+    statusColor = "text-emerald-500";
+  } else if (completedCount > 0) {
+    statusText = "Draft";
+    statusIcon = "📝";
+    statusColor = "text-orange-500";
+  }
 
-  const getMoodClass = (mood: string, current: string) => {
-    if (current !== mood) {
-      return isDarkMode
-        ? "bg-black border-white/[0.08] text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300"
-        : "bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200";
-    }
+  // Pure Data-Driven Subtitle
+  let subtitle = "No reflection recorded.";
+  if (entry.isLocked) {
+    const lockDate = entry.lockedAt ? new Date(entry.lockedAt) : dateObj;
+    subtitle = `Finalized on ${lockDate.toLocaleDateString("en-GB", { day: 'numeric', month: 'short' })}.`;
+  } else if (entry.lastEdited) {
+    subtitle = `Last edited ${entry.lastEdited}.`;
+  } else if (completedCount > 0) {
+    subtitle = "Changes saved as draft.";
+  }
 
-    if (mood === "good") {
-      return isDarkMode
-        ? "bg-green-950/30 border-green-800 text-green-400 ring-2 ring-green-900/50 ring-offset-1 ring-offset-black"
-        : "bg-green-50 border-green-300 text-green-700 ring-2 ring-green-100 ring-offset-1";
-    }
-
-    if (mood === "neutral") {
-      return isDarkMode
-        ? "bg-white/[0.04] border-white/[0.12] text-white ring-2 ring-white/[0.08] ring-offset-1 ring-offset-black"
-        : "bg-gray-100 border-gray-400 text-gray-800 ring-2 ring-gray-100 ring-offset-1";
-    }
-
-    return isDarkMode
-      ? "bg-red-950/30 border-red-800 text-red-400 ring-2 ring-red-900/50 ring-offset-1 ring-offset-black"
-      : "bg-red-50 border-red-300 text-red-700 ring-2 ring-red-100 ring-offset-1";
-  };
-
-  const getEnergyClass = (energy: string, current: string) => {
-    if (current !== energy) {
-      return isDarkMode
-        ? "bg-black border-white/[0.08] text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300"
-        : "bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200";
-    }
-
-    if (energy === "high") {
-      return isDarkMode
-        ? "bg-emerald-950/30 border-emerald-800 text-emerald-400 ring-2 ring-emerald-900/50 ring-offset-1 ring-offset-black"
-        : "bg-emerald-50 border-emerald-300 text-emerald-700 ring-2 ring-emerald-100 ring-offset-1";
-    }
-
-    if (energy === "medium") {
-      return isDarkMode
-        ? "bg-orange-950/30 border-orange-800 text-orange-400 ring-2 ring-orange-900/50 ring-offset-1 ring-offset-black"
-        : "bg-orange-50 border-orange-300 text-orange-700 ring-2 ring-orange-100 ring-offset-1";
-    }
-
-    return isDarkMode
-      ? "bg-red-950/30 border-red-800 text-red-400 ring-2 ring-red-900/50 ring-offset-1 ring-offset-black"
-      : "bg-red-50 border-red-300 text-red-700 ring-2 ring-red-100 ring-offset-1";
-  };
-
-  const getSleepClass = (sleep: string, current: string) => {
-    if (current !== sleep) {
-      return isDarkMode
-        ? "bg-black border-white/[0.08] text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300"
-        : "bg-gray-50 border-gray-100 text-gray-500 hover:bg-white hover:border-gray-200";
-    }
-
-    if (sleep === "good") {
-      return isDarkMode
-        ? "bg-indigo-950/30 border-indigo-800 text-indigo-400 ring-2 ring-indigo-900/50 ring-offset-1 ring-offset-black"
-        : "bg-indigo-50 border-indigo-300 text-indigo-700 ring-2 ring-indigo-100 ring-offset-1";
-    }
-
-    if (sleep === "average") {
-      return isDarkMode
-        ? "bg-white/[0.04] border-white/[0.12] text-white ring-2 ring-white/[0.08] ring-offset-1 ring-offset-black"
-        : "bg-gray-100 border-gray-400 text-gray-800 ring-2 ring-gray-100 ring-offset-1";
-    }
-
-    return isDarkMode
-      ? "bg-red-950/30 border-red-800 text-red-400 ring-2 ring-red-900/50 ring-offset-1 ring-offset-black"
-      : "bg-red-50 border-red-300 text-red-700 ring-2 ring-red-100 ring-offset-1";
-  };
-
-  const baseTextareaClass = `w-full min-h-[46px] max-h-40 resize-none overflow-hidden border rounded-xl px-4 py-3 text-sm font-medium leading-relaxed outline-none transition-colors shadow-sm ${
+  const btnClass = `flex items-center justify-center h-11 w-11 rounded-2xl border transition-all duration-200 active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed ${
     isDarkMode
-      ? "bg-black border-white/[0.08] text-white focus:bg-white/[0.03] focus:border-orange-500/50 placeholder-zinc-600"
-      : "bg-gray-50 border-gray-200 text-gray-800 focus:bg-white focus:border-orange-400 placeholder-gray-400"
+      ? "bg-black border-white/[0.08] text-zinc-400 hover:bg-white/[0.03] hover:text-white"
+      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
   }`;
-
-  const dividerClass = `my-7 border-t ${
-    isDarkMode ? "border-white/[0.08]" : "border-gray-200"
-  }`;
-
-  const isReadyToLock =
-    currentEntry.mood && currentEntry.energy && currentEntry.sleep;
 
   return (
-    <div
-      className={`border rounded-[24px] p-6 shadow-sm mt-6 transition-colors ${
-        isDarkMode ? "bg-black border-white/[0.08]" : "bg-white border-gray-200"
-      }`}
-    >
-      <div
-        className={`flex items-center justify-between mb-6 pb-4 border-b ${
-          isDarkMode ? "border-white/[0.08]" : "border-gray-100"
-        }`}
-      >
-        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-          Daily Behavior Log
-        </span>
+    <header className="flex flex-col gap-6 mb-10 mt-2 text-left">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+        
+        {/* Left Side: Context & Core Identification */}
+        <div className="flex flex-col gap-2">
+          <div>
+            <div className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${isDarkMode ? "text-zinc-500" : "text-gray-400"}`}>
+              {dayContext}
+            </div>
+            <h1 className={`text-3xl font-black tracking-tight leading-none ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+              {formattedDate}
+            </h1>
+          </div>
 
-        {lastEntryRef.current && (
+          {/* Clean Status & Action Subtitles */}
+          <div className="flex items-center gap-3 mt-1 text-xs">
+            <div className={`flex items-center gap-1.5 font-bold ${statusColor}`}>
+              <span>{statusIcon}</span>
+              <span className="uppercase tracking-wider text-[10px]">{statusText}</span>
+            </div>
+            <span className={isDarkMode ? "text-zinc-800" : "text-gray-200"}>•</span>
+            <p className={`font-medium ${isDarkMode ? "text-zinc-500" : "text-gray-400"}`}>
+              {subtitle}
+            </p>
+          </div>
+        </div>
+
+        {/* Right Side: Strict Block Navigation */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <button
-            onClick={handleUndo}
-            className="flex items-center gap-1 text-[10px] font-bold text-orange-500 hover:text-orange-600 uppercase tracking-widest transition-colors"
+            onClick={() => changeDate(-1)}
+            className={btnClass}
+            title="Previous Day"
           >
-            <Undo size={12} /> Undo
+            <ChevronLeft size={18} />
           </button>
-        )}
+
+          <button
+            onClick={() => setSelectedDate(actualToday)}
+            disabled={isToday}
+            className={`flex items-center justify-center gap-2 flex-1 md:flex-none h-11 px-6 rounded-2xl border text-xs font-bold uppercase tracking-widest transition-all duration-200 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed ${
+              isToday
+                ? isDarkMode
+                  ? "bg-white/[0.02] border-white/[0.05] text-zinc-700"
+                  : "bg-gray-50 border-gray-100 text-gray-300"
+                : isDarkMode
+                ? "bg-black border-white/[0.08] text-zinc-300 hover:bg-white/[0.03] hover:text-orange-400"
+                : "bg-white border-gray-200 text-gray-700 hover:text-orange-600"
+            }`}
+          >
+            <Calendar size={14} />
+            {isToday ? "Today" : "Return to Today"}
+          </button>
+
+          <button
+            onClick={() => changeDate(1)}
+            disabled={isToday} // Future timeline entries hard blocked
+            className={btnClass}
+            title="Next Day"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-2">
-        <div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleAction({ mood: "good" })}
-              className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getMoodClass(
-                "good",
-                currentEntry.mood
-              )}`}
-            >
-              <Smile size={20} />
-              <span className="text-[10px] font-bold uppercase">Good</span>
-            </button>
-
-            <button
-              onClick={() => handleAction({ mood: "neutral" })}
-              className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getMoodClass(
-                "neutral",
-                currentEntry.mood
-              )}`}
-            >
-              <Meh size={20} />
-              <span className="text-[10px] font-bold uppercase">Neutral</span>
-            </button>
-
-            <button
-              onClick={() => handleAction({ mood: "bad" })}
-              className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getMoodClass(
-                "bad",
-                currentEntry.mood
-              )}`}
-            >
-              <Frown size={20} />
-              <span className="text-[10px] font-bold uppercase">Low</span>
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleAction({ energy: "high" })}
-              className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getEnergyClass(
-                "high",
-                currentEntry.energy
-              )}`}
-            >
-              <BatteryFull size={20} />
-              <span className="text-[10px] font-bold uppercase">High</span>
-            </button>
-
-            <button
-              onClick={() => handleAction({ energy: "medium" })}
-              className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getEnergyClass(
-                "medium",
-                currentEntry.energy
-              )}`}
-            >
-              <BatteryMedium size={20} />
-              <span className="text-[10px] font-bold uppercase">Med</span>
-            </button>
-
-            <button
-              onClick={() => handleAction({ energy: "low" })}
-              className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getEnergyClass(
-                "low",
-                currentEntry.energy
-              )}`}
-            >
-              <Battery size={20} />
-              <span className="text-[10px] font-bold uppercase">Low</span>
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleAction({ sleep: "good" })}
-              className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getSleepClass(
-                "good",
-                currentEntry.sleep
-              )}`}
-            >
-              <Moon size={20} />
-              <span className="text-[10px] font-bold uppercase">Good</span>
-            </button>
-
-            <button
-              onClick={() => handleAction({ sleep: "average" })}
-              className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getSleepClass(
-                "average",
-                currentEntry.sleep
-              )}`}
-            >
-              <Cloud size={20} />
-              <span className="text-[10px] font-bold uppercase">Avg</span>
-            </button>
-
-            <button
-              onClick={() => handleAction({ sleep: "poor" })}
-              className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border transition-all active:scale-95 ${getSleepClass(
-                "poor",
-                currentEntry.sleep
-              )}`}
-            >
-              <CloudRain size={20} />
-              <span className="text-[10px] font-bold uppercase">Poor</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <hr className={dividerClass} />
-
-      <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest block mb-5">
-        What happened today?
-      </span>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">
-            Biggest Win
-          </label>
-          <textarea
-            rows={1}
-            value={currentEntry.win || ""}
-            onInput={(e) => resizeTextarea(e.currentTarget)}
-            onChange={(e) =>
-              handleTextareaChange(e, {
-                win: e.target.value,
-              })
-            }
-            placeholder="What went right today?..."
-            className={baseTextareaClass}
-          />
-        </div>
-
-        <div>
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">
-            Biggest Friction
-          </label>
-          <textarea
-            rows={1}
-            value={(currentEntry.frictions && currentEntry.frictions[0]) || ""}
-            onInput={(e) => resizeTextarea(e.currentTarget)}
-            onChange={(e) =>
-              handleTextareaChange(e, {
-                frictions: e.target.value ? [e.target.value] : [],
-              })
-            }
-            placeholder="What held you back?..."
-            className={baseTextareaClass}
-          />
-        </div>
-
-        <div>
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">
-            Today's Lesson
-          </label>
-          <textarea
-            rows={1}
-            value={currentEntry.learning || ""}
-            onInput={(e) => resizeTextarea(e.currentTarget)}
-            onChange={(e) =>
-              handleTextareaChange(e, {
-                learning: e.target.value,
-              })
-            }
-            placeholder="What did today teach you?..."
-            className={baseTextareaClass}
-          />
-        </div>
-
-        <div>
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">
-            Tomorrow Adjustment
-          </label>
-          <textarea
-            rows={1}
-            value={currentEntry.improvement || ""}
-            onInput={(e) => resizeTextarea(e.currentTarget)}
-            onChange={(e) =>
-              handleTextareaChange(e, {
-                improvement: e.target.value,
-              })
-            }
-            placeholder="What will you do differently?..."
-            className={baseTextareaClass}
-          />
-        </div>
-      </div>
-
-      <hr className={dividerClass} />
-
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-          Context Tags
-        </span>
-        <span className="text-[10px] font-bold text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full">
-          Max 3
-        </span>
-      </div>
-
-      <div className="flex flex-wrap gap-2.5">
-        {GENTLEMAN_TAGS.map((tag) => {
-          const isSelected = (currentEntry.tags || []).includes(tag);
-          const isDisabled = !isSelected && (currentEntry.tags || []).length >= 3;
-
-          return (
-            <button
-              key={tag}
-              onClick={() => handleTagToggle(tag)}
-              disabled={isDisabled}
-              className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
-                isSelected
-                  ? isDarkMode
-                    ? "bg-orange-950/40 text-orange-400 border-orange-900/50"
-                    : "bg-orange-50 text-orange-700 border-orange-200 shadow-sm"
-                  : isDisabled
-                  ? isDarkMode
-                    ? "bg-black opacity-30 text-gray-700 border-white/[0.08] cursor-not-allowed"
-                    : "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"
-                  : isDarkMode
-                  ? "bg-black text-zinc-400 border-white/[0.08] hover:bg-white/[0.03]"
-                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 shadow-sm"
-              }`}
-            >
-              {tag}
-            </button>
-          );
-        })}
-      </div>
-
-      <hr className={dividerClass} />
-
-      <div className="flex justify-end pt-2">
-        <button
-          onClick={lockCurrentDay}
-          disabled={!isReadyToLock}
-          className={`flex items-center gap-2 px-8 py-3.5 rounded-xl font-bold text-sm transition-all shadow-sm ${
-            isReadyToLock
-              ? "bg-orange-500 text-white hover:bg-orange-600 active:scale-95"
-              : isDarkMode
-              ? "bg-white/[0.03] border border-white/[0.06] text-zinc-600 cursor-not-allowed"
-              : "bg-gray-100 text-gray-400 cursor-not-allowed"
-          }`}
-        >
-          <Lock size={16} />
-          {isReadyToLock
-            ? "Finalize & Lock Day"
-            : "Set Mood, Energy, & Sleep to Lock"}
-        </button>
-      </div>
-    </div>
+    </header>
   );
 }

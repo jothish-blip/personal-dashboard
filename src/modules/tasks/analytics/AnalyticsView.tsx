@@ -36,7 +36,7 @@ export default function AnalyticsView({
   const actualToday = getLocalDate(new Date());
 
   const [filterType, setFilterType] = useState<FilterType>("month");
-  const [selectedMonth, setSelectedMonth] = useState(meta.currentMonth);
+  const [selectedMonth, setSelectedMonth] = useState(meta.currentMonth || getLocalDate(new Date()).slice(0, 7));
   const [selectedYear, setSelectedYear] = useState(
     new Date().getFullYear().toString()
   );
@@ -320,6 +320,14 @@ export default function AnalyticsView({
     return "Custom Range";
   };
 
+  const percentChange = filteredData.stats.completionPercentChange;
+  const isPositive = percentChange > 0;
+  const isNegative = percentChange < 0;
+  
+  const trendIcon = isPositive ? '📈' : isNegative ? '📉' : '➖';
+  const trendColor = isPositive ? 'text-emerald-500' : isNegative ? 'text-rose-500' : textMutedClass;
+  const trendSign = isPositive ? '+' : '';
+
   return (
     <div className="flex-1 overflow-y-auto bg-[var(--background)] text-[var(--foreground)] p-4 md:p-8 transition-colors duration-300 font-sans">
       <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-5 md:gap-6 pb-24">
@@ -408,9 +416,10 @@ export default function AnalyticsView({
           </div>
         </div>
 
-        {/* FACT-BASED DATA HERO */}
-        <div className="flex flex-col md:flex-row gap-8 mb-4 mt-2 items-end">
-          <div className="flex-1 space-y-4">
+        {/* FACT-BASED DATA HERO - CLEANED UP LAYOUT */}
+        <div className="flex flex-col gap-6 mb-4 mt-2">
+          
+          <div className="space-y-4">
             <p className={`text-xs uppercase tracking-[0.22em] font-medium ${isDarkMode ? "text-orange-400" : "text-orange-500"}`}>
               {getPeriodLabel()}
             </p>
@@ -420,40 +429,27 @@ export default function AnalyticsView({
             </h1>
 
             <div className={`max-w-xl text-[15px] leading-relaxed ${isDarkMode ? "text-white/72" : "text-slate-600"}`}>
-              Tracked across <span className="font-semibold">{tasks.length} objectives</span> over <span className="font-semibold">{filteredData.stats.activeDays} active days</span>.
+              Tracked across <span className="font-semibold">{tasks.length} {tasks.length === 1 ? 'objective' : 'objectives'}</span> over <span className="font-semibold">{filteredData.stats.activeDays} active days</span>.
             </div>
           </div>
 
-          {/* Right Side Stats Grid */}
-          <div className="grid grid-cols-2 gap-4 w-full md:min-w-[380px] md:w-auto">
+          {/* Clean 2-Card Grid */}
+          <div className="grid grid-cols-2 gap-4 w-full max-w-[500px]">
             <div className={`rounded-2xl p-4 border ${isDarkMode ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.02] border-black/[0.04]"}`}>
-              <div className={`text-[1.8rem] font-semibold tracking-tight ${textPrimaryClass}`}>
-                {tasks.length}
+              <div className={`text-[1.8rem] font-semibold tracking-tight ${trendColor}`}>
+                {trendIcon} {trendSign}{percentChange}%
               </div>
-              <div className={`text-sm ${textMutedClass}`}>Objectives</div>
-            </div>
-
-            <div className={`rounded-2xl p-4 border ${isDarkMode ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.02] border-black/[0.04]"}`}>
-              <div className={`text-[1.8rem] font-semibold tracking-tight ${textPrimaryClass}`}>
-                {filteredData.stats.activeDays}
-              </div>
-              <div className={`text-sm ${textMutedClass}`}>Active Days</div>
-            </div>
-
-            <div className={`rounded-2xl p-4 border ${isDarkMode ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.02] border-black/[0.04]"}`}>
-              <div className={`text-[1.8rem] font-semibold tracking-tight ${filteredData.stats.completionPercentChange >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                {filteredData.stats.completionPercentChange > 0 ? `+${filteredData.stats.completionPercentChange}%` : `${filteredData.stats.completionPercentChange}%`}
-              </div>
-              <div className={`text-sm ${textMutedClass}`}>Vs Previous Period</div>
+              <div className={`text-sm ${textMutedClass} mt-1`}>Vs Previous Period</div>
             </div>
 
             <div className={`rounded-2xl p-4 border ${isDarkMode ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.02] border-black/[0.04]"}`}>
               <div className={`text-[1.8rem] font-semibold tracking-tight ${textPrimaryClass}`}>
                 {filteredData.stats.avgPerDay}
               </div>
-              <div className={`text-sm ${textMutedClass}`}>Daily Average</div>
+              <div className={`text-sm ${textMutedClass} mt-1`}>Daily Average</div>
             </div>
           </div>
+
         </div>
 
         <ChartsGrid

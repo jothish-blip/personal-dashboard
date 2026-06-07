@@ -3,8 +3,8 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { 
   AlertTriangle, Target, Lock, Clock, Search, 
-  ChevronLeft, ChevronRight, HelpCircle, Maximize, Minimize, 
-  Plus, Check, X 
+  ChevronLeft, ChevronRight, Maximize, Minimize, 
+  Plus, Check
 } from 'lucide-react';
 import { Task, Meta } from '../types';
 
@@ -29,7 +29,7 @@ interface MatrixProps {
   lockToday: () => void | Promise<void>;
   setMonthYear: (value: string) => void | Promise<void>;
   isLoaded?: boolean;
-  userName?: string | null; // <-- ADDED: User name prop
+  userName?: string | null;
 }
 
 type ErrorType = 'lock' | 'future' | 'system' | '';
@@ -39,13 +39,16 @@ export default function MatrixView({
   renameTask = () => console.warn("renameTask missing in parent"), 
   renameGroup = () => console.warn("renameGroup missing in parent"), 
   lockToday, setMonthYear, isLoaded = true,
-  userName = null // <-- ADDED: Destructured from props
+  userName = null 
 }: MatrixProps) {
   
   const actualToday = getLocalDate(new Date()); 
   
   const [isMobile, setIsMobile] = useState(false);
   const [showScrollHint, setShowScrollHint] = useState(false);
+
+  // --- Point 4: Async Safety ---
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const checkScreen = () => {
@@ -75,12 +78,26 @@ export default function MatrixView({
   const [quickAddName, setQuickAddName] = useState("");
   const [quickAddSuccess, setQuickAddSuccess] = useState(false); 
   
-  const [isFocusMode, setIsFocusMode] = useState(false);
+  // --- Point 9: Add Search ---
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // --- Point 8: Focus Mode Persistence ---
+  const [isFocusMode, setIsFocusMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('matrix_focus_mode') === 'true';
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('matrix_focus_mode', String(isFocusMode));
+  }, [isFocusMode]);
+
   const [showHelp, setShowHelp] = useState(false);
   
-  // Safe Delete States
-  const [pendingDelete, setPendingDelete] = useState<{id: string, name: string} | null>(null);
-  const [confirmText, setConfirmText] = useState("");
+  // --- Point 13 & 5: Modern Undo Delete System w/ Stats ---
+  const [hiddenTasks, setHiddenTasks] = useState<Set<string>>(new Set());
+  const [undoToasts, setUndoToasts] = useState<{id: string, name: string, completions: number, timerId: NodeJS.Timeout}[]>([]);
   
   const todayRef = useRef<HTMLTableCellElement | null>(null);
 
@@ -96,34 +113,81 @@ export default function MatrixView({
     }
   }, []);
 
+  // --- Point 6: Error Toast Upgrade ---
   const showError = useCallback((msg: string, type: ErrorType = 'system') => { 
     const now = Date.now();
     if (now - lastErrorTime.current < 800) return; 
     lastErrorTime.current = now;
     const id = ++errorIdRef.current;
     
+    const duration = type === 'future' ? 2500 : type === 'lock' ? 4000 : 5000;
+    
     setErrors(prev => [...prev, { id, msg, type }]);
-    setTimeout(() => setErrors(prev => prev.filter(e => e.id !== id)), 3000); 
+    setTimeout(() => setErrors(prev => prev.filter(e => e.id !== id)), duration); 
   }, []);
 
-  // Trigger Safe Delete Modal
+  // Soft Delete Request
   const requestDelete = useCallback((id: string) => {
     const taskToDelete = tasks.find(t => t.id === id);
     if (!taskToDelete) return;
-    setPendingDelete({ id, name: taskToDelete.name });
-    setConfirmText("");
-  }, [tasks]);
 
-  const activeTasks = useMemo(() => tasks, [tasks]);
+    const completions = Object.values(taskToDelete.history || {}).filter(Boolean).length;
+    
+    // Hide instantly from UI
+    setHiddenTasks(prev => new Set(prev).add(id));
 
-  const completionMap = useMemo(() => {
-    const map: Record<string, number> = {};
+    // Set 5-second timer for permanent destruction
+    const timerId = setTimeout(() => {
+      deleteTask(id);
+      setUndoToasts(prev => prev.filter(t => t.id !== id));
+      setHiddenTasks(prev => { 
+        const n = new Set(prev); 
+        n.delete(id); 
+        return n; 
+      });
+    }, 5000);
+
+    setUndoToasts(prev => [...prev, { id, name: taskToDelete.name, completions, timerId }]);
+  }, [tasks, deleteTask]);
+
+  const undoDelete = useCallback((id: string) => {
+    setUndoToasts(prev => {
+      const toast = prev.find(t => t.id === id);
+      if (toast) clearTimeout(toast.timerId);
+      return prev.filter(t => t.id !== id);
+    });
+    setHiddenTasks(prev => {
+      const n = new Set(prev);
+      n.delete(id);
+      return n;
+    });
+  }, []);
+
+  // Filter out softly deleted and searched tasks
+  const activeTasks = useMemo(() => {
+    let filtered = tasks.filter(t => !hiddenTasks.has(t.id));
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(t => t.name.toLowerCase().includes(q) || t.group.toLowerCase().includes(q));
+    }
+    return filtered;
+  }, [tasks, hiddenTasks, searchQuery]);
+
+  // --- Point 14: Performance Improvement (Combined Loop) ---
+  const { completionMap, groupedTasks } = useMemo(() => {
+    const cMap: Record<string, number> = {};
+    const gMap: Record<string, Task[]> = {};
+    
     activeTasks.forEach(t => {
+      if (!gMap[t.group]) gMap[t.group] = [];
+      gMap[t.group].push(t);
+      
       Object.entries(t.history || {}).forEach(([date, done]) => {
-        if (done) map[date] = (map[date] || 0) + 1;
+        if (done) cMap[date] = (cMap[date] || 0) + 1;
       });
     });
-    return map;
+    
+    return { completionMap: cMap, groupedTasks: gMap };
   }, [activeTasks]);
 
   const { todayDataLength, yesterdayDataLength } = useMemo(() => {
@@ -138,15 +202,6 @@ export default function MatrixView({
 
   const [year, month] = meta.currentMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
-
-  const groupedTasks = useMemo(() => {
-    const map: Record<string, Task[]> = {};
-    activeTasks.forEach(t => {
-      if (!map[t.group]) map[t.group] = [];
-      map[t.group].push(t);
-    });
-    return map;
-  }, [activeTasks]);
 
   const groups = Object.keys(groupedTasks).sort();
 
@@ -203,84 +258,41 @@ export default function MatrixView({
     return { compareCurrentWeek: currentWk, comparePrevWeek: prevWk };
   }, [completionMap, weekOffset, actualToday]);
 
-  const { totalCurrent, totalPrev, consistencyScore, validDays, weekAvg, momentumScore } = useMemo(() => {
-    let curr = 0, prev = 0, possible = 0;
-    
+  const { consistencyScore } = useMemo(() => {
+    let curr = 0, possible = 0;
     const valid = compareCurrentWeek.filter(day => day.date <= actualToday);
-
-    valid.forEach((day, i) => {
+    valid.forEach((day) => {
       curr += day.count;
-      prev += comparePrevWeek[i].count;
       possible += activeTasks.length;
     });
-
     const score = possible === 0 ? 0 : Math.round((curr / possible) * 100);
-    const avg = valid.length ? Math.round((curr / valid.length) * 10) / 10 : 0;
-    const last3Days = valid.slice(-3);
-    const mom = last3Days.length >= 2 ? last3Days[last3Days.length-1].count - last3Days[0].count : 0;
-    
-    return { totalCurrent: curr, totalPrev: prev, consistencyScore: score, validDays: valid, weekAvg: avg, momentumScore: mom };
-  }, [compareCurrentWeek, comparePrevWeek, actualToday, activeTasks.length]);
-
-  const overallDiff = totalCurrent - totalPrev;
-  const chartMaxCount = Math.max(...validDays.map(d => d.count), 1);
-
-  const bestGlobalStreak = useMemo(() => {
-    if (isFocusMode || activeTasks.length === 0) return 0;
-    let max = 0;
-    activeTasks.forEach(t => {
-      if (!t.history) return;
-      const dates = Object.keys(t.history).sort();
-      let currentStreak = 0;
-      let lastDate: string | null = null;
-      dates.forEach(d => {
-        if (t.history![d]) {
-          if (!lastDate) currentStreak = 1;
-          else {
-            const diff = Math.round((parseLocalDate(d).getTime() - parseLocalDate(lastDate).getTime()) / 86400000);
-            if (diff === 1) currentStreak++;
-            else currentStreak = 1;
-          }
-          max = Math.max(max, currentStreak);
-          lastDate = d;
-        }
-      });
-    });
-    return max;
-  }, [activeTasks, isFocusMode]);
+    return { consistencyScore: score };
+  }, [compareCurrentWeek, actualToday, activeTasks.length]);
 
   const currentStreak = useMemo(() => {
     if (activeTasks.length === 0) return 0;
-  
     let streak = 0;
     const d = parseLocalDate(actualToday);
-  
-    const isDayActive = (dateStr: string) =>
-      activeTasks.some(t => t.history?.[dateStr]);
-  
+    const isDayActive = (dateStr: string) => activeTasks.some(t => t.history?.[dateStr]);
     let currentDateStr = actualToday;
-  
+
     if (!isDayActive(currentDateStr)) {
       d.setDate(d.getDate() - 1);
       currentDateStr = getLocalDate(d);
-  
-      if (!isDayActive(currentDateStr)) {
-        return 0;
-      }
+      if (!isDayActive(currentDateStr)) return 0;
     }
-  
+
     while (isDayActive(currentDateStr)) {
       streak++;
-  
       d.setDate(d.getDate() - 1);
       currentDateStr = getLocalDate(d);
     }
-  
     return streak;
   }, [activeTasks, actualToday]);
 
+  // TypeScript Fix Option 2
   const globalWeekStats = useMemo(() => {
-    if (isFocusMode || activeTasks.length === 0) return { best: null, worst: null };
+    if (isFocusMode || activeTasks.length === 0) return {};
     const stats = weeksInMonth.map(week => {
       const validD = week.days.filter(Boolean).length;
       const possible = validD * activeTasks.length;
@@ -288,12 +300,19 @@ export default function MatrixView({
       week.days.forEach(d => { if (d) done += completionMap[`${meta.currentMonth}-${d}`] || 0; });
       return { label: week.weekLabel, pct: possible ? (done / possible) * 100 : 0 };
     });
-    return { best: stats.reduce((max, w) => w.pct > max.pct ? w : max, stats[0]), worst: stats.reduce((min, w) => w.pct < min.pct ? w : min, stats[0]) };
+    
+    const bestW = stats.reduce((max, w) => w.pct > max.pct ? w : max, stats[0]);
+    const worstW = stats.reduce((min, w) => w.pct < min.pct ? w : min, stats[0]);
+    
+    return { 
+      best: { label: bestW.label, value: bestW.pct }, 
+      worst: { label: worstW.label, value: worstW.pct } 
+    };
   }, [weeksInMonth, activeTasks.length, completionMap, meta.currentMonth, isFocusMode]);
 
   const visibleDays = useMemo(() => weeksInMonth.flatMap(w => w.days), [weeksInMonth]);
 
-  const handleToggleSafe = useCallback((task: Task, dateStr: string) => {
+  const handleToggleSafe = useCallback(async (task: Task, dateStr: string) => {
     if (dateStr > actualToday) return showError(`Future dates are view-only`, 'future');
     
     if (dateStr < actualToday && !(meta.rollbackUsedDates || []).includes(dateStr)) {
@@ -304,19 +323,36 @@ export default function MatrixView({
       return showError(`This date is permanently locked`, 'lock');
     }
     
-    toggleTask(task.id, dateStr);
+    try {
+      await toggleTask(task.id, dateStr);
+    } catch (err) {
+      showError("Failed to update task", "system");
+    }
   }, [actualToday, meta.lockedDates, meta.rollbackUsedDates, showError, toggleTask]);
 
-  const executeQuickAdd = () => {
-    if (!quickAddName.trim()) return;
-    const parts = quickAddName.split('#');
-    const name = parts[0].trim();
-    const group = parts.length > 1 && parts[1].trim() ? parts[1].trim() : "General";
-    if (name) {
-      addTask(name, group);
-      setQuickAddName("");
+  // --- Point 2 & Point 3: Character Limits & Dupe Protect ---
+  const executeQuickAdd = async (presetName?: string) => {
+    const val = presetName || quickAddName;
+    if (!val.trim()) return;
+    
+    const parts = val.split('#');
+    const name = parts[0].trim().substring(0, 60); // 60 char limit
+    const group = parts.length > 1 && parts[1].trim() ? parts[1].trim().substring(0, 20) : "General"; // 20 char limit
+    
+    if (!name) return;
+
+    if (tasks.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+      return showError("Task already exists", "system");
+    }
+
+    try {
+      setIsSaving(true);
+      await addTask(name, group);
+      if (!presetName) setQuickAddName("");
       setQuickAddSuccess(true);
       setTimeout(() => setQuickAddSuccess(false), 200);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -325,6 +361,11 @@ export default function MatrixView({
   };
 
   const scrollToToday = () => todayRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+
+  // --- Point 12: Memoize Sidebar ---
+  const memoizedSidebar = useMemo(() => (
+    <Sidebar tasks={activeTasks} userName={userName} />
+  ), [activeTasks, userName]);
 
   return (
     <div className={`flex-1 flex flex-col min-h-screen bg-[var(--background)] text-[var(--foreground)] pb-24 relative pt-0 overscroll-y-contain transition-colors duration-500`}>
@@ -351,47 +392,23 @@ export default function MatrixView({
         </div>
       )}
 
-      {/* Safe Delete Modal */}
-      {pendingDelete && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-in fade-in" onClick={() => { setPendingDelete(null); setConfirmText(""); }}>
-          <div className="bg-[var(--surface)] rounded-2xl p-8 max-w-md w-full space-y-6 shadow-2xl animate-in zoom-in-95 duration-200 border border-[var(--border)]" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3 text-red-500 mb-2">
-              <div className="p-2 bg-red-500/10 rounded-xl"><AlertTriangle size={24} /></div>
-              <h2 className="font-bold text-2xl text-[var(--foreground)]">Delete Task?</h2>
-            </div>
-            <p className="text-sm text-[var(--muted)] leading-relaxed">
-              This action cannot be undone. To confirm deletion, type <strong>{pendingDelete.name}</strong> below:
-            </p>
-            <input
-              autoFocus
-              type="text"
-              placeholder={`Type "${pendingDelete.name}"`}
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              className="w-full pl-4 pr-4 py-3 border border-[var(--border)] bg-[var(--surface-alt)] rounded-xl text-sm outline-none focus:border-red-500 focus:bg-[var(--surface)] text-[var(--foreground)] transition-all duration-200"
-            />
-            <div className="flex gap-3 pt-2">
-              <button 
-                onClick={() => { setPendingDelete(null); setConfirmText(""); }} 
-                className="flex-1 py-3 bg-[var(--surface-alt)] text-[var(--foreground)] rounded-xl font-bold hover:bg-[var(--border)] active:scale-95 transition-all duration-200"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={confirmText.trim() !== pendingDelete.name}
-                onClick={() => {
-                  deleteTask(pendingDelete.id);
-                  setPendingDelete(null);
-                  setConfirmText("");
-                }}
-                className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all duration-200"
-              >
-                Delete
-              </button>
-            </div>
+      {/* Undo Delete Toasts */}
+      <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 flex flex-col gap-2 z-[100] pointer-events-auto">
+        {undoToasts.map((toast) => (
+          <div key={toast.id} className="bg-[var(--surface)] border border-[var(--border)] px-6 py-3 rounded-[20px] shadow-xl text-sm font-bold flex items-center gap-3 transition-all duration-300 border-indigo-500/30 text-[var(--foreground)] animate-in slide-in-from-bottom-5">
+            <span className="font-normal text-[var(--muted)]">
+              Deleted <strong className="text-[var(--foreground)]">{toast.name}</strong> 
+              {toast.completions > 0 && ` (${toast.completions} past completions)`}
+            </span>
+            <button 
+              onClick={() => undoDelete(toast.id)} 
+              className="ml-2 text-indigo-500 hover:text-indigo-400 font-bold uppercase tracking-wider text-xs bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg active:scale-95 transition-all"
+            >
+              Undo
+            </button>
           </div>
-        </div>
-      )}
+        ))}
+      </div>
 
       {/* Errors */}
       <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 flex flex-col gap-2 z-[100] pointer-events-none">
@@ -418,8 +435,7 @@ export default function MatrixView({
           todayDataLength={todayDataLength} yesterdayDataLength={yesterdayDataLength}
           tasksLength={activeTasks.length} globalWeekStats={globalWeekStats}
           meta={meta} setMonthYear={setMonthYear} addTask={addTask}
-          showError={(msg) => showError(msg, 'system')} lockToday={lockToday} actualToday={actualToday}
-        />
+          showError={(msg) => showError(msg, 'system')} lockToday={lockToday} actualToday={actualToday} existingTaskNames={[]}        />
       )}
 
       <div className={`flex-1 flex flex-col xl:flex-row mx-auto w-full gap-6 transition-all duration-500 ${isFocusMode ? 'max-w-[900px] p-2 md:p-4 justify-center' : 'max-w-[1700px] p-4 md:p-8'}`}>
@@ -430,16 +446,23 @@ export default function MatrixView({
               <div className="flex justify-between items-center mb-6"><div className="h-6 bg-[var(--surface-alt)] rounded w-48"></div><div className="h-8 bg-[var(--surface-alt)] rounded-full w-24"></div></div>
               <div className="space-y-4">{[1, 2, 3, 4].map(i => (<div key={i} className="flex gap-4 items-center"><div className="h-12 bg-[var(--surface-alt)] rounded-xl w-1/4"></div><div className="h-12 bg-[var(--surface-alt)] rounded-xl flex-1"></div></div>))}</div>
             </div>
-          ) : activeTasks.length === 0 ? (
+          ) : activeTasks.length === 0 && !searchQuery ? (
             <div className="flex-1 flex flex-col items-center justify-center p-12 bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-2xl text-[var(--muted)] min-h-[400px] shadow-sm transition-all duration-200 hover:border-orange-400/30">
               <div className="bg-indigo-500/10 p-4 rounded-full mb-4"><Target size={48} className="text-indigo-400" /></div>
               <p className="font-bold text-xl text-[var(--foreground)] mb-2">Start Tracking Your System</p>
               <p className="text-sm text-[var(--muted)] mb-4 text-center">Add your first performance objective to begin analyzing.</p>
-              <div className="flex items-center gap-2 mb-6 text-xs text-[var(--muted)] font-medium">Try adding: <span className="bg-[var(--surface-alt)] text-[var(--foreground)] px-2 py-1 rounded">Workout #Health</span> <span className="bg-[var(--surface-alt)] text-[var(--foreground)] px-2 py-1 rounded">Reading #Mind</span></div>
+              
+              {/* --- Point 7: Empty State Chips --- */}
+              <div className="flex items-center gap-2 mb-6 text-xs text-[var(--muted)] font-medium">
+                Try adding: 
+                <button disabled={isSaving} onClick={() => executeQuickAdd("Workout #Health")} className="bg-[var(--surface-alt)] hover:bg-[var(--border)] text-[var(--foreground)] px-3 py-1.5 rounded-full transition-colors active:scale-95 disabled:opacity-50">Workout #Health</button> 
+                <button disabled={isSaving} onClick={() => executeQuickAdd("Reading #Mind")} className="bg-[var(--surface-alt)] hover:bg-[var(--border)] text-[var(--foreground)] px-3 py-1.5 rounded-full transition-colors active:scale-95 disabled:opacity-50">Reading #Mind</button>
+              </div>
+              
               <div className="relative mt-4">
-                <input type="text" placeholder="Workout #Health (Press Enter)..." value={quickAddName} onChange={e => setQuickAddName(e.target.value)} onKeyDown={handleQuickAdd} autoFocus
-                  className={`pl-4 pr-10 py-3 border rounded-xl text-sm outline-none w-72 shadow-sm transition-all duration-200 ${quickAddSuccess ? 'bg-green-500/10 border-green-500 animate-[scaleUp_0.2s_ease]' : 'bg-[var(--surface-alt)] border-[var(--border)] focus:border-indigo-500 focus:bg-[var(--surface)] text-[var(--foreground)]'}`} />
-                <button onClick={executeQuickAdd} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[var(--background)] bg-[var(--foreground)] rounded-lg hover:bg-indigo-500 active:scale-95 transition-all duration-200"><Plus size={16}/></button>
+                <input type="text" placeholder="Workout #Health (Press Enter)..." value={quickAddName} onChange={e => setQuickAddName(e.target.value)} onKeyDown={handleQuickAdd} autoFocus disabled={isSaving} maxLength={80}
+                  className={`pl-4 pr-10 py-3 border rounded-xl text-sm outline-none w-72 shadow-sm transition-all duration-200 disabled:opacity-50 ${quickAddSuccess ? 'bg-green-500/10 border-green-500 animate-[scaleUp_0.2s_ease]' : 'bg-[var(--surface-alt)] border-[var(--border)] focus:border-indigo-500 focus:bg-[var(--surface)] text-[var(--foreground)]'}`} />
+                <button disabled={isSaving || !quickAddName.trim()} onClick={() => executeQuickAdd()} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[var(--background)] bg-[var(--foreground)] rounded-lg hover:bg-indigo-500 active:scale-95 disabled:opacity-50 transition-all duration-200"><Plus size={16}/></button>
               </div>
             </div>
           ) : (
@@ -450,24 +473,37 @@ export default function MatrixView({
                     {meta.lockedDates?.includes(actualToday) ? (
                       <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-md"><Lock size={12}/> Locked Mode</span>
                     ) : (
-                      <span className="text-green-600 dark:text-green-400 flex items-center gap-1.5 bg-green-500/10 px-2 py-1 rounded-md"><div className="w-2 h-2 bg-green-500 rounded-full"/> Active Tracking</span>
+                      // --- Point 10: Better Stats Header ---
+                      <span className="text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 bg-indigo-500/10 px-2 py-1 rounded-md">
+                        <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"/> Consistency: {consistencyScore}%
+                      </span>
                     )}
-                    <span className="hidden sm:inline text-[var(--muted)] font-medium ml-1">Today • {actualToday}</span>
+                    <span className="hidden sm:inline text-[var(--muted)] font-medium ml-1">Today • {actualToday} • Streak: {currentStreak}</span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
                   {!isFocusMode && (
-                    <div className="relative hidden md:block group">
-                      <input type="text" placeholder="Workout #Health (Press Enter)..." value={quickAddName} onChange={e => setQuickAddName(e.target.value)} onKeyDown={handleQuickAdd}
-                        className={`pl-3 pr-3 py-1.5 border rounded-lg text-xs outline-none transition-all duration-200 w-44 text-[var(--foreground)] ${quickAddSuccess ? 'bg-green-500/10 border-green-500 animate-[scaleUp_0.2s_ease]' : 'bg-[var(--surface-alt)] border-[var(--border)] focus:border-indigo-400 focus:bg-[var(--surface)]'}`} />
-                    </div>
+                    <>
+                      {/* --- Point 9: Search Field --- */}
+                      <div className="relative hidden lg:flex items-center group">
+                        <Search size={14} className="absolute left-3 text-[var(--muted)] group-focus-within:text-indigo-500 transition-colors" />
+                        <input type="text" placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                          className="pl-8 pr-3 py-1.5 border rounded-lg text-xs outline-none transition-all duration-200 w-32 focus:w-48 text-[var(--foreground)] bg-[var(--surface-alt)] border-[var(--border)] focus:border-indigo-400 focus:bg-[var(--surface)]" />
+                      </div>
+
+                      <div className="relative hidden md:block group">
+                        <input type="text" placeholder="Quick Add (e.g. Read #Mind)..." value={quickAddName} onChange={e => setQuickAddName(e.target.value)} onKeyDown={handleQuickAdd} disabled={isSaving} maxLength={80}
+                          className={`pl-3 pr-3 py-1.5 border rounded-lg text-xs outline-none transition-all duration-200 w-44 lg:w-56 text-[var(--foreground)] disabled:opacity-50 ${quickAddSuccess ? 'bg-green-500/10 border-green-500 animate-[scaleUp_0.2s_ease]' : 'bg-[var(--surface-alt)] border-[var(--border)] focus:border-indigo-400 focus:bg-[var(--surface)]'}`} />
+                      </div>
+                    </>
                   )}
                   
                   <div className="flex items-center gap-1 bg-[var(--surface-alt)] border border-[var(--border)] rounded-lg p-1 shadow-sm">
-                    <button onClick={() => setWeekOffset(prev => Math.max(prev - 1, -4))} className="p-1 hover:bg-[var(--surface)] text-[var(--muted)] rounded transition-colors active:scale-95"><ChevronLeft size={14}/></button>
+                    {/* --- Point 1: Unlocked Week Offset Navigation --- */}
+                    <button onClick={() => setWeekOffset(prev => prev - 1)} className="p-1 hover:bg-[var(--surface)] text-[var(--muted)] rounded transition-colors active:scale-95"><ChevronLeft size={14}/></button>
                     {!isFocusMode && <button onClick={() => { setWeekOffset(0); scrollToToday(); }} className="px-3 text-[11px] font-bold text-[var(--muted)] hover:text-[var(--foreground)] transition-colors active:scale-95">Week {activeWeekIndex + 1}</button>}
-                    <button onClick={() => setWeekOffset(prev => Math.min(prev + 1, 4))} className="p-1 hover:bg-[var(--surface)] text-[var(--muted)] rounded transition-colors active:scale-95"><ChevronRight size={14}/></button>
+                    <button onClick={() => setWeekOffset(prev => prev + 1)} className="p-1 hover:bg-[var(--surface)] text-[var(--muted)] rounded transition-colors active:scale-95"><ChevronRight size={14}/></button>
                   </div>
                   <div className="h-4 w-[1px] bg-[var(--border)]"></div>
                   <button onClick={() => setIsFocusMode(!isFocusMode)} title="Toggle Focus Mode" className={`p-1.5 rounded-lg transition-colors active:scale-95 ${isFocusMode ? 'bg-indigo-500/10 text-indigo-500' : 'hover:bg-[var(--surface-alt)] text-[var(--muted)]'}`}>
@@ -476,25 +512,29 @@ export default function MatrixView({
                 </div>
               </div>
 
-              <div className="overflow-x-auto bg-[var(--background)]">
-                <Grid 
-                  tasks={activeTasks}
-                  meta={meta}
-                  groupedTasks={groupedTasks}
-                  groups={groups}
-                  weeksInMonth={weeksInMonth}
-                  visibleDays={visibleDays}
-                  actualToday={actualToday}
-                  todayRef={todayRef}
-                  handleToggleSafe={handleToggleSafe}
-                  deleteTask={requestDelete} 
-                  renameTask={renameTask}
-                  renameGroup={renameGroup}
-                  activeWeekIndex={activeWeekIndex}
-                  showScrollHint={showScrollHint}
-                  dismissScrollHint={dismissScrollHint}
-                />
-              </div>
+              {activeTasks.length === 0 && searchQuery ? (
+                <div className="py-20 text-center text-[var(--muted)] text-sm">No tasks match "{searchQuery}"</div>
+              ) : (
+                <div className="overflow-x-auto bg-[var(--background)]">
+                  <Grid 
+                    tasks={activeTasks}
+                    meta={meta}
+                    groupedTasks={groupedTasks}
+                    groups={groups}
+                    weeksInMonth={weeksInMonth}
+                    visibleDays={visibleDays}
+                    actualToday={actualToday}
+                    todayRef={todayRef}
+                    handleToggleSafe={handleToggleSafe}
+                    deleteTask={requestDelete} 
+                    renameTask={renameTask}
+                    renameGroup={renameGroup}
+                    activeWeekIndex={activeWeekIndex}
+                    showScrollHint={showScrollHint}
+                    dismissScrollHint={dismissScrollHint}
+                  />
+                </div>
+              )}
 
             </div>
           )}
@@ -514,8 +554,7 @@ export default function MatrixView({
               xl:overflow-hidden
             "
           >
-            {/* ADDED: Passing userName down to Sidebar */}
-            <Sidebar tasks={activeTasks} userName={userName} />
+            {memoizedSidebar}
           </div>
         )}
       </div>

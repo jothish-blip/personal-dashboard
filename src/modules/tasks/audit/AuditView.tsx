@@ -132,6 +132,23 @@ export default function AuditView({
     };
   }, [filteredLogs]);
 
+  const getPeriodLabel = () => {
+    if (filterType === "all") return "All Time";
+    if (filterType === "month") {
+      const [y, m] = selectedMonth.split("-");
+      const date = new Date(parseInt(y), parseInt(m) - 1, 1);
+      return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    }
+    if (filterType === "year") return selectedYear;
+    if (filterType === "custom") {
+      if (!fromDate && !toDate) return "All Time";
+      if (fromDate && !toDate) return `Since ${fromDate}`;
+      if (!fromDate && toDate) return `Until ${toDate}`;
+      return `${fromDate} to ${toDate}`;
+    }
+    return "All Time";
+  };
+
   const handleExportCSV = () => {
     if (filteredLogs.length === 0) return alert("No data to export");
 
@@ -180,10 +197,12 @@ export default function AuditView({
 
     const summary = {
       exportedAt: new Date().toISOString(),
+      period: getPeriodLabel(),
       totalEvents: filteredLogs.length,
       mostActiveTime:
         analytics.peakHour !== null ? formatHourLabel(analytics.peakHour) : "N/A",
       topObjective: analytics.topTasks[0]?.[0] || "N/A",
+      avgEventsPerObjective: taskCount > 0 ? (filteredLogs.length / taskCount).toFixed(1) : 0,
       eventDistribution: analytics.actionCount,
       topTasks: Object.fromEntries(analytics.topTasks),
     };
@@ -202,6 +221,7 @@ export default function AuditView({
 
   const textPrimaryClass = isDarkMode ? "text-white" : "text-slate-900";
   const textMutedClass = isDarkMode ? "text-white/55" : "text-slate-500";
+  const avgEvents = taskCount > 0 ? (filteredLogs.length / taskCount).toFixed(1) : "0";
 
   return (
     <div
@@ -228,57 +248,62 @@ export default function AuditView({
         />
 
         {/* HERO SECTION */}
-        <div className="flex flex-col mb-6 mt-4">
+        <div className="flex flex-col mb-6 mt-4 max-w-3xl">
           <p className={`text-xs uppercase tracking-[0.22em] font-medium mb-4 ${isDarkMode ? "text-orange-400" : "text-orange-500"}`}>
             AUDIT LOGS
           </p>
 
-          <div className="flex flex-col md:flex-row gap-8 items-end">
+          <div className="flex flex-col gap-5">
             
-            {/* Left Side Details */}
-            <div className="flex-1 space-y-4">
+            {/* Title & Context */}
+            <div className="space-y-2">
               <h1 className={`text-[2.6rem] md:text-[3.4rem] font-semibold tracking-[-0.06em] leading-none ${textPrimaryClass}`}>
                 {filteredLogs.length} <span className="text-[1.2rem] md:text-[1.5rem] font-medium opacity-60 tracking-normal">Events</span>
               </h1>
+              <div className={`text-lg font-medium ${isDarkMode ? "text-white/40" : "text-slate-400"}`}>
+                {getPeriodLabel()}
+              </div>
+            </div>
 
-              <div className={`max-w-xl text-[15px] leading-relaxed ${isDarkMode ? "text-white/72" : "text-slate-600"}`}>
-                Complete history of objective creation, updates, deletions and execution tracking.
+            <div className={`text-[15px] leading-relaxed max-w-xl ${isDarkMode ? "text-white/72" : "text-slate-600"}`}>
+              Complete history of objective creation, updates, deletions and execution tracking.
+            </div>
+
+            {/* Premium Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 w-full mt-4">
+              <div className={`rounded-2xl p-4 border ${isDarkMode ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.02] border-black/[0.04]"}`}>
+                <div className={`text-[1.6rem] font-semibold tracking-tight ${textPrimaryClass}`}>
+                  {formatHourLabel(analytics.peakHour)}
+                </div>
+                <div className={`text-sm mt-1 ${textMutedClass}`}>Most Active</div>
               </div>
 
-              {/* Dynamic Breakdown Row */}
-              <div className="flex flex-wrap items-center gap-4 md:gap-6 mt-5 text-[13px] font-semibold tracking-wide">
-                {Object.entries(analytics.actionCount).slice(0, 4).map(([action, count]) => (
-                  <div key={action} className={isDarkMode ? "text-white/60" : "text-slate-500"}>
-                    <span className={isDarkMode ? "text-white/40" : "text-slate-400"}>{action.toUpperCase()}</span> {count}
+              <div className={`rounded-2xl p-4 border ${isDarkMode ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.02] border-black/[0.04]"}`}>
+                <div className={`text-[1.6rem] font-semibold leading-tight line-clamp-1 ${textPrimaryClass}`}>
+                  {analytics.topTasks[0]?.[0] || "—"}
+                </div>
+                <div className={`text-sm mt-1 ${textMutedClass}`}>Top Objective</div>
+              </div>
+
+              <div className={`rounded-2xl p-4 border ${isDarkMode ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.02] border-black/[0.04]"}`}>
+                <div className={`text-[1.6rem] font-semibold tracking-tight ${textPrimaryClass}`}>
+                  {avgEvents}
+                </div>
+                <div className={`text-sm mt-1 ${textMutedClass}`}>Avg Events</div>
+              </div>
+            </div>
+
+            {/* Action Pills */}
+            {Object.keys(analytics.actionCount).length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                {Object.entries(analytics.actionCount).slice(0, 5).map(([action, count]) => (
+                  <div key={action} className={`px-3.5 py-1.5 rounded-full border text-[11px] font-bold tracking-wider flex items-center gap-2 ${isDarkMode ? 'bg-white/[0.03] border-white/[0.08] text-white/80' : 'bg-black/[0.02] border-black/[0.06] text-slate-700'}`}>
+                    <span className={isDarkMode ? "text-white/40" : "text-slate-400"}>{action.toUpperCase()}</span>
+                    <span>{count}</span>
                   </div>
                 ))}
               </div>
-            </div>
-
-            {/* Right Side Stats Grid (Now 3 Cards) */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 w-full md:min-w-[480px] md:w-auto">
-              <div className={`rounded-2xl p-4 border ${isDarkMode ? "border-white/[0.04]" : "border-black/[0.04]"}`}>
-                <div className={`text-[1.8rem] font-semibold tracking-tight ${textPrimaryClass}`}>
-                  {formatHourLabel(analytics.peakHour)}
-                </div>
-                <div className={`text-sm ${textMutedClass}`}>Peak Hour</div>
-              </div>
-
-              <div className={`rounded-2xl p-4 border ${isDarkMode ? "border-white/[0.04]" : "border-black/[0.04]"}`}>
-                <div className={`text-lg font-semibold leading-tight line-clamp-2 mt-1 ${textPrimaryClass}`}>
-                  {analytics.topTasks[0]?.[0] || "—"}
-                </div>
-                <div className={`text-sm mt-1 ${textMutedClass}`}>Most Edited</div>
-              </div>
-
-              <div className={`rounded-2xl p-4 border ${isDarkMode ? "border-white/[0.04]" : "border-black/[0.04]"}`}>
-                <div className={`text-[1.8rem] font-semibold tracking-tight ${textPrimaryClass}`}>
-                  {taskCount}
-                </div>
-                <div className={`text-sm ${textMutedClass}`}>Objectives</div>
-              </div>
-            </div>
-
+            )}
           </div>
         </div>
 
@@ -292,12 +317,8 @@ export default function AuditView({
           }}
         />
 
-        {/* ADVANCED ACTIONS MENU (Moved to bottom) */}
-        <div className={`mt-4 pt-6 flex items-center justify-between border-t ${isDarkMode ? "border-white/10" : "border-black/5"}`}>
-          <div className={`text-[11px] font-bold uppercase tracking-[0.15em] ${isDarkMode ? "text-white/40" : "text-slate-400"}`}>
-            System Maintenance
-          </div>
-          
+        {/* ADVANCED ACTIONS MENU */}
+        <div className={`mt-4 pt-6 flex items-center justify-end border-t ${isDarkMode ? "border-white/10" : "border-black/5"}`}>
           <div className="relative">
             <button 
               onClick={() => setIsAdvancedMenuOpen(!isAdvancedMenuOpen)}
