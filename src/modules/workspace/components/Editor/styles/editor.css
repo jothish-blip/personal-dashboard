@@ -1,0 +1,55 @@
+.pm-editor-container {
+  /* Dynamic Variables passed from React */
+  --pm-bg: var(--editor-bg, transparent);
+  --pm-text: var(--editor-text, #111827);
+  --pm-heading: var(--editor-heading, #111827);
+  --pm-selection-bg: var(--editor-selection-bg, #bbf7d0);
+  --pm-selection-text: var(--editor-selection-text, #14532d);
+  --pm-quote-text: var(--editor-quote-text, #4b5563);
+  --pm-code-bg: var(--editor-code-bg, #f9fafb);
+  --pm-code-border: var(--editor-code-border, #e5e7eb);
+  --pm-placeholder: var(--editor-placeholder, #9ca3af);
+  --pm-line-height: var(--editor-line-height, 1.85);
+}
+
+.ProseMirror { 
+  outline: none !important; 
+  border: none !important; 
+  caret-color: #22c55e; 
+  min-height: 700px; 
+  padding-top: 1.5rem; 
+  padding-bottom: 6rem;
+  padding-left: 2.5rem;
+  padding-right: 2.5rem;
+  font-size: 17px; 
+  line-height: var(--pm-line-height) !important; 
+  transition: all 0.3s ease; 
+  color: var(--pm-text) !important; 
+  -webkit-overflow-scrolling: touch; 
+}
+.ProseMirror p { margin-bottom: 1.25em; }
+.ProseMirror h1, .ProseMirror h2, .ProseMirror h3 { margin-top: 2em; margin-bottom: 0.75em; font-weight: 900; color: var(--pm-heading) !important; }
+.ProseMirror ol { padding-left: 2.5rem; list-style-position: outside; }
+.ProseMirror ol li { padding-left: 0.5rem; }
+.ProseMirror ul[data-type="taskList"] { list-style: none; padding-left: 0; margin: 0; }
+.ProseMirror li[data-type="taskItem"] { display: flex !important; align-items: flex-start !important; gap: 0.5rem; }
+.ProseMirror li[data-type="taskItem"] > label { display: flex; align-items: center; margin: 0; flex-shrink: 0; }
+.ProseMirror li[data-type="taskItem"] > div { flex: 1; margin: 0; }
+.ProseMirror ul { padding-left: 1.5rem; }
+.ProseMirror ::selection { background: var(--pm-selection-bg); color: var(--pm-selection-text); }
+.ProseMirror blockquote { border-left: 5px solid #22c55e; padding-left: 1.5rem; color: var(--pm-quote-text); font-style: italic; margin: 2em 0; }
+.ProseMirror a { color: #16a34a; text-decoration: underline; cursor: pointer; }
+.ProseMirror pre { background: var(--pm-code-bg); border: 1px solid var(--pm-code-border); border-radius: 0.5rem; padding: 1rem; font-family: monospace; color: var(--pm-text); }
+.ProseMirror p.is-editor-empty:first-child::before { color: var(--pm-placeholder); content: attr(data-placeholder); float: left; height: 0; pointer-events: none; }
+
+@media (max-width: 768px) { 
+  .ProseMirror { 
+    padding-top: 3rem; 
+    padding-bottom: 14rem;
+    padding-left: 1.2rem;
+    padding-right: 1.2rem; 
+    min-height: calc(var(--vh, 1vh) * 100);
+    max-width: 100%;
+    font-size: 18px;
+  } 
+}

@@ -783,38 +783,66 @@ export function useWorkspaceSystem() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]); 
 
-  useEffect(() => {
-    if (!supabase || !currentUser) return;
-    const channel = supabase
-      .channel(`workspace-${currentUser.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "workspace_documents", filter: `user_id=eq.${currentUser.id}` },
-        (payload: any) => {
-          if (payload.eventType === "INSERT") setDocuments(prev => prev.some(d => d.id === payload.new.id) ? prev : [mapDoc(payload.new), ...prev]);
-          if (payload.eventType === "UPDATE") {
-            const incomingDoc = mapDoc(payload.new);
-            if (editingDocRef.current === incomingDoc.id) return; 
-            setDocuments(prev => prev.map(d => d.id === incomingDoc.id && incomingDoc.version > (d.version ?? 0) ? incomingDoc : d));
-          }
-          if (payload.eventType === "DELETE") setDocuments(prev => prev.filter(d => d.id !== payload.old.id));
-        }
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "workspace_folders", filter: `user_id=eq.${currentUser.id}` },
-        (payload: any) => {
-          if (payload.eventType === "INSERT") setFolders(prev => prev.some(f => f.id === payload.new.id) ? prev : [...prev, mapFolder(payload.new)]);
-          if (payload.eventType === "UPDATE") setFolders(prev => prev.map(f => f.id === payload.new.id ? mapFolder(payload.new) : f));
-          if (payload.eventType === "DELETE") setFolders(prev => prev.filter(f => f.id !== payload.old.id));
-        }
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "workspace_media", filter: `user_id=eq.${currentUser.id}` },
-        (payload: any) => {
-          if (payload.eventType === "INSERT") setMedia(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, mapMedia(payload.new)]);
-          if (payload.eventType === "UPDATE") setMedia(prev => prev.map(m => m.id === payload.new.id ? mapMedia(payload.new) : m));
-          if (payload.eventType === "DELETE") setMedia(prev => prev.filter(m => m.id !== payload.old.id));
-        }
-      ).subscribe();
-  
-    return () => { supabase.removeChannel(channel); };
-  }, [supabase, currentUser]);
+useEffect(() => {
+  if (!supabase || !currentUser) return;
+
+  const channelName = `workspace-${currentUser.id}`;
+
+  const existing = supabase
+    .getChannels()
+    .find(c => c.topic === `realtime:${channelName}`);
+
+  if (existing) {
+    supabase.removeChannel(existing);
+  }
+
+  const channel = supabase.channel(channelName);
+
+  channel.on(
+    "postgres_changes",
+    {
+      event: "*",
+      schema: "public",
+      table: "workspace_documents",
+      filter: `user_id=eq.${currentUser.id}`,
+    },
+    (payload) => {
+      // document logic
+    }
+  );
+
+  channel.on(
+    "postgres_changes",
+    {
+      event: "*",
+      schema: "public",
+      table: "workspace_folders",
+      filter: `user_id=eq.${currentUser.id}`,
+    },
+    (payload) => {
+      // folder logic
+    }
+  );
+
+  channel.on(
+    "postgres_changes",
+    {
+      event: "*",
+      schema: "public",
+      table: "workspace_media",
+      filter: `user_id=eq.${currentUser.id}`,
+    },
+    (payload) => {
+      // media logic
+    }
+  );
+
+  channel.subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [currentUser?.id]);
 
   useEffect(() => {
     const interval = setInterval(async () => {

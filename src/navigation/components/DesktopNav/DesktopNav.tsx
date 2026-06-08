@@ -4,15 +4,10 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LayoutGrid,
-  LayoutPanelLeft,
-  BookOpen,
-  Brain,
-  CalendarDays,
-  Settings,
-  LogOut,
   User,
   Palette,
+  Settings,
+  LogOut,
 } from "lucide-react";
 
 import ThemeToggle from "@/theme/ThemeToggle";
@@ -31,11 +26,11 @@ interface DesktopNavProps {
 }
 
 const DEFAULT_NAV_ITEMS = [
-  { label: "Tasks", icon: LayoutGrid, path: "/", key: "isTasks" },
-  { label: "Focus", icon: Brain, path: "/focus", key: "isFocus" },
-  { label: "Planner", icon: CalendarDays, path: "/Planner", key: "isCalendar" },
-  { label: "Journal", icon: BookOpen, path: "/diary", key: "isDiary" },
-  { label: "Workspace", icon: LayoutPanelLeft, path: "/Workspace", key: "isMini" },
+  { label: "Tasks", path: "/", key: "isTasks" },
+  { label: "Focus", path: "/focus", key: "isFocus" },
+  { label: "Planner", path: "/Planner", key: "isCalendar" },
+  { label: "Journal", path: "/diary", key: "isDiary" },
+  { label: "Workspace", path: "/Workspace", key: "isMini" },
 ];
 
 export default function DesktopNav(props: DesktopNavProps) {
@@ -51,6 +46,7 @@ export default function DesktopNav(props: DesktopNavProps) {
   const { isDarkMode } = useTheme();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
+  // Esc to close profile dropdown
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -70,25 +66,31 @@ export default function DesktopNav(props: DesktopNavProps) {
   return (
     <>
       {/* FLAT 2030 SYSTEM WORKSTATION HEADER */}
-      <div className="hidden md:block w-full px-4 lg:px-6 mt-3 relative z-[999] select-none">
+      <div className="hidden md:block w-full px-4 lg:px-6 mt-4 relative z-[999] select-none">
         <div
-          className={`relative w-full max-w-[1800px] mx-auto rounded-[24px] border backdrop-blur-sm transition-all duration-500 ${
+          className={`relative w-full max-w-[1800px] mx-auto rounded-[28px] transition-all duration-500 ${
             isDarkMode
-              ? "bg-black/[0.35] border-white/[0.06] shadow-[0_10px_50px_rgba(0,0,0,0.3)]"
-              : "bg-white/80 border-zinc-200/60 shadow-[0_8px_24px_rgba(0,0,0,0.01)]"
+              ? "bg-black/[0.14] backdrop-blur-[28px] shadow-[0_10px_50px_rgba(0,0,0,0.3)]"
+              : "bg-white/50 backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,0.01)]"
           }`}
+          style={{
+            backgroundImage: isDarkMode 
+              ? "linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))" 
+              : "none"
+          }}
         >
-          {/* Strictly Balanced Height: 68px */}
-          <div className="relative h-[68px] px-6 flex items-center justify-between">
+          {/* Breathing Room: 76px */}
+          <div className="relative h-[76px] px-6 flex items-center justify-between">
             
             {/* LEFT: ARCHITECTURAL LOGO ONLY */}
             <div className="flex items-center flex-shrink-0">
               <div 
-                className="relative flex items-center cursor-pointer"
+                className="relative flex items-center cursor-pointer group"
                 onClick={() => handleNav("/")}
               >
+                {/* Subtle Orange Pulse for Dark Mode */}
                 {isDarkMode && (
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-orange-500/10 blur-3xl rounded-full pointer-events-none" />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] bg-orange-500/[0.08] blur-[40px] rounded-full pointer-events-none transition-opacity duration-500 group-hover:opacity-100 opacity-60" />
                 )}
                 
                 <Image
@@ -105,117 +107,135 @@ export default function DesktopNav(props: DesktopNavProps) {
             {/* CENTER: MINIMAL TEXT-ONLY NAVIGATION LINKS */}
             <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
               {DEFAULT_NAV_ITEMS.map((item) => {
-                const Icon = item.icon;
                 const isActive = Boolean(safePaths[item.key]);
 
                 return (
-                  <div key={item.label} className="relative">
-                    <button
-                      onClick={() => handleNav(item.path)}
-                      className={`relative flex items-center gap-1.5 px-3 py-1 text-[13px] font-medium tracking-wide transition-colors duration-200 whitespace-nowrap z-10 ${
-                        isActive
-                          ? isDarkMode
-                            ? "text-orange-400"
-                            : "text-orange-600"
-                          : isDarkMode
-                          ? "text-zinc-400 hover:text-white"
-                          : "text-zinc-500 hover:text-black"
-                      }`}
-                    >
-                      <Icon size={14} className={`shrink-0 ${isActive ? "" : "opacity-60"}`} />
-                      <span>{item.label}</span>
+                  <button
+                    key={item.label}
+                    onClick={() => handleNav(item.path)}
+                    // Subtle hover lift (translateY(-1px))
+                    className={`relative px-4 py-2 text-[14px] font-medium tracking-wide transition-all duration-200 hover:-translate-y-px whitespace-nowrap z-10 ${
+                      isActive
+                        ? isDarkMode
+                          ? "text-orange-400"
+                          : "text-orange-600"
+                        : isDarkMode
+                        ? "text-zinc-400 hover:text-zinc-200"
+                        : "text-zinc-500 hover:text-zinc-800"
+                    }`}
+                  >
+                    <span className="relative z-10">{item.label}</span>
 
-                      {/* HIGH-VISIBILITY GLOWING DOT INDICATOR */}
-                      {isActive && (
-                        <motion.div
-                          layoutId="desktop-active-dot"
-                          className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_12px_rgba(249,115,22,0.45)]"
-                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                        />
-                      )}
-                    </button>
-                  </div>
+                    {/* LIQUID ACTIVE PILL INDICATOR */}
+                    {isActive && (
+                      <motion.div
+                        layoutId="desktop-active-pill"
+                        className={`absolute inset-0 rounded-full backdrop-blur-xl ${
+                          isDarkMode 
+                            ? "bg-orange-500/12 border border-orange-500/10 shadow-[0_0_40px_rgba(249,115,22,0.15)]" 
+                            : "bg-orange-500/8"
+                        }`}
+                        transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                      />
+                    )}
+                  </button>
                 );
               })}
             </div>
 
-            {/* RIGHT: IDENTITY ANCHOR (AVATAR + NAME) */}
-            <div className="flex items-center">
+            {/* RIGHT: IDENTITY ANCHOR */}
+            <div className="flex items-center gap-4">
               <div className="relative">
+                {/* Elevated z-index ensures button sits above the fixed backdrop for proper toggle logic */}
                 <button
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
-                  className={`flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-transparent transition-all duration-200 ${
+                  onClick={() => setIsProfileOpen((prev) => !prev)}
+                  className={`relative z-[100000] flex items-center gap-3 px-2 py-1.5 pr-4 rounded-full transition-all duration-200 hover:scale-[1.02] ${
                     isDarkMode 
-                      ? "hover:border-orange-500/20" 
-                      : "hover:border-orange-500/20"
-                  }`}
+                      ? "hover:bg-white/5" 
+                      : "hover:bg-black/5"
+                  } ${isProfileOpen ? (isDarkMode ? "bg-white/5" : "bg-black/5") : ""}`}
                 >
-                  <div className="relative w-8 h-8 rounded-full overflow-hidden bg-gradient-to-tr from-orange-500 to-amber-400 p-px shrink-0">
-                    <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center overflow-hidden">
-                      {userProfile?.avatar_url?.startsWith("http") ? (
-                        <Image
-                          src={userProfile.avatar_url}
-                          alt="Profile"
-                          width={32}
-                          height={32}
-                          className="object-cover w-full h-full"
-                          unoptimized
-                        />
-                      ) : (
-                        <User size={12} className="text-orange-400" />
-                      )}
-                    </div>
+                  <div className={`relative w-9 h-9 rounded-full overflow-hidden flex items-center justify-center shrink-0 ${
+                    isDarkMode ? "bg-white/5" : "bg-black/5"
+                  }`}>
+                    {userProfile?.avatar_url?.startsWith("http") ? (
+                      <Image
+                        src={userProfile.avatar_url}
+                        alt="Profile"
+                        width={36}
+                        height={36}
+                        className="object-cover w-full h-full"
+                        unoptimized
+                      />
+                    ) : (
+                      <User size={15} className={isDarkMode ? "text-zinc-400" : "text-zinc-500"} />
+                    )}
                   </div>
 
-                  <span className={`text-sm font-medium tracking-wide ${isDarkMode ? "text-zinc-200" : "text-zinc-800"}`}>
-                    {userProfile?.full_name?.split(" ")[0] || "Jothish"}
-                  </span>
+                  {/* Combined Name & Streak Identity */}
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[14px] font-medium tracking-wide ${isDarkMode ? "text-zinc-200" : "text-zinc-800"}`}>
+                      {userProfile?.full_name?.split(" ")[0] || "Jothish"}
+                    </span>
+                    <div className={`w-[1px] h-3 ${isDarkMode ? "bg-white/20" : "bg-black/20"}`} />
+                    <span className="text-[13px] font-bold text-orange-500 flex items-center gap-1">
+                      🔥 {currentStreak}
+                    </span>
+                  </div>
                 </button>
 
                 {/* WORKSTATION SYSTEM DROPDOWN */}
                 <AnimatePresence>
                   {isProfileOpen && (
                     <>
+                      {/* Invisible backdrop to capture outside clicks */}
                       <div
                         className="fixed inset-0 z-[99998]"
                         onClick={() => setIsProfileOpen(false)}
                       />
 
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                        initial={{ opacity: 0, scale: 0.98, y: 6 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                        exit={{ opacity: 0, scale: 0.98, y: 6 }}
                         transition={{ duration: 0.15, ease: "easeOut" }}
-                        className={`absolute top-[46px] right-0 w-64 rounded-2xl border p-1.5 z-[99999] shadow-2xl ${
+                        className={`absolute top-[60px] right-0 w-64 rounded-[32px] p-2 z-[99999] shadow-2xl border ${
                           isDarkMode
                             ? "bg-zinc-950/95 backdrop-blur-md border-white/[0.08] shadow-[0_10px_40px_rgba(0,0,0,0.5)]"
                             : "bg-white/95 backdrop-blur-md border-zinc-200/80 shadow-[0_10px_40px_rgba(0,0,0,0.06)]"
                         }`}
                       >
-                        <div className="p-1 space-y-0.5">
-                          {/* ANALYTICS TRANSFERRED INSIDE DROPDOWN HEADER */}
-                          <div className={`px-3 py-2 mb-1 flex items-center justify-between text-xs border-b ${
-                            isDarkMode ? "border-white/[0.04]" : "border-zinc-100"
-                          }`}>
-                            <span className={isDarkMode ? "text-zinc-500" : "text-zinc-400"}>Current Progress</span>
-                            <span className="text-orange-500 font-medium flex items-center gap-1">
-                              🔥 {currentStreak} Days
-                            </span>
+                        {/* Unified Profile Header inside Dropdown */}
+                        <div className="flex flex-col items-center text-center pt-4 pb-5 mb-2 border-b border-zinc-500/10">
+                          <div className={`w-14 h-14 rounded-full flex items-center justify-center overflow-hidden mb-3 ${isDarkMode ? "bg-white/5" : "bg-black/5"}`}>
+                            {userProfile?.avatar_url?.startsWith("http") ? (
+                              <img src={userProfile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                              <User size={20} className={isDarkMode ? "text-zinc-400" : "text-zinc-500"} />
+                            )}
                           </div>
+                          <p className={`text-[16px] font-semibold tracking-tight ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                            {userProfile?.full_name || "NexUP Pioneer"}
+                          </p>
+                          <p className="text-[13px] font-medium text-orange-500 mt-1 flex items-center gap-1">
+                            🔥 {currentStreak} Day Streak
+                          </p>
+                        </div>
 
+                        <div className="p-1 space-y-0.5">
                           {/* Profile Action */}
                           <button
                             onClick={() => {
                               handleNav("/profile");
                               setIsProfileOpen(false);
                             }}
-                            className={`w-full px-3 py-2 rounded-xl text-sm font-medium text-left flex items-center gap-3 transition-colors ${
+                            className={`w-full px-3 py-2.5 rounded-[20px] text-sm font-medium text-left flex items-center gap-3 transition-colors ${
                               isDarkMode 
                                 ? "text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100" 
                                 : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
                             }`}
                           >
-                            <User size={15} className={isDarkMode ? "text-zinc-400" : "text-zinc-500"} />
+                            <User size={16} className={isDarkMode ? "text-zinc-400" : "text-zinc-500"} />
                             Profile
                           </button>
 
@@ -225,24 +245,24 @@ export default function DesktopNav(props: DesktopNavProps) {
                               handleNav("/settings");
                               setIsProfileOpen(false);
                             }}
-                            className={`w-full px-3 py-2 rounded-xl text-sm font-medium text-left flex items-center gap-3 transition-colors ${
+                            className={`w-full px-3 py-2.5 rounded-[20px] text-sm font-medium text-left flex items-center gap-3 transition-colors ${
                               isDarkMode 
                                 ? "text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100" 
                                 : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
                             }`}
                           >
-                            <Settings size={15} className={isDarkMode ? "text-zinc-400" : "text-zinc-500"} />
+                            <Settings size={16} className={isDarkMode ? "text-zinc-400" : "text-zinc-500"} />
                             Settings
                           </button>
 
                           {/* Integrated Theme Toggle Row */}
                           <div
-                            className={`w-full px-3 py-1.5 rounded-xl text-sm font-medium flex items-center justify-between ${
+                            className={`w-full px-3 py-2 rounded-[20px] text-sm font-medium flex items-center justify-between ${
                               isDarkMode ? "text-zinc-300" : "text-zinc-600"
                             }`}
                           >
                             <div className="flex items-center gap-3">
-                              <Palette size={15} className={isDarkMode ? "text-zinc-400" : "text-zinc-500"} />
+                              <Palette size={16} className={isDarkMode ? "text-zinc-400" : "text-zinc-500"} />
                               <span>Appearance</span>
                             </div>
                             <div className="scale-90 origin-right">
@@ -251,7 +271,7 @@ export default function DesktopNav(props: DesktopNavProps) {
                           </div>
 
                           {/* Structural Partition Divider */}
-                          <div className={`h-[1px] my-1 ${isDarkMode ? "bg-white/[0.06]" : "bg-zinc-100"}`} />
+                          <div className={`h-[1px] my-1.5 ${isDarkMode ? "bg-white/[0.06]" : "bg-zinc-100"}`} />
 
                           {/* Log Out Action */}
                           <button
@@ -260,13 +280,13 @@ export default function DesktopNav(props: DesktopNavProps) {
                               setIsProfileOpen(false);
                               if (handleLogout) handleLogout();
                             }}
-                            className={`w-full px-3 py-2 rounded-xl text-sm font-medium text-left flex items-center gap-3 transition-colors ${
+                            className={`w-full px-3 py-2.5 rounded-[20px] text-sm font-medium text-left flex items-center gap-3 transition-colors ${
                               isDarkMode 
                                 ? "text-red-400 hover:bg-red-500/10 hover:text-red-300" 
                                 : "text-red-600 hover:bg-red-50 hover:text-red-700"
                             }`}
                           >
-                            <LogOut size={15} />
+                            <LogOut size={16} />
                             Log Out
                           </button>
                         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 import DesktopNav from "@/navigation/components/DesktopNav/DesktopNav";
@@ -29,32 +29,40 @@ export default function Navbar({
   const { currentUser } = useFocusSystem();
   const { currentStreak } = useNexCore();
 
-  const [userProfile, setUserProfile] = useState<any>(currentUser || null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const lastNavigationRef = useRef<number>(0);
 
+  // Profile Fallback: Always ensure we have at least the base user data to render
+  const mergedProfile = userProfile || currentUser;
+
+  // ─── CACHE & PROFILE LOADING ───
   useEffect(() => {
     if (!supabase || !currentUser?.id) return;
 
     let ignore = false;
+    const cacheKey = `nexspace_profile_${currentUser.id}`;
 
     const loadProfile = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", currentUser.id)
         .single();
 
-      if (!ignore && data) {
+      if (!ignore && data && !error) {
         setUserProfile(data);
-        localStorage.setItem("nexspace_profile", JSON.stringify(data));
+        localStorage.setItem(cacheKey, JSON.stringify(data));
       }
     };
 
-    const cached = localStorage.getItem("nexspace_profile");
-
+    // Attempt to load from user-specific cache first
+    const cached = localStorage.getItem(cacheKey);
     if (cached) {
       try {
         setUserProfile(JSON.parse(cached));
-      } catch {}
+      } catch (err) {
+        console.error("Failed to parse cached profile", err);
+      }
     }
 
     loadProfile();
@@ -64,9 +72,15 @@ export default function Navbar({
     };
   }, [supabase, currentUser]);
 
-  const handleLogout = async () => {
+  // ─── AUTHENTICATION ───
+  const handleLogout = useCallback(async () => {
     try {
       if (!supabase) return;
+      
+      // Clear user-specific cache to prevent leakage to next login
+      if (currentUser?.id) {
+        localStorage.removeItem(`nexspace_profile_${currentUser.id}`);
+      }
 
       await supabase.auth.signOut();
 
@@ -75,30 +89,41 @@ export default function Navbar({
     } catch (error) {
       console.error("Logout failed:", error);
     }
-  };
+  }, [supabase, currentUser, router]);
 
-  const handleNav = (path: string) => {
+  // ─── ROUTING & NAVIGATION GUARD ───
+  const handleNav = useCallback((path: string) => {
+    const now = Date.now();
+
+    // 300ms Cooldown to prevent rapid-fire mis-taps or duplicate edge swipes
+    if (now - lastNavigationRef.current < 300) {
+      return;
+    }
+    lastNavigationRef.current = now;
+
+    // Prevent duplicate pushes if already on the exact path
+    if (pathname === path) return;
+
     router.push(path);
-  };
+  }, [pathname, router]);
 
-  const activePaths = useMemo(
-    () => ({
-      isTasks: pathname === "/",
-      isFocus: pathname === "/focus",
-      isCalendar: pathname === "/Planner",
-      isDiary: pathname === "/diary",
-      isMini: pathname === "/Workspace",
-    }),
-    [pathname]
-  );
+  // Use startsWith for safer nested route matching, exact match for root
+  const activePaths = useMemo(() => ({
+    isTasks: pathname === "/",
+    isFocus: pathname.startsWith("/focus"),
+    isCalendar: pathname.startsWith("/Planner"),
+    isDiary: pathname.startsWith("/diary"),
+    isMini: pathname.startsWith("/Workspace"),
+  }), [pathname]);
 
-  const navProps = {
+  // ─── MEMOIZED PROPS ───
+  const navProps = useMemo(() => ({
     activePaths,
     handleNav,
     handleLogout,
-    userProfile,
+    userProfile: mergedProfile,
     currentStreak,
-  };
+  }), [activePaths, handleNav, handleLogout, mergedProfile, currentStreak]);
 
   return (
     <>
