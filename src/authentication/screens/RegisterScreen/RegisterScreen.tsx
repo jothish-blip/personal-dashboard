@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense, useRef, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { FaGithub, FaDiscord } from "react-icons/fa";
+import Image from "next/image";
 import { 
   Loader2, 
   Sun, 
@@ -179,43 +180,30 @@ function LandingExperience() {
   >
     <div className="relative h-[64px] sm:h-[70px] lg:h-[74px] 2xl:h-[82px] px-3 sm:px-5 md:px-6 lg:px-7 xl:px-8 flex items-center justify-between">
 
-      {/* Left: Logo */}
-      <div className="flex items-center gap-2 sm:gap-3 cursor-pointer select-none min-w-0">
-        <div
-          className={`relative w-10 h-10 sm:w-11 sm:h-11 lg:w-12 lg:h-12 rounded-[18px] sm:rounded-2xl flex items-center justify-center border overflow-hidden flex-shrink-0 ${
-            isDarkMode
-              ? "bg-white/[0.03] border-white/[0.08]"
-              : "bg-white border-zinc-200"
-          }`}
-        >
-          {/* subtle orange ambient */}
-          <div className="absolute inset-0 bg-orange-500/10 blur-xl" />
-
-          <img
-            src="/favicon.ico"
-            alt="NexSpace"
-            className="relative z-10 w-4 h-4 sm:w-5 sm:h-5 object-contain"
-          />
-        </div>
-
-        <div className="flex flex-col leading-none min-w-0">
-          <span
-            className={`font-semibold tracking-tight text-[14px] sm:text-[15px] lg:text-[16px] truncate ${
-              isDarkMode ? "text-white" : "text-zinc-900"
-            }`}
-          >
-            NexSpace
-          </span>
-
-          <span
-            className={`text-[10px] sm:text-[11px] font-medium truncate ${
-              isDarkMode ? "text-zinc-500" : "text-zinc-400"
-            }`}
-          >
-            Build consistency
-          </span>
-        </div>
-      </div>
+<div
+  onClick={() => router.push("/")}
+  className="flex items-center cursor-pointer select-none"
+>
+  <Image
+    src={isDarkMode ? "/logo-dark.png" : "/logo-light.png"}
+    alt="NexSpace"
+    width={600}
+    height={140}
+    priority
+    className={`
+      w-auto
+      object-contain
+      object-left
+      transition-all
+      duration-300
+      hover:scale-105
+      h-[140px]
+      sm:h-[160px]
+      lg:h-[180px]
+      ${isDarkMode ? "translate-y-2 sm:translate-y-2" : ""}
+    `}
+  />
+</div>
 
       {/* Center: subtle trust indicator */}
       <div

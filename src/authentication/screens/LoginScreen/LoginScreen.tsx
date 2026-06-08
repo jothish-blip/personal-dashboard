@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/theme/ThemeProvider";
 import { Moon, Sun, Loader2 } from "lucide-react";
 import { FaGithub, FaDiscord } from "react-icons/fa";
+import Image from "next/image";
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 48 48">
@@ -90,17 +91,34 @@ export default function LoginPage() {
       />
 
       {/* Focused Top Navigation */}
-      <nav className="absolute top-0 left-0 w-full px-6 sm:px-12 py-8 z-50 flex items-center justify-between">
+      <nav className="absolute top-0 left-0 w-full px-6 sm:px-12 py-5 z-50 flex items-center justify-between">
         
         {/* Left: Minimal Logo */}
         <div 
           onClick={() => router.push("/")}
           className="flex items-center gap-3 cursor-pointer group"
         >
-          <img src="/favicon.ico" className="w-8 h-8 group-hover:scale-105 transition-transform duration-500 ease-out" />
-          <div className="hidden sm:block">
-            <div className="font-semibold text-[14px] tracking-tight leading-tight">NexSpace</div>
-            <div className="text-[11px] text-zinc-500 font-medium tracking-wide">Build consistency</div>
+          <div
+            onClick={() => router.push("/")}
+            className="cursor-pointer group"
+          ><Image
+  src={isDarkMode ? "/logo-dark.png" : "/logo-light.png"}
+  alt="NexSpace"
+  width={280}
+  height={60}
+  priority
+  className="
+    h-10
+    sm:h-12
+    lg:h-14
+    xl:h-16
+    w-auto
+    object-contain
+    transition-transform
+    duration-300
+    group-hover:scale-105
+  "
+/>
           </div>
         </div>
 

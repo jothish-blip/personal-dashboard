@@ -65,47 +65,42 @@ export default function DesktopNav(props: DesktopNavProps) {
 
   return (
     <>
-      {/* FLAT 2030 SYSTEM WORKSTATION HEADER */}
+      {/* PURE BLACK WORKSTATION HEADER */}
       <div className="hidden md:block w-full px-4 lg:px-6 mt-4 relative z-[999] select-none">
         <div
-          className={`relative w-full max-w-[1800px] mx-auto rounded-[28px] transition-all duration-500 ${
+          className={`relative w-full max-w-[1800px] mx-auto rounded-[24px] transition-all duration-500 ${
             isDarkMode
-              ? "bg-black/[0.14] backdrop-blur-[28px] shadow-[0_10px_50px_rgba(0,0,0,0.3)]"
-              : "bg-white/50 backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,0.01)]"
+              ? "bg-[#000000] border border-white/[0.04] shadow-none"
+              : "bg-white border border-zinc-200/80 shadow-[0_8px_24px_rgba(0,0,0,0.01)]"
           }`}
-          style={{
-            backgroundImage: isDarkMode 
-              ? "linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))" 
-              : "none"
-          }}
         >
-          {/* Breathing Room: 76px */}
-          <div className="relative h-[76px] px-6 flex items-center justify-between">
+          {/* Expanded Breathing Room: 82px */}
+          <div className="relative h-[82px] px-6 flex items-center justify-between">
             
-            {/* LEFT: ARCHITECTURAL LOGO ONLY */}
+            {/* LEFT: CALIBRATED ARCHITECTURAL LOGO */}
             <div className="flex items-center flex-shrink-0">
               <div 
                 className="relative flex items-center cursor-pointer group"
                 onClick={() => handleNav("/")}
               >
-                {/* Subtle Orange Pulse for Dark Mode */}
+                {/* Ultra-subtle Environmental Contrast Ring */}
                 {isDarkMode && (
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] bg-orange-500/[0.08] blur-[40px] rounded-full pointer-events-none transition-opacity duration-500 group-hover:opacity-100 opacity-60" />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[130%] h-[130%] bg-orange-500/[0.03] blur-[32px] rounded-full pointer-events-none transition-opacity duration-500 group-hover:opacity-100 opacity-50" />
                 )}
                 
                 <Image
                   src={isDarkMode ? "/logo-dark.svg" : "/logo-light.svg"}
                   alt="NexSpace"
-                  width={220}
-                  height={48}
-                  className="relative z-10 h-[48px] w-auto object-contain object-left"
+                  width={280}
+                  height={70}
+                  className="relative z-10 h-[70px] w-auto object-contain object-left"
                   priority
                 />
               </div>
             </div>
 
-            {/* CENTER: MINIMAL TEXT-ONLY NAVIGATION LINKS */}
-            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+            {/* CENTER: HIGH-CONTRAST TYPOGRAPHIC NAVIGATION */}
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1">
               {DEFAULT_NAV_ITEMS.map((item) => {
                 const isActive = Boolean(safePaths[item.key]);
 
@@ -113,29 +108,37 @@ export default function DesktopNav(props: DesktopNavProps) {
                   <button
                     key={item.label}
                     onClick={() => handleNav(item.path)}
-                    // Subtle hover lift (translateY(-1px))
-                    className={`relative px-4 py-2 text-[14px] font-medium tracking-wide transition-all duration-200 hover:-translate-y-px whitespace-nowrap z-10 ${
+                    className={`relative px-4 py-2 text-[14px] font-medium tracking-wide transition-all duration-200 whitespace-nowrap z-10 ${
                       isActive
                         ? isDarkMode
-                          ? "text-orange-400"
-                          : "text-orange-600"
+                          ? "text-white"
+                          : "text-zinc-950"
                         : isDarkMode
-                        ? "text-zinc-400 hover:text-zinc-200"
-                        : "text-zinc-500 hover:text-zinc-800"
+                        ? "text-zinc-500 hover:text-white"
+                        : "text-zinc-400 hover:text-zinc-900"
                     }`}
                   >
                     <span className="relative z-10">{item.label}</span>
 
-                    {/* LIQUID ACTIVE PILL INDICATOR */}
+                    {/* REFINED ARCHITECTURAL PILL INDICATOR */}
                     {isActive && (
                       <motion.div
                         layoutId="desktop-active-pill"
-                        className={`absolute inset-0 rounded-full backdrop-blur-xl ${
+                        className={`absolute inset-0 rounded-full ${
                           isDarkMode 
-                            ? "bg-orange-500/12 border border-orange-500/10 shadow-[0_0_40px_rgba(249,115,22,0.15)]" 
-                            : "bg-orange-500/8"
+                            ? "bg-white/[0.03] border border-white/[0.05]" 
+                            : "bg-zinc-100 border border-zinc-200/50"
                         }`}
-                        transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                      />
+                    )}
+
+                    {/* HIGH-PRECISION REFINED ACTIVE SUB-DOT */}
+                    {isActive && (
+                      <motion.div 
+                        layoutId="desktop-active-dot"
+                        className="absolute bottom-[-2px] left-1/2 -translate-x-1/2 w-3 h-[1.5px] bg-orange-500 rounded-full"
+                        transition={{ type: "spring", stiffness: 400, damping: 32 }}
                       />
                     )}
                   </button>
@@ -146,96 +149,96 @@ export default function DesktopNav(props: DesktopNavProps) {
             {/* RIGHT: IDENTITY ANCHOR */}
             <div className="flex items-center gap-4">
               <div className="relative">
-                {/* Elevated z-index ensures button sits above the fixed backdrop for proper toggle logic */}
                 <button
                   onClick={() => setIsProfileOpen((prev) => !prev)}
-                  className={`relative z-[100000] flex items-center gap-3 px-2 py-1.5 pr-4 rounded-full transition-all duration-200 hover:scale-[1.02] ${
+                  className={`relative z-[100000] flex items-center gap-3 px-2 py-1.5 pr-4 rounded-full transition-all duration-200 ${
                     isDarkMode 
-                      ? "hover:bg-white/5" 
-                      : "hover:bg-black/5"
-                  } ${isProfileOpen ? (isDarkMode ? "bg-white/5" : "bg-black/5") : ""}`}
+                      ? "hover:bg-white/[0.02]" 
+                      : "hover:bg-black/[0.02]"
+                  } ${isProfileOpen ? (isDarkMode ? "bg-white/[0.02]" : "bg-black/[0.02]") : ""}`}
                 >
-                  <div className={`relative w-9 h-9 rounded-full overflow-hidden flex items-center justify-center shrink-0 ${
-                    isDarkMode ? "bg-white/5" : "bg-black/5"
+                  <div className={`relative w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0 border ${
+                    isDarkMode ? "bg-[#000000] border-white/[0.05]" : "bg-black/5 border-transparent"
                   }`}>
                     {userProfile?.avatar_url?.startsWith("http") ? (
                       <Image
                         src={userProfile.avatar_url}
                         alt="Profile"
-                        width={36}
-                        height={36}
+                        width={32}
+                        height={32}
                         className="object-cover w-full h-full"
                         unoptimized
                       />
                     ) : (
-                      <User size={15} className={isDarkMode ? "text-zinc-400" : "text-zinc-500"} />
+                      <User size={14} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
                     )}
                   </div>
 
-                  {/* Combined Name & Streak Identity */}
+                  {/* Combined Structural Identity */}
                   <div className="flex items-center gap-2">
-                    <span className={`text-[14px] font-medium tracking-wide ${isDarkMode ? "text-zinc-200" : "text-zinc-800"}`}>
+                    <span className={`text-[13px] font-medium tracking-wide ${isDarkMode ? "text-zinc-300" : "text-zinc-800"}`}>
                       {userProfile?.full_name?.split(" ")[0] || "Jothish"}
                     </span>
-                    <div className={`w-[1px] h-3 ${isDarkMode ? "bg-white/20" : "bg-black/20"}`} />
-                    <span className="text-[13px] font-bold text-orange-500 flex items-center gap-1">
+                    <div className={`w-[1px] h-2.5 ${isDarkMode ? "bg-white/[0.08]" : "bg-black/10"}`} />
+                    <span className="text-[12px] font-bold text-orange-500 flex items-center gap-0.5">
                       🔥 {currentStreak}
                     </span>
                   </div>
                 </button>
 
-                {/* WORKSTATION SYSTEM DROPDOWN */}
+                {/* SOLID PURE BLACK DROPDOWN SYSTEM */}
                 <AnimatePresence>
                   {isProfileOpen && (
                     <>
-                      {/* Invisible backdrop to capture outside clicks */}
                       <div
                         className="fixed inset-0 z-[99998]"
                         onClick={() => setIsProfileOpen(false)}
                       />
 
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.98, y: 6 }}
+                        initial={{ opacity: 0, scale: 0.98, y: 4 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.98, y: 6 }}
-                        transition={{ duration: 0.15, ease: "easeOut" }}
-                        className={`absolute top-[60px] right-0 w-64 rounded-[32px] p-2 z-[99999] shadow-2xl border ${
+                        exit={{ opacity: 0, scale: 0.98, y: 4 }}
+                        transition={{ duration: 0.12, ease: "easeOut" }}
+                        className={`absolute top-[54px] right-0 w-60 rounded-[20px] p-1.5 z-[99999] border shadow-none ${
                           isDarkMode
-                            ? "bg-zinc-950/95 backdrop-blur-md border-white/[0.08] shadow-[0_10px_40px_rgba(0,0,0,0.5)]"
-                            : "bg-white/95 backdrop-blur-md border-zinc-200/80 shadow-[0_10px_40px_rgba(0,0,0,0.06)]"
+                            ? "bg-[#000000] border-white/[0.06]"
+                            : "bg-white border-zinc-200/80"
                         }`}
                       >
-                        {/* Unified Profile Header inside Dropdown */}
-                        <div className="flex flex-col items-center text-center pt-4 pb-5 mb-2 border-b border-zinc-500/10">
-                          <div className={`w-14 h-14 rounded-full flex items-center justify-center overflow-hidden mb-3 ${isDarkMode ? "bg-white/5" : "bg-black/5"}`}>
+                        {/* Dropdown Header */}
+                        <div className="flex flex-col items-center text-center pt-3 pb-4 mb-1 border-b border-white/[0.04]">
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center overflow-hidden mb-2.5 border ${
+                            isDarkMode ? "bg-[#000000] border-white/[0.05]" : "bg-black/5 border-transparent"
+                          }`}>
                             {userProfile?.avatar_url?.startsWith("http") ? (
                               <img src={userProfile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                             ) : (
-                              <User size={20} className={isDarkMode ? "text-zinc-400" : "text-zinc-500"} />
+                              <User size={18} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
                             )}
                           </div>
-                          <p className={`text-[16px] font-semibold tracking-tight ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                          <p className={`text-[14px] font-semibold tracking-tight ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                             {userProfile?.full_name || "NexUP Pioneer"}
                           </p>
-                          <p className="text-[13px] font-medium text-orange-500 mt-1 flex items-center gap-1">
+                          <p className="text-[12px] font-medium text-orange-500 mt-0.5 flex items-center gap-0.5">
                             🔥 {currentStreak} Day Streak
                           </p>
                         </div>
 
-                        <div className="p-1 space-y-0.5">
+                        <div className="space-y-0.5">
                           {/* Profile Action */}
                           <button
                             onClick={() => {
                               handleNav("/profile");
                               setIsProfileOpen(false);
                             }}
-                            className={`w-full px-3 py-2.5 rounded-[20px] text-sm font-medium text-left flex items-center gap-3 transition-colors ${
+                            className={`w-full px-3 py-2 rounded-[14px] text-[13px] font-medium text-left flex items-center gap-3 transition-colors ${
                               isDarkMode 
-                                ? "text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100" 
-                                : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+                                ? "text-zinc-400 hover:bg-white/[0.02] hover:text-white" 
+                                : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
                             }`}
                           >
-                            <User size={16} className={isDarkMode ? "text-zinc-400" : "text-zinc-500"} />
+                            <User size={15} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
                             Profile
                           </button>
 
@@ -245,33 +248,33 @@ export default function DesktopNav(props: DesktopNavProps) {
                               handleNav("/settings");
                               setIsProfileOpen(false);
                             }}
-                            className={`w-full px-3 py-2.5 rounded-[20px] text-sm font-medium text-left flex items-center gap-3 transition-colors ${
+                            className={`w-full px-3 py-2 rounded-[14px] text-[13px] font-medium text-left flex items-center gap-3 transition-colors ${
                               isDarkMode 
-                                ? "text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100" 
-                                : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+                                ? "text-zinc-400 hover:bg-white/[0.02] hover:text-white" 
+                                : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
                             }`}
                           >
-                            <Settings size={16} className={isDarkMode ? "text-zinc-400" : "text-zinc-500"} />
+                            <Settings size={15} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
                             Settings
                           </button>
 
-                          {/* Integrated Theme Toggle Row */}
+                          {/* Theme Toggle Row */}
                           <div
-                            className={`w-full px-3 py-2 rounded-[20px] text-sm font-medium flex items-center justify-between ${
-                              isDarkMode ? "text-zinc-300" : "text-zinc-600"
+                            className={`w-full px-3 py-1.5 rounded-[14px] text-[13px] font-medium flex items-center justify-between ${
+                              isDarkMode ? "text-zinc-400" : "text-zinc-600"
                             }`}
                           >
                             <div className="flex items-center gap-3">
-                              <Palette size={16} className={isDarkMode ? "text-zinc-400" : "text-zinc-500"} />
+                              <Palette size={15} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
                               <span>Appearance</span>
                             </div>
-                            <div className="scale-90 origin-right">
+                            <div className="scale-75 origin-right">
                               <ThemeToggle />
                             </div>
                           </div>
 
                           {/* Structural Partition Divider */}
-                          <div className={`h-[1px] my-1.5 ${isDarkMode ? "bg-white/[0.06]" : "bg-zinc-100"}`} />
+                          <div className={`h-[1px] my-1 ${isDarkMode ? "bg-white/[0.04]" : "bg-zinc-100"}`} />
 
                           {/* Log Out Action */}
                           <button
@@ -280,13 +283,13 @@ export default function DesktopNav(props: DesktopNavProps) {
                               setIsProfileOpen(false);
                               if (handleLogout) handleLogout();
                             }}
-                            className={`w-full px-3 py-2.5 rounded-[20px] text-sm font-medium text-left flex items-center gap-3 transition-colors ${
+                            className={`w-full px-3 py-2 rounded-[14px] text-[13px] font-medium text-left flex items-center gap-3 transition-colors ${
                               isDarkMode 
-                                ? "text-red-400 hover:bg-red-500/10 hover:text-red-300" 
-                                : "text-red-600 hover:bg-red-50 hover:text-red-700"
+                                ? "text-red-400/90 hover:bg-red-500/[0.04] hover:text-red-400" 
+                                : "text-red-600 hover:bg-red-50/60 hover:text-red-700"
                             }`}
                           >
-                            <LogOut size={16} />
+                            <LogOut size={15} />
                             Log Out
                           </button>
                         </div>

@@ -32,10 +32,9 @@ export default function Navbar({
   const [userProfile, setUserProfile] = useState<any>(null);
   const lastNavigationRef = useRef<number>(0);
 
-  // Profile Fallback: Always ensure we have at least the base user data to render
   const mergedProfile = userProfile || currentUser;
 
-  // ─── CACHE & PROFILE LOADING ───
+  // ─── CACHE & PROFILE CONTAINER LOADING ───
   useEffect(() => {
     if (!supabase || !currentUser?.id) return;
 
@@ -55,7 +54,6 @@ export default function Navbar({
       }
     };
 
-    // Attempt to load from user-specific cache first
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       try {
@@ -72,12 +70,11 @@ export default function Navbar({
     };
   }, [supabase, currentUser]);
 
-  // ─── AUTHENTICATION ───
+  // ─── TERMINATE ACTIVE ENVIRONMENT SESSION ───
   const handleLogout = useCallback(async () => {
     try {
       if (!supabase) return;
       
-      // Clear user-specific cache to prevent leakage to next login
       if (currentUser?.id) {
         localStorage.removeItem(`nexspace_profile_${currentUser.id}`);
       }
@@ -87,27 +84,25 @@ export default function Navbar({
       router.replace("/login");
       router.refresh();
     } catch (error) {
-      console.error("Logout failed:", error);
+      console.error("Logout runtime error:", error);
     }
   }, [supabase, currentUser, router]);
 
-  // ─── ROUTING & NAVIGATION GUARD ───
+  // ─── SYSTEM-LEVEL NAVIGATION ROUTER GUARD ───
   const handleNav = useCallback((path: string) => {
     const now = Date.now();
 
-    // 300ms Cooldown to prevent rapid-fire mis-taps or duplicate edge swipes
+    // Balanced 300ms Cooldown to handle overlap safely
     if (now - lastNavigationRef.current < 300) {
       return;
     }
     lastNavigationRef.current = now;
 
-    // Prevent duplicate pushes if already on the exact path
     if (pathname === path) return;
 
     router.push(path);
   }, [pathname, router]);
 
-  // Use startsWith for safer nested route matching, exact match for root
   const activePaths = useMemo(() => ({
     isTasks: pathname === "/",
     isFocus: pathname.startsWith("/focus"),
@@ -116,7 +111,6 @@ export default function Navbar({
     isMini: pathname.startsWith("/Workspace"),
   }), [pathname]);
 
-  // ─── MEMOIZED PROPS ───
   const navProps = useMemo(() => ({
     activePaths,
     handleNav,
@@ -126,12 +120,12 @@ export default function Navbar({
   }), [activePaths, handleNav, handleLogout, mergedProfile, currentStreak]);
 
   return (
-    <>
-      {/* Desktop Navbar */}
+    <header className="w-full relative z-[50] select-none no-swipe">
+      {/* Desktop Shell Linkage */}
       <DesktopNav {...navProps} />
 
-      {/* Mobile Navbar */}
+      {/* Mobile Shell Linkage */}
       <MobileNav {...navProps} />
-    </>
+    </header>
   );
 }

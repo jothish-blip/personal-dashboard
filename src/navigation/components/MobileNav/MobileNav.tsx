@@ -133,15 +133,24 @@ export default function MobileNav(props: MobileNavProps) {
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] bg-orange-500/[0.08] blur-[30px] rounded-full pointer-events-none transition-opacity duration-500 group-hover:opacity-100 opacity-60" />
           )}
 
-          <Image
-            src={isDarkMode ? "/logo-dark.svg" : "/logo-light.svg"}
-            alt="NexSpace"
-            width={150}
-            height={36}
-            // mix-blend-multiply eliminates the white box issue in light mode without modifying the SVG
-            className={`relative z-10 h-[36px]   w-auto object-contain object-left ${!isDarkMode ? "mix-blend-multiply" : ""}`}
-            priority
-          />
+<Image
+  src={isDarkMode ? "/logo-dark.png" : "/logo-light.png"}
+  alt="NexSpace"
+  width={280}
+  height={80}
+  className="
+    relative z-10
+    h-[64px]
+    sm:h-[72px]
+    w-auto
+    object-contain
+    object-left
+    transition-transform
+    duration-300
+    group-hover:scale-105
+  "
+  priority
+/>
         </div>
 
         {/* Profile Avatar Trigger (Visible when dock is closed) */}
