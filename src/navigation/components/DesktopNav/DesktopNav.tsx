@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -39,19 +40,41 @@ export default function DesktopNav(props: DesktopNavProps) {
     handleNav = () => {},
     handleLogout = () => {},
     userProfile = null,
-    currentStreak = 42,
   } = props;
 
   const safePaths = activePaths || {};
   const { isDarkMode } = useTheme();
+  
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [dropdownCoords, setDropdownCoords] = useState({ top: 0, right: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
-  // Esc to close profile dropdown
+  // Ensure Portal only renders on the client
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsProfileOpen(false);
+    setMounted(true);
+  }, []);
+
+  // Handle Dropdown Positioning & Esc Key
+  useEffect(() => {
+    const updatePosition = () => {
+      if (buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        setDropdownCoords({
+          top: rect.bottom + 10, // 10px gap below button
+          right: window.innerWidth - rect.right,
+        });
       }
+    };
+
+    if (isProfileOpen) {
+      updatePosition();
+      // Recalculate on resize, or just close it to be safe
+      window.addEventListener("resize", () => setIsProfileOpen(false));
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsProfileOpen(false);
     };
 
     if (isProfileOpen) {
@@ -60,13 +83,14 @@ export default function DesktopNav(props: DesktopNavProps) {
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", () => setIsProfileOpen(false));
     };
   }, [isProfileOpen]);
 
   return (
     <>
       {/* PURE BLACK WORKSTATION HEADER */}
-      <div className="hidden md:block w-full px-4 lg:px-6 mt-4 relative z-[999] select-none">
+      <div className="hidden md:block w-full px-4 lg:px-6 mt-4 relative z-[1000] select-none">
         <div
           className={`relative w-full max-w-[1800px] mx-auto rounded-[24px] transition-all duration-500 ${
             isDarkMode
@@ -74,7 +98,6 @@ export default function DesktopNav(props: DesktopNavProps) {
               : "bg-white border border-zinc-200/80 shadow-[0_8px_24px_rgba(0,0,0,0.01)]"
           }`}
         >
-          {/* Expanded Breathing Room: 82px */}
           <div className="relative h-[82px] px-6 flex items-center justify-between">
             
             {/* LEFT: CALIBRATED ARCHITECTURAL LOGO */}
@@ -83,7 +106,6 @@ export default function DesktopNav(props: DesktopNavProps) {
                 className="relative flex items-center cursor-pointer group"
                 onClick={() => handleNav("/")}
               >
-                {/* Ultra-subtle Environmental Contrast Ring */}
                 {isDarkMode && (
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[130%] h-[130%] bg-orange-500/[0.03] blur-[32px] rounded-full pointer-events-none transition-opacity duration-500 group-hover:opacity-100 opacity-50" />
                 )}
@@ -120,7 +142,6 @@ export default function DesktopNav(props: DesktopNavProps) {
                   >
                     <span className="relative z-10">{item.label}</span>
 
-                    {/* REFINED ARCHITECTURAL PILL INDICATOR */}
                     {isActive && (
                       <motion.div
                         layoutId="desktop-active-pill"
@@ -133,7 +154,6 @@ export default function DesktopNav(props: DesktopNavProps) {
                       />
                     )}
 
-                    {/* HIGH-PRECISION REFINED ACTIVE SUB-DOT */}
                     {isActive && (
                       <motion.div 
                         layoutId="desktop-active-dot"
@@ -148,161 +168,163 @@ export default function DesktopNav(props: DesktopNavProps) {
 
             {/* RIGHT: IDENTITY ANCHOR */}
             <div className="flex items-center gap-4">
-              <div className="relative">
-                <button
-                  onClick={() => setIsProfileOpen((prev) => !prev)}
-                  className={`relative z-[100000] flex items-center gap-3 px-2 py-1.5 pr-4 rounded-full transition-all duration-200 ${
-                    isDarkMode 
-                      ? "hover:bg-white/[0.02]" 
-                      : "hover:bg-black/[0.02]"
-                  } ${isProfileOpen ? (isDarkMode ? "bg-white/[0.02]" : "bg-black/[0.02]") : ""}`}
-                >
-                  <div className={`relative w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0 border ${
-                    isDarkMode ? "bg-[#000000] border-white/[0.05]" : "bg-black/5 border-transparent"
-                  }`}>
-                    {userProfile?.avatar_url?.startsWith("http") ? (
-                      <Image
-                        src={userProfile.avatar_url}
-                        alt="Profile"
-                        width={32}
-                        height={32}
-                        className="object-cover w-full h-full"
-                        unoptimized
-                      />
-                    ) : (
-                      <User size={14} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
-                    )}
-                  </div>
-
-                  {/* Combined Structural Identity */}
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[13px] font-medium tracking-wide ${isDarkMode ? "text-zinc-300" : "text-zinc-800"}`}>
-                      {userProfile?.full_name?.split(" ")[0] || "Jothish"}
-                    </span>
-                    <div className={`w-[1px] h-2.5 ${isDarkMode ? "bg-white/[0.08]" : "bg-black/10"}`} />
-                    <span className="text-[12px] font-bold text-orange-500 flex items-center gap-0.5">
-                      🔥 {currentStreak}
-                    </span>
-                  </div>
-                </button>
-
-                {/* SOLID PURE BLACK DROPDOWN SYSTEM */}
-                <AnimatePresence>
-                  {isProfileOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-[99998]"
-                        onClick={() => setIsProfileOpen(false)}
-                      />
-
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.98, y: 4 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.98, y: 4 }}
-                        transition={{ duration: 0.12, ease: "easeOut" }}
-                        className={`absolute top-[54px] right-0 w-60 rounded-[20px] p-1.5 z-[99999] border shadow-none ${
-                          isDarkMode
-                            ? "bg-[#000000] border-white/[0.06]"
-                            : "bg-white border-zinc-200/80"
-                        }`}
-                      >
-                        {/* Dropdown Header */}
-                        <div className="flex flex-col items-center text-center pt-3 pb-4 mb-1 border-b border-white/[0.04]">
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center overflow-hidden mb-2.5 border ${
-                            isDarkMode ? "bg-[#000000] border-white/[0.05]" : "bg-black/5 border-transparent"
-                          }`}>
-                            {userProfile?.avatar_url?.startsWith("http") ? (
-                              <img src={userProfile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                            ) : (
-                              <User size={18} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
-                            )}
-                          </div>
-                          <p className={`text-[14px] font-semibold tracking-tight ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                            {userProfile?.full_name || "NexUP Pioneer"}
-                          </p>
-                          <p className="text-[12px] font-medium text-orange-500 mt-0.5 flex items-center gap-0.5">
-                            🔥 {currentStreak} Day Streak
-                          </p>
-                        </div>
-
-                        <div className="space-y-0.5">
-                          {/* Profile Action */}
-                          <button
-                            onClick={() => {
-                              handleNav("/profile");
-                              setIsProfileOpen(false);
-                            }}
-                            className={`w-full px-3 py-2 rounded-[14px] text-[13px] font-medium text-left flex items-center gap-3 transition-colors ${
-                              isDarkMode 
-                                ? "text-zinc-400 hover:bg-white/[0.02] hover:text-white" 
-                                : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-                            }`}
-                          >
-                            <User size={15} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
-                            Profile
-                          </button>
-
-                          {/* Settings Action */}
-                          <button
-                            onClick={() => {
-                              handleNav("/settings");
-                              setIsProfileOpen(false);
-                            }}
-                            className={`w-full px-3 py-2 rounded-[14px] text-[13px] font-medium text-left flex items-center gap-3 transition-colors ${
-                              isDarkMode 
-                                ? "text-zinc-400 hover:bg-white/[0.02] hover:text-white" 
-                                : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-                            }`}
-                          >
-                            <Settings size={15} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
-                            Settings
-                          </button>
-
-                          {/* Theme Toggle Row */}
-                          <div
-                            className={`w-full px-3 py-1.5 rounded-[14px] text-[13px] font-medium flex items-center justify-between ${
-                              isDarkMode ? "text-zinc-400" : "text-zinc-600"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Palette size={15} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
-                              <span>Appearance</span>
-                            </div>
-                            <div className="scale-75 origin-right">
-                              <ThemeToggle />
-                            </div>
-                          </div>
-
-                          {/* Structural Partition Divider */}
-                          <div className={`h-[1px] my-1 ${isDarkMode ? "bg-white/[0.04]" : "bg-zinc-100"}`} />
-
-                          {/* Log Out Action */}
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setIsProfileOpen(false);
-                              if (handleLogout) handleLogout();
-                            }}
-                            className={`w-full px-3 py-2 rounded-[14px] text-[13px] font-medium text-left flex items-center gap-3 transition-colors ${
-                              isDarkMode 
-                                ? "text-red-400/90 hover:bg-red-500/[0.04] hover:text-red-400" 
-                                : "text-red-600 hover:bg-red-50/60 hover:text-red-700"
-                            }`}
-                          >
-                            <LogOut size={15} />
-                            Log Out
-                          </button>
-                        </div>
-                      </motion.div>
-                    </>
+              <button
+                ref={buttonRef}
+                onClick={() => setIsProfileOpen((prev) => !prev)}
+                className={`relative flex items-center gap-3 px-2 py-1.5 pr-4 rounded-full transition-all duration-200 ${
+                  isDarkMode 
+                    ? "hover:bg-white/[0.02]" 
+                    : "hover:bg-black/[0.02]"
+                } ${isProfileOpen ? (isDarkMode ? "bg-white/[0.02]" : "bg-black/[0.02]") : ""}`}
+              >
+                <div className={`relative w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0 border ${
+                  isDarkMode ? "bg-[#000000] border-white/[0.05]" : "bg-black/5 border-transparent"
+                }`}>
+                  {userProfile?.avatar_url?.startsWith("http") ? (
+                    <Image
+                      src={userProfile.avatar_url}
+                      alt="Profile"
+                      width={32}
+                      height={32}
+                      className="object-cover w-full h-full"
+                      unoptimized
+                    />
+                  ) : (
+                    <User size={14} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
                   )}
-                </AnimatePresence>
-              </div>
-            </div>
+                </div>
 
+                <div className="flex items-center gap-2">
+                  <span className={`text-[13px] font-medium tracking-wide ${isDarkMode ? "text-zinc-300" : "text-zinc-800"}`}>
+                    {userProfile?.full_name?.split(" ")[0] || "User"}
+                  </span>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* PORTAL RENDERED DROPDOWN */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {isProfileOpen && (
+            <>
+              {/* BACKDROP */}
+              <div
+                className="fixed inset-0 z-[99998]"
+                onClick={() => setIsProfileOpen(false)}
+              />
+
+              {/* DROPDOWN MENU */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: -4 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                style={{ 
+                  position: 'fixed',
+                  top: `${dropdownCoords.top}px`,
+                  right: `${dropdownCoords.right}px`
+                }}
+                className={`w-[260px] rounded-[24px] p-2 z-[99999] border ${
+                  isDarkMode
+                    ? "bg-[#000000] border-white/[0.05] shadow-[0_32px_100px_rgba(0,0,0,0.85)]"
+                    : "bg-white border-zinc-200 shadow-[0_24px_80px_rgba(0,0,0,0.12)]"
+                }`}
+              >
+                {/* 1. Identity Section - Centered */}
+                <div className="flex flex-col items-center justify-center pt-4 pb-3">
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center overflow-hidden shrink-0 border mb-3 ${
+                    isDarkMode ? "bg-[#000000] border-white/[0.05]" : "bg-black/5 border-transparent"
+                  }`}>
+                    {userProfile?.avatar_url?.startsWith("http") ? (
+                      <img src={userProfile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <User size={20} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
+                    )}
+                  </div>
+                  <p className={`text-[15px] font-semibold tracking-tight ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                    {userProfile?.full_name || "NexUP Pioneer"}
+                  </p>
+                </div>
+
+                <div className={`h-[1px] mx-2 mb-2 ${isDarkMode ? "bg-white/[0.05]" : "bg-zinc-100"}`} />
+
+                {/* 2. Navigation Actions */}
+                <div className="space-y-0.5 mb-2">
+                  <button
+                    onClick={() => {
+                      handleNav("/profile");
+                      setIsProfileOpen(false);
+                    }}
+                    className={`w-full px-3 py-2.5 rounded-[14px] text-[13.5px] font-medium text-left flex items-center gap-3 transition-colors ${
+                      isDarkMode 
+                        ? "text-zinc-400 hover:bg-white/[0.03] hover:text-white" 
+                        : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                    }`}
+                  >
+                    <User size={16} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
+                    Profile
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleNav("/settings");
+                      setIsProfileOpen(false);
+                    }}
+                    className={`w-full px-3 py-2.5 rounded-[14px] text-[13.5px] font-medium text-left flex items-center gap-3 transition-colors ${
+                      isDarkMode 
+                        ? "text-zinc-400 hover:bg-white/[0.03] hover:text-white" 
+                        : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                    }`}
+                  >
+                    <Settings size={16} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
+                    Settings
+                  </button>
+
+                  <div className={`w-full px-3 py-2 rounded-[14px] text-[13.5px] font-medium flex items-center justify-between transition-colors ${
+                    isDarkMode 
+                      ? "text-zinc-400 hover:bg-white/[0.03]" 
+                      : "text-zinc-600 hover:bg-zinc-50"
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <Palette size={16} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
+                      <span>Appearance</span>
+                    </div>
+                    <div className="scale-75 origin-right">
+                      <ThemeToggle />
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`h-[1px] mx-2 my-2 ${isDarkMode ? "bg-white/[0.05]" : "bg-zinc-100"}`} />
+
+                {/* 3. Log Out */}
+                <div>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setIsProfileOpen(false);
+                      if (handleLogout) handleLogout();
+                    }}
+                    className={`w-full px-3 py-2.5 rounded-[14px] text-[13.5px] font-medium text-left flex items-center gap-3 transition-colors ${
+                      isDarkMode 
+                        ? "text-red-400/90 hover:bg-white/[0.03] hover:text-red-400" 
+                        : "text-red-600 hover:bg-red-50 hover:text-red-700"
+                    }`}
+                  >
+                    <LogOut size={16} />
+                    Log Out
+                  </button>
+                </div>
+
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </>
   );
 }
