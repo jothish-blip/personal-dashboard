@@ -16,7 +16,6 @@ export default function ServiceWorkerRegister() {
 
   // 2. Auth Listener with explicit types to satisfy TS
   useEffect(() => {
-    // 🔥 FIX: Check if supabase exists before running auth logic
     if (!supabase) return;
 
     const checkUser = async () => {
@@ -35,31 +34,16 @@ export default function ServiceWorkerRegister() {
   }, [supabase]);
 
   useEffect(() => {
-    // 3. REGISTER OS SERVICE WORKER
-    if ("serviceWorker" in navigator) {
-      const registerSW = async () => {
-        try {
-          await navigator.serviceWorker.register("/sw.js");
-        } catch (err) {
-          console.error("Service Worker registration failed:", err);
-        }
-      };
-
-      if (document.readyState === "complete") {
-        registerSW();
-      } else {
-        window.addEventListener("load", registerSW);
-      }
-    }
-
-    // ✅ Wait for user to be logged in before starting intelligent tracking
+    // FIX 1: Removed duplicate navigator.serviceWorker.register("/sw.js") from here.
+    
+    // Wait for user to be logged in before starting intelligent tracking
     if (!userId) return;
 
-    // 4. START INACTIVITY ENGINE & TRACKER
-    initActivityTracker(); // 🔥 Listens to mouse/keyboard to track idle time
-    startInactivityEngine(addNotification); // 🔥 Passes DB link so it can push UI notifications
+    // 3. START INACTIVITY ENGINE & TRACKER
+    initActivityTracker();
+    startInactivityEngine(addNotification); 
 
-    // 5. START PLANNER ENGINE
+    // 4. START PLANNER ENGINE
     const plannerTimer = setInterval(() => {
       try {
         const raw = localStorage.getItem("taskflow_planner_v1");
@@ -75,7 +59,6 @@ export default function ServiceWorkerRegister() {
           const eventTime = new Date(`${event.date}T${event.time}`).getTime();
           const diff = eventTime - now;
 
-          // 🔥 Reminders delegated to centralized Brain
           if (diff <= 3600000 && diff > 2400000) {
             handlePlannerEvent(addNotification, event, "1h");
           }

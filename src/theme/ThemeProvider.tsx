@@ -49,7 +49,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // 2. Listen for System Theme Changes
     const handleChange = (e: MediaQueryListEvent) => {
       const currentStored = window.localStorage.getItem(THEME_STORAGE_KEY);
-      // ONLY update if the user hasn't manually overridden it (i.e., they are in system mode)
       if (!currentStored) {
         const newSystemTheme = e.matches ? "dark" : "light";
         setTheme(newSystemTheme);
@@ -89,7 +88,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setTheme((prev) => {
       const newTheme = prev === "dark" ? "light" : "dark";
       
-      // Update both the mode and actual theme
       setThemeModeState(newTheme);
       window.localStorage.setItem(THEME_STORAGE_KEY, newTheme);
       applyThemeToDOM(newTheme);
@@ -113,9 +111,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [theme, themeMode]
   );
 
-  // Prevent hydration mismatch on initial render
+  // Prevent wiping the DOM tree during hydration
   if (!mounted) {
-    return null; 
+    return (
+      <ThemeContext.Provider
+        value={{
+          theme: "light",
+          themeMode: "system",
+          isDarkMode: false,
+          toggleTheme: () => {},
+          setThemeMode: () => {},
+        }}
+      >
+        {children}
+      </ThemeContext.Provider>
+    );
   }
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

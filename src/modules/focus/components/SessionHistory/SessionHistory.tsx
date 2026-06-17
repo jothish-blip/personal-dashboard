@@ -70,13 +70,13 @@ export default function SessionHistory() {
     
     if (isDeepWork) {
       if (distractionCount <= 2) return { label: "Deep Focus", style: isDark ? "bg-emerald-950/30 text-emerald-400 border border-emerald-900/50" : "bg-emerald-50 text-emerald-700 border border-emerald-200" };
-      if (distractionCount <= 6) return { label: "Stable", style: isDark ? "bg-blue-950/30 text-blue-400 border border-blue-900/50" : "bg-blue-50 text-blue-700 border border-blue-200" };
-      if (distractionCount <= 10) return { label: "Attention Shifted", style: isDark ? "bg-orange-950/30 text-orange-400 border border-orange-900/50" : "bg-orange-50 text-orange-700 border border-orange-200" };
+      if (distractionCount <= 4) return { label: "Stable", style: isDark ? "bg-blue-950/30 text-blue-400 border border-blue-900/50" : "bg-blue-50 text-blue-700 border border-blue-200" };
+      if (distractionCount <= 5) return { label: "Attention Shifted", style: isDark ? "bg-orange-950/30 text-orange-400 border border-orange-900/50" : "bg-orange-50 text-orange-700 border border-orange-200" };
       return { label: "Interrupted", style: isDark ? "bg-red-950/30 text-red-400 border border-red-900/50" : "bg-red-50 text-red-700 border border-red-200" };
     } else {
       if (distractionCount === 0) return { label: "Deep Focus", style: isDark ? "bg-emerald-950/30 text-emerald-400 border border-emerald-900/50" : "bg-emerald-50 text-emerald-700 border border-emerald-200" };
       if (distractionCount <= 3) return { label: "Stable", style: isDark ? "bg-blue-950/30 text-blue-400 border border-blue-900/50" : "bg-blue-50 text-blue-700 border border-blue-200" };
-      if (distractionCount <= 6) return { label: "Attention Shifted", style: isDark ? "bg-orange-950/30 text-orange-400 border border-orange-900/50" : "bg-orange-50 text-orange-700 border border-orange-200" };
+      if (distractionCount <= 5) return { label: "Attention Shifted", style: isDark ? "bg-orange-950/30 text-orange-400 border border-orange-900/50" : "bg-orange-50 text-orange-700 border border-orange-200" };
       return { label: "Interrupted", style: isDark ? "bg-red-950/30 text-red-400 border border-red-900/50" : "bg-red-50 text-red-700 border border-red-200" };
     }
   };

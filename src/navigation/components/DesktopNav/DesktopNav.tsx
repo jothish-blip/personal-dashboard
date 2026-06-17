@@ -27,11 +27,36 @@ interface DesktopNavProps {
 }
 
 const DEFAULT_NAV_ITEMS = [
-  { label: "Tasks", path: "/", key: "isTasks" },
-  { label: "Focus", path: "/focus", key: "isFocus" },
-  { label: "Planner", path: "/Planner", key: "isCalendar" },
-  { label: "Journal", path: "/diary", key: "isDiary" },
-  { label: "Workspace", path: "/Workspace", key: "isMini" },
+  {
+    label: "Tasks",
+    tooltip: "Execution Engine",
+    path: "/",
+    key: "isTasks",
+  },
+  {
+    label: "Focus",
+    tooltip: "Deep Work System",
+    path: "/focus",
+    key: "isFocus",
+  },
+  {
+    label: "Planner",
+    tooltip: "Strategic Intelligence",
+    path: "/Planner",
+    key: "isCalendar",
+  },
+  {
+    label: "Journal",
+    tooltip: "Reflection Archive",
+    path: "/diary",
+    key: "isDiary",
+  },
+  {
+    label: "Workspace",
+    tooltip: "Operations Dashboard",
+    path: "/Workspace",
+    key: "isMini",
+  },
 ];
 
 export default function DesktopNav(props: DesktopNavProps) {
@@ -49,47 +74,68 @@ export default function DesktopNav(props: DesktopNavProps) {
   const [mounted, setMounted] = useState(false);
   const [dropdownCoords, setDropdownCoords] = useState({ top: 0, right: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const navigatingRef = useRef(false);
 
-  // Ensure Portal only renders on the client
+  // Safe navigation lock to prevent spam clicking
+  const safeNavigate = (path: string) => {
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
+    handleNav(path);
+    setTimeout(() => {
+      navigatingRef.current = false;
+    }, 300);
+  };
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Handle Dropdown Positioning & Esc Key
+  // Handle Keyboard Shortcuts
+  useEffect(() => {
+    const handleShortcuts = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        const num = parseInt(e.key);
+        if (num >= 1 && num <= DEFAULT_NAV_ITEMS.length) {
+          e.preventDefault();
+          safeNavigate(DEFAULT_NAV_ITEMS[num - 1].path);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleShortcuts);
+    return () => window.removeEventListener("keydown", handleShortcuts);
+  }, []);
+
+  // Handle Dropdown Positioning & Esc/Resize Events
   useEffect(() => {
     const updatePosition = () => {
       if (buttonRef.current) {
         const rect = buttonRef.current.getBoundingClientRect();
         setDropdownCoords({
-          top: rect.bottom + 10, // 10px gap below button
+          top: rect.bottom + 10,
           right: window.innerWidth - rect.right,
         });
       }
     };
 
-    if (isProfileOpen) {
-      updatePosition();
-      // Recalculate on resize, or just close it to be safe
-      window.addEventListener("resize", () => setIsProfileOpen(false));
-    }
-
+    const handleResize = () => setIsProfileOpen(false);
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setIsProfileOpen(false);
     };
 
     if (isProfileOpen) {
+      updatePosition();
+      window.addEventListener("resize", handleResize);
       window.addEventListener("keydown", handleKeyDown);
     }
 
     return () => {
+      window.removeEventListener("resize", handleResize);
       window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("resize", () => setIsProfileOpen(false));
     };
   }, [isProfileOpen]);
 
   return (
     <>
-      {/* PURE BLACK WORKSTATION HEADER */}
       <div className="hidden md:block w-full px-4 lg:px-6 mt-4 relative z-[1000] select-none">
         <div
           className={`relative w-full max-w-[1800px] mx-auto rounded-[24px] transition-all duration-500 ${
@@ -100,16 +146,14 @@ export default function DesktopNav(props: DesktopNavProps) {
         >
           <div className="relative h-[82px] px-6 flex items-center justify-between">
             
-            {/* LEFT: CALIBRATED ARCHITECTURAL LOGO */}
             <div className="flex items-center flex-shrink-0">
               <div 
                 className="relative flex items-center cursor-pointer group"
-                onClick={() => handleNav("/")}
+                onClick={() => safeNavigate("/")}
               >
                 {isDarkMode && (
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[130%] h-[130%] bg-orange-500/[0.03] blur-[32px] rounded-full pointer-events-none transition-opacity duration-500 group-hover:opacity-100 opacity-50" />
                 )}
-                
                 <Image
                   src={isDarkMode ? "/logo-dark.svg" : "/logo-light.svg"}
                   alt="NexSpace"
@@ -121,7 +165,6 @@ export default function DesktopNav(props: DesktopNavProps) {
               </div>
             </div>
 
-            {/* CENTER: HIGH-CONTRAST TYPOGRAPHIC NAVIGATION */}
             <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1">
               {DEFAULT_NAV_ITEMS.map((item) => {
                 const isActive = Boolean(safePaths[item.key]);
@@ -129,26 +172,29 @@ export default function DesktopNav(props: DesktopNavProps) {
                 return (
                   <button
                     key={item.label}
-                    onClick={() => handleNav(item.path)}
-                    className={`relative px-4 py-2 text-[14px] font-medium tracking-wide transition-all duration-200 whitespace-nowrap z-10 ${
+                    onClick={() => safeNavigate(item.path)}
+                    className={`relative group px-4 py-2 text-[14px] font-medium tracking-wide transition-all duration-200 whitespace-nowrap z-10 ${
                       isActive
-                        ? isDarkMode
-                          ? "text-white"
-                          : "text-zinc-950"
-                        : isDarkMode
-                        ? "text-zinc-500 hover:text-white"
-                        : "text-zinc-400 hover:text-zinc-900"
+                        ? isDarkMode ? "text-white" : "text-zinc-950"
+                        : isDarkMode ? "text-zinc-500 hover:text-white" : "text-zinc-400 hover:text-zinc-900"
                     }`}
                   >
                     <span className="relative z-10">{item.label}</span>
+
+                    {/* Desktop Hover Tooltip */}
+                    <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1 rounded-md text-[11px] font-medium tracking-wider whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${
+                      isDarkMode ? "bg-zinc-800 text-zinc-300 border border-white/5" : "bg-zinc-800 text-white shadow-md"
+                    }`}>
+                      {item.tooltip}
+                    </div>
 
                     {isActive && (
                       <motion.div
                         layoutId="desktop-active-pill"
                         className={`absolute inset-0 rounded-full ${
                           isDarkMode 
-                            ? "bg-white/[0.03] border border-white/[0.05]" 
-                            : "bg-zinc-100 border border-zinc-200/50"
+                            ? "bg-white/[0.03] border border-white/[0.05] shadow-[0_0_30px_rgba(249,115,22,0.08)]" 
+                            : "bg-zinc-100 border border-zinc-200/50 shadow-[0_0_20px_rgba(249,115,22,0.05)]"
                         }`}
                         transition={{ type: "spring", stiffness: 400, damping: 32 }}
                       />
@@ -166,15 +212,12 @@ export default function DesktopNav(props: DesktopNavProps) {
               })}
             </div>
 
-            {/* RIGHT: IDENTITY ANCHOR */}
             <div className="flex items-center gap-4">
               <button
                 ref={buttonRef}
                 onClick={() => setIsProfileOpen((prev) => !prev)}
                 className={`relative flex items-center gap-3 px-2 py-1.5 pr-4 rounded-full transition-all duration-200 ${
-                  isDarkMode 
-                    ? "hover:bg-white/[0.02]" 
-                    : "hover:bg-black/[0.02]"
+                  isDarkMode ? "hover:bg-white/[0.02]" : "hover:bg-black/[0.02]"
                 } ${isProfileOpen ? (isDarkMode ? "bg-white/[0.02]" : "bg-black/[0.02]") : ""}`}
               >
                 <div className={`relative w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0 border ${
@@ -193,7 +236,6 @@ export default function DesktopNav(props: DesktopNavProps) {
                     <User size={14} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
                   )}
                 </div>
-
                 <div className="flex items-center gap-2">
                   <span className={`text-[13px] font-medium tracking-wide ${isDarkMode ? "text-zinc-300" : "text-zinc-800"}`}>
                     {userProfile?.full_name?.split(" ")[0] || "User"}
@@ -210,13 +252,10 @@ export default function DesktopNav(props: DesktopNavProps) {
         <AnimatePresence>
           {isProfileOpen && (
             <>
-              {/* BACKDROP */}
               <div
                 className="fixed inset-0 z-[99998]"
                 onClick={() => setIsProfileOpen(false)}
               />
-
-              {/* DROPDOWN MENU */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.96, y: -4 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -233,7 +272,6 @@ export default function DesktopNav(props: DesktopNavProps) {
                     : "bg-white border-zinc-200 shadow-[0_24px_80px_rgba(0,0,0,0.12)]"
                 }`}
               >
-                {/* 1. Identity Section - Centered */}
                 <div className="flex flex-col items-center justify-center pt-4 pb-3">
                   <div className={`w-14 h-14 rounded-full flex items-center justify-center overflow-hidden shrink-0 border mb-3 ${
                     isDarkMode ? "bg-[#000000] border-white/[0.05]" : "bg-black/5 border-transparent"
@@ -251,17 +289,14 @@ export default function DesktopNav(props: DesktopNavProps) {
 
                 <div className={`h-[1px] mx-2 mb-2 ${isDarkMode ? "bg-white/[0.05]" : "bg-zinc-100"}`} />
 
-                {/* 2. Navigation Actions */}
                 <div className="space-y-0.5 mb-2">
                   <button
                     onClick={() => {
-                      handleNav("/profile");
+                      safeNavigate("/profile");
                       setIsProfileOpen(false);
                     }}
                     className={`w-full px-3 py-2.5 rounded-[14px] text-[13.5px] font-medium text-left flex items-center gap-3 transition-colors ${
-                      isDarkMode 
-                        ? "text-zinc-400 hover:bg-white/[0.03] hover:text-white" 
-                        : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                      isDarkMode ? "text-zinc-400 hover:bg-white/[0.03] hover:text-white" : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
                     }`}
                   >
                     <User size={16} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
@@ -270,13 +305,11 @@ export default function DesktopNav(props: DesktopNavProps) {
 
                   <button
                     onClick={() => {
-                      handleNav("/settings");
+                      safeNavigate("/settings");
                       setIsProfileOpen(false);
                     }}
                     className={`w-full px-3 py-2.5 rounded-[14px] text-[13.5px] font-medium text-left flex items-center gap-3 transition-colors ${
-                      isDarkMode 
-                        ? "text-zinc-400 hover:bg-white/[0.03] hover:text-white" 
-                        : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                      isDarkMode ? "text-zinc-400 hover:bg-white/[0.03] hover:text-white" : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
                     }`}
                   >
                     <Settings size={16} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
@@ -284,9 +317,7 @@ export default function DesktopNav(props: DesktopNavProps) {
                   </button>
 
                   <div className={`w-full px-3 py-2 rounded-[14px] text-[13.5px] font-medium flex items-center justify-between transition-colors ${
-                    isDarkMode 
-                      ? "text-zinc-400 hover:bg-white/[0.03]" 
-                      : "text-zinc-600 hover:bg-zinc-50"
+                    isDarkMode ? "text-zinc-400 hover:bg-white/[0.03]" : "text-zinc-600 hover:bg-zinc-50"
                   }`}>
                     <div className="flex items-center gap-3">
                       <Palette size={16} className={isDarkMode ? "text-zinc-500" : "text-zinc-400"} />
@@ -300,7 +331,6 @@ export default function DesktopNav(props: DesktopNavProps) {
 
                 <div className={`h-[1px] mx-2 my-2 ${isDarkMode ? "bg-white/[0.05]" : "bg-zinc-100"}`} />
 
-                {/* 3. Log Out */}
                 <div>
                   <button
                     onClick={(e) => {
@@ -309,16 +339,13 @@ export default function DesktopNav(props: DesktopNavProps) {
                       if (handleLogout) handleLogout();
                     }}
                     className={`w-full px-3 py-2.5 rounded-[14px] text-[13.5px] font-medium text-left flex items-center gap-3 transition-colors ${
-                      isDarkMode 
-                        ? "text-red-400/90 hover:bg-white/[0.03] hover:text-red-400" 
-                        : "text-red-600 hover:bg-red-50 hover:text-red-700"
+                      isDarkMode ? "text-red-400/90 hover:bg-white/[0.03] hover:text-red-400" : "text-red-600 hover:bg-red-50 hover:text-red-700"
                     }`}
                   >
                     <LogOut size={16} />
                     Log Out
                   </button>
                 </div>
-
               </motion.div>
             </>
           )}

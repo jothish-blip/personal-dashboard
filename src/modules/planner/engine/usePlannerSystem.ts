@@ -230,8 +230,20 @@ export function usePlannerSystem() {
   useEffect(() => {
     if (!supabase || !currentUser) return;
 
-    const channel = supabase
-      .channel(`planner-${currentUser.id}`)
+    const channelName = `planner-${currentUser.id}`;
+
+    // FIX: Clear out existing channels caught in React 18 Strict Mode
+    const existingChannels = supabase.getChannels();
+    existingChannels.forEach((c) => {
+      if (c.topic === `realtime:${channelName}`) {
+        supabase.removeChannel(c);
+      }
+    });
+
+    // Create a fresh channel and chain listeners before subscribe
+    const channel = supabase.channel(channelName);
+
+    channel
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "planner_events", filter: `user_id=eq.${currentUser.id}` },
@@ -271,7 +283,9 @@ export function usePlannerSystem() {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { 
+      supabase.removeChannel(channel); 
+    };
   }, [supabase, currentUser]);
 
   // --- RECOVERY SYNC ---

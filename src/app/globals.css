@@ -26,17 +26,15 @@
   /* Keep borders slightly visible */
   --border: #1f2937;
 
-  /* Text hierarchy */
   --muted: #9ca3af;
-
   --primary-orange: #f97316;
-
   --scrollbar-track: #000000;
   --scrollbar-thumb: #1f2937;
-
   --selection-bg: #f97316;
   --selection-text: #ffffff;
 }
+
+/* FIX 4: Removed body { background-color: #000000; } */
 
 /* GPU Smoothness & Scrolling */
 html {
@@ -59,8 +57,7 @@ body {
   transform: translateZ(0);
 }
 
-/* GLOBAL SMOOTH THEME TRANSITION (Optimized) */
-/* Only animate the major structural backgrounds to avoid DOM freezing */
+/* GLOBAL SMOOTH THEME TRANSITION */
 body, main, aside, nav, header, .theme-transition {
   transition-property: background-color, color, border-color;
   transition-duration: 300ms;
@@ -72,52 +69,43 @@ body, main, aside, nav, header, .theme-transition {
 .dark [class*="bg-white"] {
   background-color: #000000;
 }
-
 .dark [class*="border-gray-"],
 .dark [class*="border-white"] {
   border-color: #1f2937;
 }
-
 .dark [class*="text-gray-900"],
 .dark [class*="text-gray-800"],
 .dark [class*="text-gray-700"] {
   color: #ffffff;
 }
-
 .dark [class*="text-gray-600"],
 .dark [class*="text-gray-500"] {
   color: #9ca3af;
 }
-
 .dark [class*="text-gray-400"] {
   color: #6b7280;
 }
 
-/* 3. Modern Scrollbar Styling (Chrome, Safari, Edge) */
+/* 3. Modern Scrollbar Styling */
 ::-webkit-scrollbar {
-  width: 8px; /* Slimmer for a modern look */
-  height: 8px; /* For horizontal scrollbars */
+  width: 8px; 
+  height: 8px; 
 }
-
 ::-webkit-scrollbar-track {
   background: var(--scrollbar-track);
 }
-
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 10px;
-  border: 2px solid var(--scrollbar-track); /* Creates a padding effect */
+  border: 2px solid var(--scrollbar-track); 
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary-orange);
   cursor: pointer;
 }
-
 .dark ::-webkit-scrollbar-track {
   background: #000000;
 }
-
 .dark ::-webkit-scrollbar-thumb {
   background: #1f2937;
 }
@@ -138,7 +126,6 @@ body, main, aside, nav, header, .theme-transition {
   max-width: 100% !important;
 }
 
-/* Custom Scrollbar for sleek dropdowns */
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
 }
@@ -153,10 +140,9 @@ body, main, aside, nav, header, .theme-transition {
   background-color: #d1d5db;
 }
 .dark .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-  background-color: #374151; /* Dark mode hover fallback */
+  background-color: #374151; 
 }
 
-/* Premium Bell Swing Animation */
 @keyframes swing {
   0% { transform: rotate(0deg); }
   15% { transform: rotate(15deg); }

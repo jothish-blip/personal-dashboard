@@ -9,7 +9,6 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void) {
   const [isSuccess, setIsSuccess] = useState(false);
   const [readyToRefresh, setReadyToRefresh] = useState(false);
 
-  // Use a ref for the callback so we don't re-bind DOM listeners on every render
   const savedOnRefresh = useRef(onRefresh);
   useEffect(() => {
     savedOnRefresh.current = onRefresh;
@@ -21,7 +20,6 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void) {
   const isTracking = useRef(false);
   const pullDistanceRef = useRef(0);
 
-  // Reduced thresholds for native Android-like atomic feel
   const MAX_PULL = 60;
   const REFRESH_THRESHOLD = 35;
   const ACTIVATION_DISTANCE = 12;
@@ -31,8 +29,6 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void) {
       if (window.scrollY > 0) return;
 
       const target = e.target as HTMLElement;
-
-      // Ignore floating sidebars / menus / horizontal scrollers
       if (target && target.closest(".prevent-pull-refresh")) return;
       if (target && target.closest('[data-horizontal-scroll="true"]')) return;
 
@@ -51,17 +47,14 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void) {
       const diffY = currentY - startY.current;
       const diffX = currentX - startX.current;
 
-      // Horizontal swipe → cancel tracking entirely
       if (Math.abs(diffX) > Math.abs(diffY)) {
         isTracking.current = false;
         isPulling.current = false;
         return;
       }
 
-      // Only track downward gestures
       if (diffY <= 0) return;
 
-      // Lock into the gesture once past activation
       if (diffY > ACTIVATION_DISTANCE) {
         isPulling.current = true;
         setIsDragging(true);
@@ -69,7 +62,6 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void) {
 
       if (!isPulling.current) return;
 
-      // Apply resistance to the pull (Parallax effect)
       const limitedPull = Math.min(diffY * 0.45, MAX_PULL);
       pullDistanceRef.current = limitedPull;
 
@@ -86,9 +78,8 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void) {
         await savedOnRefresh.current();
       } finally {
         setIsRefreshing(false);
-        setIsSuccess(true); // Trigger the "✓ Updated" state
+        setIsSuccess(true);
         
-        // Wait 800ms before fading away completely
         setTimeout(() => {
           setIsSuccess(false);
           reset();
@@ -102,14 +93,11 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void) {
         return;
       }
 
-      // Disable drag immediately so the CSS spring transition can take over
       setIsDragging(false);
 
-      // Atomic completion: If they crossed the 35px threshold and let go, DO NOT cancel.
       if (pullDistanceRef.current >= REFRESH_THRESHOLD) {
         triggerRefresh();
       } else {
-        // Released too early -> smooth snap back
         reset();
       }
     };

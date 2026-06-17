@@ -47,7 +47,6 @@ export default function MatrixView({
   const [isMobile, setIsMobile] = useState(false);
   const [showScrollHint, setShowScrollHint] = useState(false);
 
-  // --- Point 4: Async Safety ---
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -78,10 +77,8 @@ export default function MatrixView({
   const [quickAddName, setQuickAddName] = useState("");
   const [quickAddSuccess, setQuickAddSuccess] = useState(false); 
   
-  // --- Point 9: Add Search ---
   const [searchQuery, setSearchQuery] = useState("");
 
-  // --- Point 8: Focus Mode Persistence ---
   const [isFocusMode, setIsFocusMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('matrix_focus_mode') === 'true';
@@ -95,7 +92,6 @@ export default function MatrixView({
 
   const [showHelp, setShowHelp] = useState(false);
   
-  // --- Point 13 & 5: Modern Undo Delete System w/ Stats ---
   const [hiddenTasks, setHiddenTasks] = useState<Set<string>>(new Set());
   const [undoToasts, setUndoToasts] = useState<{id: string, name: string, completions: number, timerId: NodeJS.Timeout}[]>([]);
   
@@ -113,7 +109,6 @@ export default function MatrixView({
     }
   }, []);
 
-  // --- Point 6: Error Toast Upgrade ---
   const showError = useCallback((msg: string, type: ErrorType = 'system') => { 
     const now = Date.now();
     if (now - lastErrorTime.current < 800) return; 
@@ -126,17 +121,14 @@ export default function MatrixView({
     setTimeout(() => setErrors(prev => prev.filter(e => e.id !== id)), duration); 
   }, []);
 
-  // Soft Delete Request
   const requestDelete = useCallback((id: string) => {
     const taskToDelete = tasks.find(t => t.id === id);
     if (!taskToDelete) return;
 
     const completions = Object.values(taskToDelete.history || {}).filter(Boolean).length;
     
-    // Hide instantly from UI
     setHiddenTasks(prev => new Set(prev).add(id));
 
-    // Set 5-second timer for permanent destruction
     const timerId = setTimeout(() => {
       deleteTask(id);
       setUndoToasts(prev => prev.filter(t => t.id !== id));
@@ -163,7 +155,6 @@ export default function MatrixView({
     });
   }, []);
 
-  // Filter out softly deleted and searched tasks
   const activeTasks = useMemo(() => {
     let filtered = tasks.filter(t => !hiddenTasks.has(t.id));
     if (searchQuery.trim()) {
@@ -173,7 +164,6 @@ export default function MatrixView({
     return filtered;
   }, [tasks, hiddenTasks, searchQuery]);
 
-  // --- Point 14: Performance Improvement (Combined Loop) ---
   const { completionMap, groupedTasks } = useMemo(() => {
     const cMap: Record<string, number> = {};
     const gMap: Record<string, Task[]> = {};
@@ -290,7 +280,6 @@ export default function MatrixView({
     return streak;
   }, [activeTasks, actualToday]);
 
-  // TypeScript Fix Option 2
   const globalWeekStats = useMemo(() => {
     if (isFocusMode || activeTasks.length === 0) return {};
     const stats = weeksInMonth.map(week => {
@@ -330,14 +319,13 @@ export default function MatrixView({
     }
   }, [actualToday, meta.lockedDates, meta.rollbackUsedDates, showError, toggleTask]);
 
-  // --- Point 2 & Point 3: Character Limits & Dupe Protect ---
   const executeQuickAdd = async (presetName?: string) => {
     const val = presetName || quickAddName;
     if (!val.trim()) return;
     
     const parts = val.split('#');
-    const name = parts[0].trim().substring(0, 60); // 60 char limit
-    const group = parts.length > 1 && parts[1].trim() ? parts[1].trim().substring(0, 20) : "General"; // 20 char limit
+    const name = parts[0].trim().substring(0, 60);
+    const group = parts.length > 1 && parts[1].trim() ? parts[1].trim().substring(0, 20) : "General";
     
     if (!name) return;
 
@@ -362,7 +350,6 @@ export default function MatrixView({
 
   const scrollToToday = () => todayRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 
-  // --- Point 12: Memoize Sidebar ---
   const memoizedSidebar = useMemo(() => (
     <Sidebar tasks={activeTasks} userName={userName} />
   ), [activeTasks, userName]);
@@ -430,12 +417,22 @@ export default function MatrixView({
         @keyframes scaleUp { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
       `}</style>
 
+      {/* Header Rendering - Now passing missing props */}
       {!isFocusMode && (
         <Header 
-          todayDataLength={todayDataLength} yesterdayDataLength={yesterdayDataLength}
-          tasksLength={activeTasks.length} globalWeekStats={globalWeekStats}
-          meta={meta} setMonthYear={setMonthYear} addTask={addTask}
-          showError={(msg) => showError(msg, 'system')} lockToday={lockToday} actualToday={actualToday} existingTaskNames={[]}        />
+          userId={userName || "local-user"}
+          userLockedDates={meta.lockedDates || []}
+          existingTaskNames={activeTasks.map(t => t.name)}
+          selectedMonth={meta.currentMonth}
+          todayDataLength={todayDataLength} 
+          yesterdayDataLength={yesterdayDataLength}
+          tasksLength={activeTasks.length} 
+          setMonthYear={setMonthYear} 
+          addTask={addTask}
+          showError={(msg) => showError(msg, 'system')} 
+          lockToday={() => lockToday()} 
+          actualToday={actualToday} 
+        />
       )}
 
       <div className={`flex-1 flex flex-col xl:flex-row mx-auto w-full gap-6 transition-all duration-500 ${isFocusMode ? 'max-w-[900px] p-2 md:p-4 justify-center' : 'max-w-[1700px] p-4 md:p-8'}`}>
@@ -452,7 +449,6 @@ export default function MatrixView({
               <p className="font-bold text-xl text-[var(--foreground)] mb-2">Start Tracking Your System</p>
               <p className="text-sm text-[var(--muted)] mb-4 text-center">Add your first performance objective to begin analyzing.</p>
               
-              {/* --- Point 7: Empty State Chips --- */}
               <div className="flex items-center gap-2 mb-6 text-xs text-[var(--muted)] font-medium">
                 Try adding: 
                 <button disabled={isSaving} onClick={() => executeQuickAdd("Workout #Health")} className="bg-[var(--surface-alt)] hover:bg-[var(--border)] text-[var(--foreground)] px-3 py-1.5 rounded-full transition-colors active:scale-95 disabled:opacity-50">Workout #Health</button> 
@@ -473,7 +469,6 @@ export default function MatrixView({
                     {meta.lockedDates?.includes(actualToday) ? (
                       <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-md"><Lock size={12}/> Locked Mode</span>
                     ) : (
-                      // --- Point 10: Better Stats Header ---
                       <span className="text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 bg-indigo-500/10 px-2 py-1 rounded-md">
                         <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"/> Consistency: {consistencyScore}%
                       </span>
@@ -485,7 +480,6 @@ export default function MatrixView({
                 <div className="flex items-center gap-3">
                   {!isFocusMode && (
                     <>
-                      {/* --- Point 9: Search Field --- */}
                       <div className="relative hidden lg:flex items-center group">
                         <Search size={14} className="absolute left-3 text-[var(--muted)] group-focus-within:text-indigo-500 transition-colors" />
                         <input type="text" placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
@@ -500,7 +494,6 @@ export default function MatrixView({
                   )}
                   
                   <div className="flex items-center gap-1 bg-[var(--surface-alt)] border border-[var(--border)] rounded-lg p-1 shadow-sm">
-                    {/* --- Point 1: Unlocked Week Offset Navigation --- */}
                     <button onClick={() => setWeekOffset(prev => prev - 1)} className="p-1 hover:bg-[var(--surface)] text-[var(--muted)] rounded transition-colors active:scale-95"><ChevronLeft size={14}/></button>
                     {!isFocusMode && <button onClick={() => { setWeekOffset(0); scrollToToday(); }} className="px-3 text-[11px] font-bold text-[var(--muted)] hover:text-[var(--foreground)] transition-colors active:scale-95">Week {activeWeekIndex + 1}</button>}
                     <button onClick={() => setWeekOffset(prev => prev + 1)} className="p-1 hover:bg-[var(--surface)] text-[var(--muted)] rounded transition-colors active:scale-95"><ChevronRight size={14}/></button>

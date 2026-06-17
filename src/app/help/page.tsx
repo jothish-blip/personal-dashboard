@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 import HelpLayout from "@/help/layout";
@@ -13,43 +14,49 @@ import SocialSystemPage from "@/help/pages/social-system/page";
 import FailureRecoveryPage from "@/help/pages/failure-recovery/page";
 import RoadmapPage from "@/help/pages/roadmap/page";
 
-export default function HelpRoute() {
+function HelpContent() {
   const searchParams = useSearchParams();
+  const page = searchParams.get("page") || "home";
 
-  const page =
-    searchParams.get("page") || "home";
+  switch (page) {
+    case "discipline-engine":
+      return <DisciplineEnginePage />;
 
-  const renderPage = () => {
-    switch (page) {
-      case "discipline-engine":
-        return <DisciplineEnginePage />;
+    case "gamification-system":
+      return <GamificationSystemPage />;
 
-      case "gamification-system":
-        return <GamificationSystemPage />;
+    case "progression-economy":
+      return <ProgressionEconomyPage />;
 
-      case "progression-economy":
-        return <ProgressionEconomyPage />;
+    case "rewards-badges":
+      return <RewardsBadgesPage />;
 
-      case "rewards-badges":
-        return <RewardsBadgesPage />;
+    case "social-system":
+      return <SocialSystemPage />;
 
-      case "social-system":
-        return <SocialSystemPage />;
+    case "failure-recovery":
+      return <FailureRecoveryPage />;
 
-      case "failure-recovery":
-        return <FailureRecoveryPage />;
+    case "roadmap":
+      return <RoadmapPage />;
 
-      case "roadmap":
-        return <RoadmapPage />;
+    default:
+      return <HelpPage />;
+  }
+}
 
-      default:
-        return <HelpPage />;
-    }
-  };
-
+export default function HelpRoute() {
   return (
     <HelpLayout>
-      {renderPage()}
+      <Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        }
+      >
+        <HelpContent />
+      </Suspense>
     </HelpLayout>
   );
 }
