@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutGrid,
@@ -34,7 +35,6 @@ const NAV_ITEMS = [
   { label: "Workspace", icon: LayoutPanelLeft, path: "/Workspace", key: "isMini" },
 ];
 
-// Helper to generate premium initials if no avatar exists
 const getInitials = (name?: string) => {
   if (!name) return "NX";
   const parts = name.trim().split(" ");
@@ -53,6 +53,7 @@ export default function MobileNav(props: MobileNavProps) {
 
   const safePaths = activePaths || {};
   const { isDarkMode } = useTheme();
+  const pathname = usePathname();
   
   const [mounted, setMounted] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -60,12 +61,18 @@ export default function MobileNav(props: MobileNavProps) {
   const [showHint, setShowHint] = useState(false);
   
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const navigatingRef = useRef(false);
 
-  // Global close utility to prevent menu conflicts
   const closeAllMenus = () => {
     setIsNavExpanded(false);
     setIsProfileMenuOpen(false);
   };
+
+  // Reset menu state on any route change
+  useEffect(() => {
+    navigatingRef.current = false;
+    closeAllMenus();
+  }, [pathname]);
 
   useEffect(() => {
     setMounted(true);
@@ -75,13 +82,11 @@ export default function MobileNav(props: MobileNavProps) {
     }
   }, []);
 
-  // Outside click detection for profile menu (Fix 2)
   useEffect(() => {
     if (!isProfileMenuOpen) return;
 
     const handleOutsideClick = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node;
-
       if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
         setIsProfileMenuOpen(false);
       }
@@ -100,8 +105,6 @@ export default function MobileNav(props: MobileNavProps) {
     if (typeof navigator !== "undefined" && navigator.vibrate) {
       navigator.vibrate(10);
     }
-    
-    // Ensure mutual exclusivity
     setIsProfileMenuOpen(false);
     setIsNavExpanded(true);
     
@@ -111,15 +114,12 @@ export default function MobileNav(props: MobileNavProps) {
     }
   };
 
-  // Strict structural layout lock (Scroll lock & safe touch-action)
   useEffect(() => {
     const isAnyMenuOpen = isNavExpanded || isProfileMenuOpen;
     document.body.dataset.navOpen = isAnyMenuOpen ? "true" : "false";
 
     if (isAnyMenuOpen) {
-      // Fix 10: Removed document.documentElement.style.overflow to prevent layout recalculation lag
       document.body.style.overflow = "hidden";
-      // Restored panning so internal scroll/taps on UI elements still process correctly
       document.body.style.touchAction = "pan-x pan-y";
     } else {
       document.body.style.overflow = "";
@@ -135,20 +135,27 @@ export default function MobileNav(props: MobileNavProps) {
 
   if (!mounted) return null;
 
+  // Identify Active Context
+  const activeIndex = NAV_ITEMS.findIndex(item => Boolean(safePaths[item.key]));
+  const prevModule = activeIndex > 0 ? NAV_ITEMS[activeIndex - 1] : null;
+  const nextModule = activeIndex !== -1 && activeIndex < NAV_ITEMS.length - 1 ? NAV_ITEMS[activeIndex + 1] : null;
+
   return (
     <div className="mobile-nav-root">
-      {/* ─── HEADER ─── */}
       <header className="md:hidden w-full flex items-center justify-between px-6 pt-6 pb-2 relative z-[100] select-none">
-        {/* Brand Logo */}
         <div 
-          className="relative flex items-center cursor-pointer active:opacity-80 transition-opacity group rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-          onClick={() => handleNav("/")}
+          className="relative flex items-center cursor-pointer active:opacity-80 transition-opacity group rounded-md focus:outline-none"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeAllMenus();
+            setTimeout(() => { window.location.href = "/"; }, 100);
+          }}
           style={{ touchAction: "manipulation" }}
         >
           {isDarkMode && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] bg-orange-500/[0.08] blur-[30px] rounded-full pointer-events-none transition-opacity duration-500 group-hover:opacity-100 opacity-60" />
           )}
-
           <Image
             src={isDarkMode ? "/logo-dark.png" : "/logo-light.png"}
             alt="NexSpace"
@@ -159,11 +166,9 @@ export default function MobileNav(props: MobileNavProps) {
           />
         </div>
 
-        {/* Profile Avatar Trigger */}
         <div className="relative prevent-pull-refresh" ref={profileMenuRef}>
           <button
             onClick={(e) => {
-              // Fix 4: Stop propagation to prevent immediate bubbling close
               e.stopPropagation();
               setIsNavExpanded(false);
               setIsProfileMenuOpen((prev) => !prev);
@@ -179,42 +184,27 @@ export default function MobileNav(props: MobileNavProps) {
             />
           </button>
 
-          {/* Premium Mini Account Center Menu - PORTALED */}
           {createPortal(
             <AnimatePresence>
               {isProfileMenuOpen && (
                 <>
-                  {/* Solid Full Screen Backdrop */}
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    // Fix 2: Removed onClick={closeAllMenus} to rely on standard document outside-click listener
-                    className={`fixed inset-0 z-[2147483645] ${
-                      isDarkMode ? "bg-black" : "bg-white"
-                    }`}
+                    className={`fixed inset-0 z-[2147483645] ${isDarkMode ? "bg-black" : "bg-white"}`}
                   />
-
-                  {/* Unified Design System */}
                   <motion.div
-                    // Fix 8: Faster profile open with refined y-axis
                     initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ type: "spring", stiffness: 800, damping: 45 }}
-                    // Fix 1: Stop all pointer/touch propagation so internal clicks don't bubble to backdrop
                     onClick={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onTouchStart={(e) => e.stopPropagation()}
-                    // Fix 3: Pure black background and border-white/[0.08]
                     className={`fixed top-20 right-4 left-4 sm:left-auto sm:w-80 p-6 rounded-[36px] shadow-lg border z-[2147483647] ${
-                      isDarkMode
-                        ? "bg-black border-white/[0.08] shadow-black/90"
-                        : "bg-white border-black/5 shadow-black/10"
+                      isDarkMode ? "bg-black border-white/[0.08] shadow-black/90" : "bg-white border-black/5 shadow-black/10"
                     }`}
                   >
-                    {/* Account Header with Avatar */}
                     <div className="flex flex-col items-center text-center pb-5 mb-4 border-b border-zinc-500/10">
                       <div className="w-14 h-14 rounded-full bg-zinc-200 dark:bg-black flex items-center justify-center overflow-hidden mb-3">
                         {userProfile?.avatar_url ? (
@@ -225,25 +215,18 @@ export default function MobileNav(props: MobileNavProps) {
                           </span>
                         )}
                       </div>
-                      <p className="text-[16px] font-semibold tracking-tight">
-                        {userProfile?.full_name || "NexUP Pioneer"}
-                      </p>
+                      <p className="text-[16px] font-semibold tracking-tight">{userProfile?.full_name || "NexUP Pioneer"}</p>
                       <p className="text-[13px] font-medium text-orange-500 mt-1 flex items-center gap-1">
                         🔥 {currentStreak} Day Streak
                       </p>
                     </div>
 
                     <div className="space-y-1">
-                      <div className={`flex items-center justify-between px-3 py-3 rounded-2xl mb-2 ${
-                        isDarkMode ? "bg-white/[0.03]" : "bg-black/5"
-                      }`}>
+                      <div className={`flex items-center justify-between px-3 py-3 rounded-2xl mb-2 ${isDarkMode ? "bg-white/[0.03]" : "bg-black/5"}`}>
                         <span className="text-[13px] font-medium tracking-wide">Theme</span>
-                        {/* Fix 5: Complete event isolation for ThemeToggle */}
                         <div 
                           onClick={(e) => e.stopPropagation()}
                           onPointerDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onTouchStart={(e) => e.stopPropagation()}
                           className="relative z-[2147483647]"
                         >
                           <ThemeToggle />
@@ -251,9 +234,11 @@ export default function MobileNav(props: MobileNavProps) {
                       </div>
                       
                       <button
-                        onClick={() => {
-                          handleNav("/settings");
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           closeAllMenus();
+                          setTimeout(() => { handleNav("/settings"); }, 150);
                         }}
                         style={{ touchAction: "manipulation" }}
                         className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-medium text-[13px] transition-colors ${
@@ -265,7 +250,9 @@ export default function MobileNav(props: MobileNavProps) {
                       </button>
 
                       <button
-                        onClick={async () => {
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           closeAllMenus();
                           if (handleLogout) await handleLogout();
                         }}
@@ -287,10 +274,8 @@ export default function MobileNav(props: MobileNavProps) {
         </div>
       </header>
 
-      {/* ─── LIQUID SPATIAL NAVIGATION DOCK - PORTALED ─── */}
       {createPortal(
         <div className="md:hidden">
-          {/* Full Viewport Solid Backdrop */}
           <AnimatePresence>
             {isNavExpanded && (
               <motion.div
@@ -298,38 +283,30 @@ export default function MobileNav(props: MobileNavProps) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={closeAllMenus}
-                className={`fixed inset-0 z-[2147483645] ${
-                  isDarkMode ? "bg-black" : "bg-white"
-                }`}
+                className={`fixed inset-0 z-[2147483645] ${isDarkMode ? "bg-black" : "bg-white"}`}
               />
             )}
           </AnimatePresence>
 
-          {/* Bottom Interactive Zone */}
           <div 
             className="fixed bottom-0 left-0 right-0 z-[2147483646] flex justify-center pb-6 pointer-events-none prevent-pull-refresh"
             style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
           >
             <AnimatePresence mode="wait">
               {!isNavExpanded ? (
-                // STATE 1: GESTURE-FIRST INTERACTIVE CAPSULE
                 <motion.div
                   key="minimal-nav"
                   initial={{ y: 20, opacity: 0, scale: 0.8 }}
                   animate={{ y: 0, opacity: 1, scale: 1 }}
                   exit={{ y: 20, opacity: 0, scale: 0.8 }}
-                  // Fix 1: Faster transition bottleneck removed
                   transition={{ type: "spring", stiffness: 700, damping: 40, mass: 0.6 }}
                   drag="y"
                   dragConstraints={{ top: 0, bottom: 0 }}
-                  // Fix 10: Smooth elastic setup and momentum
                   dragElastic={0.08}
                   dragMomentum={true}
                   dragDirectionLock
-                  // Fix 7: Removed heavy scaling while dragging, replaced with direct translation
                   whileDrag={{ y: -2 }}
                   onDragEnd={(_, info) => {
-                    // Fix 2: Sensitive upward swipe detection
                     if (info.offset.y < -3 || info.velocity.y < -50) handleOpenNav();
                   }}
                   onClick={handleOpenNav}
@@ -348,72 +325,49 @@ export default function MobileNav(props: MobileNavProps) {
                       </motion.span>
                     )}
                   </AnimatePresence>
-                  <div 
-                    className="w-14 h-2 bg-orange-500 rounded-full transition-shadow duration-300 mt-2"
-                    style={{
-                      boxShadow: "0 0 12px rgba(249,115,22,0.4), 0 0 20px rgba(249,115,22,0.2)"
-                    }}
+                  <motion.div 
+                    className="w-20 h-2.5 bg-orange-500 rounded-full transition-shadow mt-2"
+                    animate={{ opacity: [0.6, 1, 0.6] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    style={{ boxShadow: "0 0 12px rgba(249,115,22,0.4), 0 0 20px rgba(249,115,22,0.2)" }}
                   />
                 </motion.div>
               ) : (
-                // STATE 2: EXPANDED COMMAND CENTER
                 <motion.div
                   key="expanded-nav"
-                  // Fix 1: Adjusted initial y for smoother spring motion
                   initial={{ scaleY: 0.6, opacity: 0, y: 80, borderRadius: "50px" }}
                   animate={{ scaleY: 1, opacity: 1, y: 0, borderRadius: "36px" }}
                   exit={{ scaleY: 0.6, opacity: 0, y: 80, borderRadius: "50px" }}
-                  // Fix 1: Faster transition bottleneck removed
                   transition={{ type: "spring", stiffness: 700, damping: 40, mass: 0.6 }}
                   onClick={(e) => e.stopPropagation()}
                   drag="y"
                   dragConstraints={{ top: 0, bottom: 0 }}
-                  // Fix 10: Smooth elastic setup and momentum
                   dragElastic={0.06}
                   dragMomentum={true}
                   dragDirectionLock
                   onDragEnd={(_, info) => {
-                    // Fix 3: Sensitive downward swipe detection
                     if (info.offset.y > 3 || info.velocity.y > 50) closeAllMenus();
                   }}
-                  style={{ transformOrigin: "bottom center", zIndex: 2147483647 }}
-                  // Fix 3: Pure black rendering for Expanded Nav module
+                  style={{ 
+                    transformOrigin: "bottom center", 
+                    zIndex: 2147483647,
+                    touchAction: "manipulation"
+                  }}
                   className={`pointer-events-auto relative w-[92vw] max-w-sm overflow-hidden shadow-lg border ${
-                    isDarkMode
-                      ? "bg-black border-white/[0.08] shadow-black/90"
-                      : "bg-white border-black/5 shadow-black/10"
+                    isDarkMode ? "bg-black border-white/[0.08] shadow-black/90" : "bg-white border-black/5 shadow-black/10"
                   }`}
                 >
-                  {/* Subtle Drag Handle */}
                   <div className="w-full flex justify-center pt-5 pb-5">
                     <div className="w-10 h-1.5 rounded-full bg-zinc-500/30" />
                   </div>
 
-                  {/* Unified Profile Header */}
-                  <div className="flex flex-col items-center justify-center pb-6 px-6">
-                    <div className="w-14 h-14 rounded-full bg-zinc-200 dark:bg-black flex items-center justify-center overflow-hidden mb-2">
-                      {userProfile?.avatar_url ? (
-                        <img src={userProfile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-[16px] font-semibold text-zinc-600 dark:text-zinc-400 tracking-wide">
-                          {getInitials(userProfile?.full_name)}
-                        </span>
-                      )}
-                    </div>
-                    <span className={`text-[16px] font-semibold tracking-[-0.01em] ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                      {userProfile?.full_name || "NexUP Pioneer"}
-                    </span>
-                    <div className="text-[12px] font-medium text-orange-500 mt-1 flex items-center gap-1.5 tracking-wide">
-                      🔥 {currentStreak} Day Streak
-                    </div>
-                    
-                    <span className="text-[11px] font-medium opacity-40 uppercase tracking-[0.2em] text-zinc-500 mt-4">
-                      NexSpace
-                    </span>
+                  {/* Context Header */}
+                  <div className="flex justify-between w-full px-8 text-[11px] font-semibold uppercase tracking-widest text-zinc-500 mb-6">
+                    <span className={prevModule ? "opacity-100" : "opacity-0"}>← {prevModule?.label}</span>
+                    <span className={nextModule ? "opacity-100" : "opacity-0"}>{nextModule?.label} →</span>
                   </div>
 
-                  {/* Context-Aware Symmetric Module Layout */}
-                  <div className="grid grid-cols-2 gap-y-5 gap-x-4 px-6 pb-12">
+                  <div className="grid grid-cols-2 max-w-[280px] mx-auto gap-y-6 gap-x-6 px-6 pb-12">
                     {NAV_ITEMS.map((item, index) => {
                       const Icon = item.icon;
                       const isActive = Boolean(safePaths[item.key]);
@@ -422,14 +376,19 @@ export default function MobileNav(props: MobileNavProps) {
                       return (
                         <button
                           key={item.key}
-                          onClick={() => {
-                            handleNav(item.path);
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             closeAllMenus();
+                            // Hard redirect for modules to completely bypass Framer Motion unmount freezing
+                            setTimeout(() => {
+                              window.location.href = item.path;
+                            }, 100);
                           }}
-                          // Fix 6: Implemented explicit manipulation touch-action directly on interactive components
-                          style={{ touchAction: "manipulation" }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          style={{ touchAction: "manipulation", zIndex: 2147483647 }}
                           className={`flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform duration-300 ${
-                            isLastAndOdd ? "col-span-2" : ""
+                            isLastAndOdd ? "col-span-2 flex justify-center" : ""
                           }`}
                         >
                           <div

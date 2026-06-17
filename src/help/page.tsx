@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -69,7 +69,7 @@ const helpArticles = [
 const featuredTitles = ["Discipline Engine", "Gamification System", "Progression Economy"];
 const featuredArticles = helpArticles.filter(article => featuredTitles.includes(article.title));
 
-export default function HelpPage() {
+function HelpPageContent() {
   const { isDarkMode } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -231,5 +231,19 @@ export default function HelpPage() {
         
       </div>
     </div>
+  );
+}
+
+export default function HelpPage() {
+  return (
+    <Suspense 
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }
+    >
+      <HelpPageContent />
+    </Suspense>
   );
 }

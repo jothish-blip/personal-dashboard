@@ -32,8 +32,6 @@ const AuditView = nextDynamic(() => import("@/modules/tasks/audit/AuditView"), {
 // Focus Engine
 import { useFocusSystem } from "@/modules/focus/engine/useFocusSystem";
 
-export const dynamic = "force-dynamic";
-
 export default function Home() {
   const router = useRouter();
   const pathname = usePathname();
@@ -44,6 +42,13 @@ export default function Home() {
   const [isStateLoaded, setIsStateLoaded] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  
+  // FIX 1: Hydration safe session storage check
+  const [hasSessionLoaded, setHasSessionLoaded] = useState(false);
+
+  useEffect(() => {
+    setHasSessionLoaded(sessionStorage.getItem("nexspace_session_loaded") === "true");
+  }, []);
 
   const isMini = pathname === "/Workspace";
 
@@ -146,11 +151,6 @@ export default function Home() {
     sessionStorage.setItem("nexengine_active_tab", tab);
   };
 
-  const hasSessionLoaded =
-    typeof window !== "undefined"
-      ? sessionStorage.getItem("nexspace_session_loaded") === "true"
-      : false;
-
   const shouldBlockRender =
     isAuthenticated === null ||
     isAuthenticated === false ||
@@ -161,9 +161,9 @@ export default function Home() {
   if (shouldBlockRender) {
     if (!hasSessionLoaded) {
       return (
-        <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${
-          isDarkMode ? "bg-[#000000] text-gray-400" : "bg-[#F9FAFB] text-gray-500"
-        }`}>
+        // FIX 3: Removed JS-based ternary for theme colors to prevent Server/Client hydration mismatch.
+        // Using Tailwind dark mode classes instead so CSS handles it purely.
+        <div className="min-h-screen flex items-center justify-center bg-[#F9FAFB] dark:bg-[#000000] text-gray-500 dark:text-gray-400 transition-colors duration-300">
           <div className="flex flex-col items-center gap-3 animate-pulse">
             <span className="text-sm font-bold uppercase tracking-widest text-orange-500">
               Initializing Workspace...
@@ -215,6 +215,7 @@ export default function Home() {
                     renameGroup={renameGroup}  
                     lockToday={lockToday}
                     setMonthYear={setMonthYear}
+                    userName={currentUser?.user_metadata?.full_name || currentUser?.email || "User"}
                   />
                 )}
 

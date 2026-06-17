@@ -1,15 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import Script from "next/script";
 
 import TopProgressBar from "@/refresh/TopProgressBar";
 import OfflineView from "@/app/not-found/OfflineView";
 import PWARegistration from "@/pwa/PWARegistration";
+import ModuleContainer from "@/navigation/moduleNavigation/ModuleContainer";
 import ClientWrapper from "@/pwa/ClientWrapper";
-import ScrollRestoration from "@/refresh/ScrollRestoration";
 import { FocusProvider } from "@/modules/focus/engine/useFocusSystem";
 
-// ✅ Sidebar import
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -52,14 +52,15 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
     >
-      <body className="overflow-x-hidden">
-        {/* Theme Script */}
-        <script
+      <head>
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function () {
                 try {
-                  var stored = localStorage.getItem('nexspace _theme');
+                  var stored = localStorage.getItem('nexspace_theme');
                   var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
                   
                   var finalTheme = stored ? stored : (systemDark ? 'dark' : 'light');
@@ -71,7 +72,8 @@ export default function RootLayout({
             `,
           }}
         />
-
+      </head>
+      <body className="overflow-x-hidden">
         {/* SYSTEM LAYER */}
         <PWARegistration />
         <TopProgressBar />
@@ -80,16 +82,12 @@ export default function RootLayout({
         {/* APP LAYER */}
         <FocusProvider>
           <ClientWrapper>
-
-            {/* ✅ Main App Content */}
-            <main className="min-h-screen w-full">
+            <ModuleContainer>
               {children}
-            </main>
-
+            </ModuleContainer>
           </ClientWrapper>
         </FocusProvider>
 
-        <ScrollRestoration />
       </body>
     </html>
   );

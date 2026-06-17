@@ -81,7 +81,6 @@ export function useNexCore() {
 
     const newLog = { id, action, name, detail, time };
 
-    // Update local UI instantly
     setState(prev => {
       const newState = {
         ...prev,
@@ -93,19 +92,11 @@ export function useNexCore() {
 
     if (!user || !supabase) return;
 
-    // Save to Supabase
     const { error } = await (supabase as any)
       .from("audit_logs")
-      .insert({
-        id,
-        user_id: user.id,
-        action,
-        name,
-        detail,
-        time
-      });
+      .insert({ id, user_id: user.id, action, name, detail, time });
 
-    if (error) console.error("Audit log sync error:", error);
+    if (error) console.error("Audit log sync error:", error.message || error);
   };
 
   const fetchLogsFromDB = async () => {
@@ -123,15 +114,12 @@ export function useNexCore() {
       .limit(100);
 
     if (error) {
-      console.error("Audit fetch error:", error);
+      console.error("Audit fetch error:", error.message || error);
       return;
     }
 
     setState(prev => {
-      const newState = {
-        ...prev,
-        logs: data || []
-      };
+      const newState = { ...prev, logs: data || [] };
       debouncedSave(KEY, newState);
       return newState;
     });
@@ -148,10 +136,7 @@ export function useNexCore() {
     if (queue.length === 0) return;
 
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      console.warn("Supabase client null, keeping actions in offline queue.");
-      return;
-    }
+    if (!supabase) return;
 
     setIsSyncing(true);
     let remainingQueue: QueueAction[] = [];
@@ -192,96 +177,6 @@ export function useNexCore() {
     setIsSyncing(false);
   };
 
-  const storeDailyStats = async (tasks: Task[], userId: string) => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
-    const today = getTodayLocal();
-    let completed = 0;
-
-    tasks.forEach(task => {
-      if (task.history?.[today]) completed++;
-    });
-
-    const total = tasks.length;
-    const missed = total - completed;
-    
-    const efficiency = total === 0 ? 0 : completed / total;
-    
-    let score = (efficiency * 20) - ((1 - efficiency) * 20); 
-
-    const is_missed = completed === 0 && total > 0;
-    if (is_missed) score = -20;
-
-    await ((supabase as any).from("daily_stats")).upsert({
-      user_id: userId,
-      date: today,
-      completed,
-      missed,
-      score,
-      is_missed
-    }, { onConflict: 'user_id, date' });
-  };
-
-  const backfillMissedDays = async (tasks: Task[], userId: string) => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
-    const { data: lastEntry } = await ((supabase as any).from("daily_stats"))
-      .select("date")
-      .eq("user_id", userId)
-      .order("date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const todayStr = getTodayLocal();
-    const todayDate = new Date(todayStr);
-
-    let startDate = lastEntry ? new Date(lastEntry.date) : null;
-
-    if (!startDate) {
-      startDate = new Date(todayDate);
-      startDate.setDate(startDate.getDate() - 1);
-    }
-
-    const d = new Date(startDate);
-    d.setDate(d.getDate() + 1);
-
-    const missingEntries = [];
-
-    while (d <= todayDate) {
-      const dateStr = d.toISOString().split("T")[0];
-
-      const total = tasks.length;
-      const completed = tasks.filter(t => t.history?.[dateStr]).length;
-      const missed = total - completed;
-      
-      const efficiency = total === 0 ? 0 : completed / total;
-      
-      let score = (efficiency * 20) - ((1 - efficiency) * 20);
-
-      const is_missed = completed === 0 && total > 0;
-      if (is_missed) score = -20;
-
-      missingEntries.push({
-        user_id: userId,
-        date: dateStr,
-        completed,
-        missed,
-        score,
-        is_missed
-      });
-
-      d.setDate(d.getDate() + 1);
-    }
-
-    if (missingEntries.length > 0) {
-      await ((supabase as any).from("daily_stats")).upsert(missingEntries, {
-        onConflict: "user_id, date"
-      });
-    }
-  };
-
   const fetchTasksFromDB = async () => {
     const user = userRef.current;
     if (!user) return;
@@ -292,7 +187,7 @@ export function useNexCore() {
     const { data, error } = await ((supabase as any).from("tasks")).select("*").eq("user_id", user.id);
     
     if (error) {
-      console.error("Fetch error:", error);
+      console.error("Fetch error:", error.message || error);
       addNotification("system", "Sync Error", "Failed to fetch tasks", "high");
       return;
     }
@@ -309,9 +204,6 @@ export function useNexCore() {
       debouncedSave(KEY, newState);
       return newState;
     });
-
-    await backfillMissedDays(newTasks, user.id);
-    await storeDailyStats(newTasks, user.id); 
   };
 
   const setupRealtime = () => {
@@ -334,21 +226,13 @@ export function useNexCore() {
 
     const channel = supabase.channel(channelName);
 
-    channel.on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` },
-      () => {
-        fetchTasksFromDB();
-      }
-    );
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` }, () => {
+      fetchTasksFromDB();
+    });
 
-    channel.on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "audit_logs", filter: `user_id=eq.${user.id}` },
-      () => {
-        fetchLogsFromDB();
-      }
-    );
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "audit_logs", filter: `user_id=eq.${user.id}` }, () => {
+      fetchLogsFromDB();
+    });
 
     channel.subscribe();
 
@@ -428,29 +312,29 @@ export function useNexCore() {
       fetchTasksFromDB();
       fetchLogsFromDB();
     };
+    
     const handleOffline = () => addNotification("system", "Offline", "No internet connection. Actions will be queued.", "high");
-    const handleFocus = () => {
-      fetchTasksFromDB();
-      fetchLogsFromDB();
-    };
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        fetchTasksFromDB();
-        fetchLogsFromDB();
-      }
-    };
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       cleanupRef.current?.(); 
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleSilentRefresh = async () => {
+      await fetchTasksFromDB();
+      await fetchLogsFromDB();
+    };
+
+    window.addEventListener("nexspace-refresh", handleSilentRefresh);
+
+    return () => {
+      window.removeEventListener("nexspace-refresh", handleSilentRefresh);
     };
   }, []);
 
@@ -458,8 +342,6 @@ export function useNexCore() {
     const interval = setInterval(() => {
       if (navigator.onLine && userRef.current) {
         handleGlobalState(addNotification, state.tasks, []);
-        fetchTasksFromDB(); 
-        storeDailyStats(state.tasks, userRef.current.id); 
       }
     }, 30000); 
 
@@ -538,10 +420,7 @@ export function useNexCore() {
 
     setState(prev => {
       const updatedTasks = prev.tasks.map(t => t.id === id ? { ...t, name: newName.trim() } : t);
-      const newState = {
-        ...prev,
-        tasks: updatedTasks
-      };
+      const newState = { ...prev, tasks: updatedTasks };
       debouncedSave(KEY, newState);
       return newState;
     });
@@ -555,9 +434,7 @@ export function useNexCore() {
     }
 
     const { error } = await ((supabase as any).from("tasks")).update({ name: newName.trim() }).eq("id", id);
-    if (error) {
-      addToQueue({ type: "UPDATE", id, payload: { name: newName.trim() } });
-    }
+    if (error) addToQueue({ type: "UPDATE", id, payload: { name: newName.trim() } });
   };
 
   const renameGroup = async (oldGroup: string, newGroup: string) => {
@@ -568,10 +445,7 @@ export function useNexCore() {
 
     setState(prev => {
       const updatedTasks = prev.tasks.map(t => t.group === oldGroup ? { ...t, group: newGroup.trim() } : t);
-      const newState = {
-        ...prev,
-        tasks: updatedTasks
-      };
+      const newState = { ...prev, tasks: updatedTasks };
       debouncedSave(KEY, newState);
       return newState;
     });
@@ -617,12 +491,8 @@ export function useNexCore() {
     const updatedHistory = { ...task.history, [dateStr]: status };
     const updatedTasksArray = state.tasks.map(t => t.id === id ? { ...t, history: updatedHistory } : t);
 
-    // Optimistic UI instantly sets state
     setState(prev => {
-      const newState = { 
-        ...prev, 
-        tasks: updatedTasksArray
-      };
+      const newState = { ...prev, tasks: updatedTasksArray };
       debouncedSave(KEY, newState);
       return newState;
     });
@@ -634,7 +504,6 @@ export function useNexCore() {
     });
     
     if (status) handleTaskUpdate(addNotification, updatedTasksArray, dateStr); 
-    storeDailyStats(updatedTasksArray, user.id); 
 
     const supabase = getSupabaseClient();
 
@@ -644,9 +513,7 @@ export function useNexCore() {
     }
 
     const { error } = await ((supabase as any).from("tasks")).update({ history: updatedHistory }).eq("id", id);
-    if (error) {
-      addToQueue({ type: "UPDATE", id, payload: { history: updatedHistory } });
-    }
+    if (error) addToQueue({ type: "UPDATE", id, payload: { history: updatedHistory } });
   };
 
   const deleteTask = async (id: string) => {
@@ -656,10 +523,7 @@ export function useNexCore() {
     const taskToDelete = state.tasks.find(t => t.id === id);
 
     setState(prev => {
-      const newState = { 
-        ...prev, 
-        tasks: prev.tasks.filter(t => t.id !== id)
-      };
+      const newState = { ...prev, tasks: prev.tasks.filter(t => t.id !== id) };
       debouncedSave(KEY, newState);
       return newState;
     });
@@ -675,9 +539,7 @@ export function useNexCore() {
     }
 
     const { error } = await ((supabase as any).from("tasks")).delete().eq("id", id);
-    if (error) {
-      addToQueue({ type: "DELETE", id });
-    }
+    if (error) addToQueue({ type: "DELETE", id });
   };
 
   const lockToday = async () => {

@@ -18,14 +18,12 @@ export default function PullToRefreshUI() {
     await refreshPage();
   });
 
-  // Haptic feedback trigger when the release threshold is met
   useEffect(() => {
     if (readyToRefresh && typeof navigator !== "undefined" && navigator.vibrate && !isRefreshing && !isSuccess) {
       navigator.vibrate(10);
     }
   }, [readyToRefresh, isRefreshing, isSuccess]);
 
-  // Keep DOM clean when completely idle
   if (pullDistance <= 0 && !isRefreshing && !isSuccess) return null;
 
   const REFRESH_THRESHOLD = 35;
@@ -35,8 +33,6 @@ export default function PullToRefreshUI() {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
-  // When actively dragging, follow finger. 
-  // When refreshing/success, lock at 60px.
   const translateY = isRefreshing || isSuccess ? 60 : Math.min(pullDistance * 1.2, 80);
   const isVisible = pullDistance > 0 || isRefreshing || isSuccess;
 
@@ -46,7 +42,6 @@ export default function PullToRefreshUI() {
       style={{
         transform: `translateY(${translateY}px) scale(${isVisible ? 1 : 0.8})`,
         opacity: isVisible ? 1 : 0,
-        // Disable transitions while finger is down. Enable spring when finger releases.
         transition: isDragging 
           ? "none" 
           : "transform 300ms cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms ease",
@@ -73,7 +68,6 @@ export default function PullToRefreshUI() {
           </>
         ) : (
           <>
-            {/* SVG Progress Ring */}
             <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 40 40">
               <circle 
                 cx="20" cy="20" r={radius} 
@@ -93,7 +87,6 @@ export default function PullToRefreshUI() {
               />
             </svg>
             
-            {/* Inner Arrow */}
             <ArrowDown
               size={16}
               className={`transition-transform duration-300 ${
