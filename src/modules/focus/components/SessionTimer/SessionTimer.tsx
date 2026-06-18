@@ -3,9 +3,10 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useFocusSystem } from "../../engine/useFocusSystem";
-import { Play, Pause, Square, Check, Sparkles } from "lucide-react";
+import { Play, Pause, Square, Check, Sparkles, Maximize } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "@/theme/ThemeProvider";
+import FocusFullscreen from "./FocusFullscreen"; // Import the new component
 
 export default function SessionTimer() {
   const {
@@ -16,6 +17,7 @@ export default function SessionTimer() {
     mode,
     isSessionComplete,
     startSession,
+    resumeSession,
     pauseSession,
     stopSession,
     setTimeRemaining,
@@ -30,12 +32,28 @@ export default function SessionTimer() {
   const [mounted, setMounted] = useState(false);
   const [activeModal, setActiveModal] = useState<"pause" | "endNormal" | "endExtra" | null>(null);
   
-  // Prevents the background timer from instantly snapping to 25:00 while the modal animates out
+  // Fullscreen State
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
+  
   const lastTimeRef = useRef(initialSessionTime);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // Listen for native ESC key or browser fullscreen exit
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        setIsFullscreen(false);
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
   useEffect(() => {
@@ -47,13 +65,12 @@ export default function SessionTimer() {
 
   const isExtraMode = !!currentSession?.completedAt;
 
-  // Strict scroll and touch lock when any modal is open
   useEffect(() => {
-    if (activeModal) {
+    if (activeModal && !isFullscreen) {
       document.body.style.overflow = "hidden";
       document.body.style.touchAction = "none";
       document.documentElement.style.overflow = "hidden";
-    } else {
+    } else if (!isFullscreen) {
       document.body.style.overflow = "";
       document.body.style.touchAction = "";
       document.documentElement.style.overflow = "";
@@ -64,9 +81,8 @@ export default function SessionTimer() {
       document.body.style.touchAction = "";
       document.documentElement.style.overflow = "";
     };
-  }, [activeModal]);
+  }, [activeModal, isFullscreen]);
 
-  // Anti-Jump Display Logic
   const displayTime = useMemo(() => {
     let time;
     if (!isActive && !isPaused && !isExtraMode) {
@@ -79,7 +95,6 @@ export default function SessionTimer() {
       time = timeRemaining;
     }
 
-    // Freeze display if a modal is open or animating closed to prevent visual flash
     if ((activeModal || isTransitioning) && !isActive && !isPaused && !isExtraMode) {
       return lastTimeRef.current;
     }
@@ -88,34 +103,39 @@ export default function SessionTimer() {
     return time;
   }, [isActive, isPaused, isExtraMode, currentSession, extraTime, getRemainingTime, timeRemaining, initialSessionTime, activeModal, isTransitioning]);
 
-  // Subtle Haptic feedback when time is running out (mobile only)
   useEffect(() => {
     if (isActive && !isPaused && !isExtraMode && displayTime > 0 && displayTime < 10) {
       if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(50);
     }
   }, [displayTime, isActive, isPaused, isExtraMode]);
 
-  // Spacebar controls
+  const handleModalOpen = (modalType: "pause" | "endNormal" | "endExtra") => {
+    if (isActive && !isPaused) {
+      pauseSession();
+    }
+    setActiveModal(modalType);
+  };
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === "INPUT") return;
-      if (activeModal) return; 
+      if (activeModal || isFullscreen) return; // Let fullscreen component handle keys if active
       
       if (e.code === "Space") {
         e.preventDefault();
         if (isExtraMode) return;
         if (!isActive) {
-          startSession();
+          handleStartWithFullscreen();
         } else if (isPaused) {
           handleResume();
         } else {
-          setActiveModal("pause");
+          handleModalOpen("pause");
         }
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [isActive, isPaused, isExtraMode, startSession, activeModal]);
+  }, [isActive, isPaused, isExtraMode, activeModal, isFullscreen]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, "0");
@@ -146,24 +166,55 @@ export default function SessionTimer() {
     return "You're in flow";
   };
 
-  // State Mutators mapping to distinct UX flows
-  const handleResume = () => {
+  // Fullscreen Entry Protocol
+  const handleStartWithFullscreen = async () => {
     startSession();
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+      setIsFullscreen(true);
+    } catch (err) {
+      console.warn("Fullscreen API blocked or unsupported, falling back to simulated full screen", err);
+      setIsFullscreen(true);
+    }
   };
 
-  const confirmPause = () => {
-    pauseSession();
-    setActiveModal(null);
+  const enterFullscreenOnly = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+      setIsFullscreen(true);
+    } catch (err) {
+      setIsFullscreen(true);
+    }
   };
 
-  const confirmEndNormal = () => {
+  const handleResume = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (isResuming) return;
+    
+    setIsResuming(true);
+
+    try {
+      resumeSession(); 
+      setActiveModal(null);
+    } finally {
+      setIsResuming(false);
+    }
+  };
+
+  const confirmEndNormal = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setIsTransitioning(true);
     stopSession(false);
     setActiveModal(null);
     setTimeout(() => setIsTransitioning(false), 300);
   };
 
-  const confirmEndExtra = (save: boolean) => {
+  const confirmEndExtra = (save: boolean, e: React.MouseEvent) => {
+    e.stopPropagation();
     setIsTransitioning(true);
     stopSession(save);
     setActiveModal(null);
@@ -183,7 +234,6 @@ export default function SessionTimer() {
   const strokeDashoffset = circumference * (1 - progress);
   const isInterrupted = !isActive && currentSession && !isSessionComplete;
 
-  // Unified Modal UI Constants
   const modalSurfaceClass = isDarkMode 
     ? "bg-black border border-white/[0.08] shadow-2xl" 
     : "bg-white border border-black/[0.05] shadow-xl";
@@ -260,7 +310,6 @@ export default function SessionTimer() {
               </linearGradient>
             </defs>
 
-            {/* Background Track Circle */}
             <circle
               cx="50%"
               cy="50%"
@@ -271,7 +320,6 @@ export default function SessionTimer() {
               className={`transition-colors ${isDarkMode ? "text-white/[0.04]" : "text-gray-100"}`}
             />
 
-            {/* Active Progress Circle */}
             <circle
               cx="50%"
               cy="50%"
@@ -329,19 +377,32 @@ export default function SessionTimer() {
         {/* PRIMARY CONTROLS */}
         <div className="flex flex-col sm:flex-row gap-3 w-full max-w-[280px] sm:max-w-none sm:w-auto px-4 sm:px-0 z-10 transition-all">
           {isExtraMode ? (
-            <button
-              onClick={() => setActiveModal("endExtra")}
-              className={`w-full sm:w-auto px-10 py-3.5 flex items-center justify-center gap-2 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] ${
-                isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
-              }`}
-            >
-              <Check size={18} /> Complete Session
-            </button>
+            <>
+              <button
+                onClick={() => handleModalOpen("endExtra")}
+                className={`w-full sm:w-auto px-10 py-3.5 flex items-center justify-center gap-2 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] ${
+                  isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
+                }`}
+              >
+                <Check size={18} /> Complete Session
+              </button>
+              
+              {!isFullscreen && (
+                <button
+                  onClick={enterFullscreenOnly}
+                  className={`w-full sm:w-auto px-6 py-3.5 border flex items-center justify-center gap-2 font-semibold rounded-xl transition-all active:scale-[0.98] ${
+                    isDarkMode ? "bg-black border-white/[0.08] text-purple-400 hover:bg-white/[0.04]" : "bg-purple-50 border-purple-200 text-purple-600 hover:bg-purple-100"
+                  }`}
+                >
+                  <Maximize size={18} /> Enter Fullscreen
+                </button>
+              )}
+            </>
           ) : (
             <>
               {!isActive || isPaused ? (
                 <button
-                  onClick={isPaused ? handleResume : startSession}
+                  onClick={isPaused ? handleResume : handleStartWithFullscreen}
                   className={`w-full sm:w-auto px-10 py-3.5 flex items-center justify-center gap-2 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] ${
                     isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
                   }`}
@@ -350,7 +411,7 @@ export default function SessionTimer() {
                 </button>
               ) : (
                 <button
-                  onClick={() => setActiveModal("pause")}
+                  onClick={() => handleModalOpen("pause")}
                   className={`w-full sm:w-auto px-10 py-3.5 border flex items-center justify-center gap-2 font-semibold rounded-xl transition-all active:scale-[0.98] ${
                     isDarkMode ? "bg-black border-white/[0.08] text-gray-300 hover:bg-white/[0.04]" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
                   }`}
@@ -360,14 +421,28 @@ export default function SessionTimer() {
               )}
 
               {isActive && (
-                <button
-                  onClick={() => setActiveModal("endNormal")}
-                  className={`flex-1 sm:flex-none px-6 py-3.5 border flex items-center justify-center gap-2 font-semibold rounded-xl transition-all active:scale-[0.98] ${
-                    isDarkMode ? "bg-red-500/15 border-red-500/40 text-red-400 hover:bg-red-500/25" : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
-                  }`}
-                >
-                  <Square size={16} className="fill-current" /> End
-                </button>
+                <>
+                  <button
+                    onClick={() => handleModalOpen("endNormal")}
+                    className={`flex-1 sm:flex-none px-6 py-3.5 border flex items-center justify-center gap-2 font-semibold rounded-xl transition-all active:scale-[0.98] ${
+                      isDarkMode ? "bg-red-500/15 border-red-500/40 text-red-400 hover:bg-red-500/25" : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
+                    }`}
+                  >
+                    <Square size={16} className="fill-current" /> End
+                  </button>
+
+                  {/* Re-enter Fullscreen Button (if active but user minimized) */}
+                  {!isFullscreen && !isPaused && (
+                    <button
+                      onClick={enterFullscreenOnly}
+                      className={`flex-1 sm:flex-none px-6 py-3.5 border flex items-center justify-center gap-2 font-semibold rounded-xl transition-all active:scale-[0.98] ${
+                        isDarkMode ? "bg-black border-white/[0.08] text-gray-300 hover:bg-white/[0.04]" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                      }`}
+                    >
+                      <Maximize size={16} /> Enter Fullscreen
+                    </button>
+                  )}
+                </>
               )}
             </>
           )}
@@ -384,14 +459,16 @@ export default function SessionTimer() {
         </div>
       </div>
 
-      {/* =======================================================================
-          UNIFIED PORTAL MODALS
-      ========================================================================*/}
-      
-      {mounted && createPortal(
+      {/* RENDER FULLSCREEN COMPONENT OVERLAY WHEN ACTIVE */}
+      <AnimatePresence>
+        {isFullscreen && mounted && (
+          <FocusFullscreen onExit={() => setIsFullscreen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* STANDARD MODALS (Only render if NOT in fullscreen) */}
+      {mounted && !isFullscreen && createPortal(
         <AnimatePresence>
-          
-          {/* 1. Pause Modal */}
           {activeModal === "pause" && (
             <motion.div
               variants={overlayVariants}
@@ -399,7 +476,6 @@ export default function SessionTimer() {
               animate="visible"
               exit="exit"
               transition={{ duration: 0.2 }}
-              onClick={() => setActiveModal(null)}
               className="fixed inset-0 z-[999999] flex items-center justify-center px-4 bg-black/80 backdrop-blur-md"
             >
               <motion.div
@@ -433,7 +509,8 @@ export default function SessionTimer() {
                     <Play size={18} className="fill-current" /> Resume Focus
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setActiveModal(null);
                       stopSession(false);
                     }}
@@ -448,7 +525,6 @@ export default function SessionTimer() {
             </motion.div>
           )}
 
-          {/* 2. End Normal Session Modal */}
           {activeModal === "endNormal" && (
             <motion.div
               variants={overlayVariants}
@@ -456,7 +532,6 @@ export default function SessionTimer() {
               animate="visible"
               exit="exit"
               transition={{ duration: 0.2 }}
-              onClick={() => setActiveModal(null)}
               className="fixed inset-0 z-[999999] flex items-center justify-center px-4 bg-black/80 backdrop-blur-md"
             >
               <motion.div
@@ -490,7 +565,7 @@ export default function SessionTimer() {
                     Yes, End Session
                   </button>
                   <button
-                    onClick={() => setActiveModal(null)}
+                    onClick={handleResume} 
                     className={`w-full px-6 py-4 border font-semibold rounded-xl transition-all active:scale-[0.98] ${
                       isDarkMode ? "bg-black border-white/[0.08] text-gray-300 hover:bg-white/[0.04]" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
                     }`}
@@ -502,7 +577,6 @@ export default function SessionTimer() {
             </motion.div>
           )}
 
-          {/* 3. End Extra Focus Modal */}
           {activeModal === "endExtra" && (
             <motion.div
               variants={overlayVariants}
@@ -510,7 +584,6 @@ export default function SessionTimer() {
               animate="visible"
               exit="exit"
               transition={{ duration: 0.2 }}
-              onClick={() => setActiveModal(null)}
               className="fixed inset-0 z-[999999] flex items-center justify-center px-4 bg-black/80 backdrop-blur-md"
             >
               <motion.div
@@ -554,7 +627,7 @@ export default function SessionTimer() {
 
                 <div className="flex flex-col gap-3 w-full">
                   <button
-                    onClick={() => confirmEndExtra(true)}
+                    onClick={(e) => confirmEndExtra(true, e)}
                     className={`w-full px-6 py-4 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] text-base ${
                       isDarkMode ? "bg-purple-500 text-white hover:bg-purple-600" : "bg-purple-600 text-white hover:bg-purple-700"
                     }`}
@@ -562,7 +635,7 @@ export default function SessionTimer() {
                     Save Total Time & End
                   </button>
                   <button
-                    onClick={() => confirmEndExtra(false)}
+                    onClick={(e) => confirmEndExtra(false, e)}
                     className={`w-full px-6 py-4 border font-semibold rounded-xl transition-all active:scale-[0.98] ${
                       isDarkMode ? "bg-black border-white/[0.08] text-gray-400 hover:bg-white/[0.04]" : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                     }`}

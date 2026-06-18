@@ -48,7 +48,7 @@ const acquireLock = (lockKey: string, cooldownMs: number): boolean => {
     return true;
   }
   return false;
-};
+}
 
 const parseDBDate = (dateStr: string | undefined | null) => {
   if (!dateStr) return 0;
@@ -165,22 +165,18 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
   useEffect(() => { initialSessionTimeRef.current = initialSessionTime; }, [initialSessionTime]);
 
-  // ─── LOCAL STORAGE: SCOPED TO CURRENT USER ───
   useEffect(() => {
     if (typeof window !== "undefined" && currentUser?.id) {
-      // 1. Scoped played sessions
       const playedSessions = JSON.parse(localStorage.getItem(`played_sessions_${currentUser.id}`) || "[]");
       playedSessionRef.current = new Set(playedSessions);
 
-      // 2. Scoped daily goal
       const savedGoal = localStorage.getItem(`daily_goal_${currentUser.id}`);
       if (savedGoal) setDailyGoal(Number(savedGoal));
-      else setDailyGoal(3 * 3600); // Default to 3 hrs if not set
+      else setDailyGoal(3 * 3600); 
     }
   }, [currentUser?.id]);
 
   const updateDailyGoal = useCallback((seconds: number) => {
-    // Math checks guardrail inputs (between 1 hour and 16 hours limit)
     const safeSeconds = Math.max(3600, Math.min(16 * 3600, seconds)); 
     setDailyGoal(safeSeconds);
     
@@ -230,8 +226,13 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     setIsSessionComplete(true);
   }, []);
 
+  // DEFENSIVE PAUSE CALCULATION
   const getPausedTime = useCallback((session: ExtendedActiveSession, since: number = 0) => {
-    return (session.pauseSegments || []).reduce((acc, seg) => {
+    if (!session || !session.pauseSegments) return 0;
+    return session.pauseSegments.reduce((acc, seg) => {
+      // Ignore segments that ended before our 'since' boundary
+      if (seg.end && seg.end <= since) return acc;
+
       const segStart = Math.max(seg.start, since);
       const segEnd = seg.end || Date.now(); 
       if (segEnd <= segStart) return acc;
@@ -239,6 +240,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }, 0);
   }, []);
 
+  // SINGLE SOURCE OF TRUTH FOR ELAPSED TIME
   const getElapsedTime = useCallback(() => {
     const session = currentSessionRef.current;
     if (!session) return 0;
@@ -298,13 +300,14 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         const remoteSession = activeData.session as ExtendedActiveSession;
         const merged = mergeSessions(currentSessionRef.current, remoteSession);
 
+        const segments = merged.pauseSegments || [];
+        const lastSegment = segments[segments.length - 1];
+        const isActuallyPaused = !!(lastSegment && !lastSegment.end);
+
         setCurrentSession(merged);
         setIsActive(true);
         setMode(merged.mode);
-
-        const segments = merged.pauseSegments || [];
-        const lastSegment = segments[segments.length - 1];
-        setIsPaused(!!(lastSegment && !lastSegment.end)); 
+        setIsPaused(isActuallyPaused); 
 
         const duration = merged.initialDuration || initialSessionTime;
         setInitialSessionTime(duration);
@@ -325,7 +328,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     } finally {
       isFetchingRef.current = false;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, triggerSessionComplete]);
 
   useEffect(() => {
@@ -357,7 +359,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         .throwOnError(); 
 
     } catch (err) {
-      console.error("❌ DB SAVE FAILED:", err);
       if (retries > 0) {
         setTimeout(() => syncSessionToDB(session, isCompleted, retries - 1), 1000);
       }
@@ -388,7 +389,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       setIsSessionComplete(false);
       setExtraTime(0);
       setIsLoaded(true);
-      // Clean up generic state, but scoped states stay orphaned until login again
     }
   }, [currentUser, authInitialized, fetchSessionsFromDB]);
 
@@ -435,7 +435,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }, 30000); 
 
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, currentSession, currentUser]);
 
   useEffect(() => {
@@ -502,7 +501,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     };
   }, [currentUser?.id, triggerSessionComplete]); 
 
-  // ─── SCOPED MULTI-TAB SYNC ───
   useEffect(() => {
     const handleStorageSync = (e: StorageEvent) => {
       if (!e.newValue || !currentUser?.id) return;
@@ -533,132 +531,28 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", handleStorageSync);
   }, [stopAlarm, currentUser?.id]); 
 
-  const stopSession = async (saveExtraTime = false) => {
-    setIsSessionComplete(false);
-    stopAlarm(); 
-
-    if (!currentUser?.id) return; 
-    
-    const latestRefSession = currentSessionRef.current;
-    if (!latestRefSession) return;
-
-    const latestSessionStr = localStorage.getItem(`focus_active_session_${currentUser.id}`);
-    let finalSession = latestRefSession;
-    
-    if (latestSessionStr && latestRefSession) {
-      try {
-        const parsed = JSON.parse(latestSessionStr) as ExtendedActiveSession;
-        if (parsed.id === latestRefSession.id) { 
-          finalSession = parsed;
-        }
-      } catch (e) {}
-    }
-
-    const finalElapsed = Math.min(getElapsedTime(), finalSession.initialDuration || initialSessionTimeRef.current);
-    const finalExtraTime = (saveExtraTime && finalSession.extraStartTime) ? getExtraTime() : 0;
-    
-    const endTime = Date.now();
-    const totalDuration = (endTime - finalSession.startTime) / 1000;
-    const pausedTime = Math.max(0, totalDuration - (finalElapsed + finalExtraTime));
-
-    if (currentSession) {
-      currentSession.completedAt = undefined;
-      currentSession.extraStartTime = undefined;
-    }
-
-    setIsActive(false);
-    setIsPaused(false);
-
-    localStorage.removeItem(`focus_active_session_${currentUser.id}`);
-
-    if (saveExtraTime) {
-      localStorage.removeItem(`focus_complete_signal_${currentUser.id}`);
-      localStorage.setItem(`focus_complete_signal_${currentUser.id}`, JSON.stringify({ time: Date.now() }));
-      localStorage.removeItem(`focus_checkpoint_${currentUser.id}`); 
-    } else {
-      localStorage.removeItem(`focus_stop_signal_${currentUser.id}`);
-      localStorage.setItem(`focus_stop_signal_${currentUser.id}`, JSON.stringify({ time: Date.now(), type: "STOP" }));
-
-      localStorage.setItem(`focus_checkpoint_${currentUser.id}`, JSON.stringify({
-        sessionId: finalSession.id,
-        remaining: timeRemaining,
-        initialTime: initialSessionTime, 
-        stoppedAt: Date.now()
-      }));
-
-      if (acquireLock(`focus_abort_alert_${finalSession.id}`, 5000)) {
-        addNotification('focus', 'Session Ended', 'Logging your focus time to history.', 'medium', '/focus');
-      }
-    }
-
-    const finalDistractions = Array.isArray(finalSession.distractions) ? finalSession.distractions : [];
-    const score = calculateFocusScore(finalElapsed, finalDistractions);
-
-    const completedSession: FocusSession = {
-      ...finalSession,
-      initialDuration: finalSession.initialDuration || initialSessionTime,
-      endTime,
-      durationSeconds: finalElapsed,
-      totalSessionSeconds: totalDuration, 
-      extraDuration: finalExtraTime, 
-      actualDuration: finalElapsed + finalExtraTime,
-      date: new Date(finalSession.startTime).toISOString(),
-      score,
-      distractionCount: finalDistractions.length,
-      topDistraction: null, 
-      avgDistractionGap: 0, 
-      // @ts-ignore
-      pausedDuration: pausedTime 
-    };
-
-    if (sessionHistory.some(s => s.id === completedSession.id)) {
-      return;
-    }
-
-    setSessionHistory((prev) => {
-        const alreadySaved = prev.some(s => s.id === completedSession.id);
-        if (!alreadySaved) return [completedSession, ...prev];
-        return prev;
-    });
-
-    await syncSessionToDB(completedSession, true);
-
-    if (currentUser) {
-      await (supabase as any).from("focus_active_sessions").delete().eq("user_id", currentUser.id);
-    }
-
-    setCurrentSession(null);
-    setFocusedTime(0);
-    setTotalElapsed(0);
-    
-    setIsSessionComplete(false);
-    setExtraTime(0);
-    
-    if (mode === "pomodoro") setTimeRemaining(MODE_DURATIONS.pomodoro);
-    if (mode === "deepWork") setTimeRemaining(MODE_DURATIONS.deepWork);
-
-    await fetchSessionsFromDB(); 
-  };
-
+  // ============================================================================
+  // SINGLE SOURCE INTERVAL CHECK
+  // ============================================================================
   useEffect(() => {
     const interval = setInterval(() => {
       const session = currentSessionRef.current;
       
       if (!session) {
-          if (isActiveRef.current) {
-            setIsActive(false);
-          }
+          if (isActiveRef.current) setIsActive(false);
           return;
       }
 
       if (session.startTime > Date.now()) return;
 
-      const rem = getRemainingTime();
-      const elapsed = getElapsedTime();
+      // STRICTLY USE ELAPSED TIME FOR ALL LOGIC
+      const targetDuration = session.initialDuration || initialSessionTimeRef.current;
+      const elapsedSeconds = getElapsedTime();
+      const remainingSeconds = Math.max(0, targetDuration - elapsedSeconds);
 
-      setTimeRemaining(rem);
-      setFocusedTime(elapsed);
-      setTotalElapsed(elapsed);
+      setTimeRemaining(remainingSeconds);
+      setFocusedTime(elapsedSeconds);
+      setTotalElapsed(elapsedSeconds);
 
       if (session.completedAt && session.extraStartTime) {
         setExtraTime(getExtraTime());
@@ -666,7 +560,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
       const isActuallyComplete =
         !isPausedRef.current && 
-        rem <= 0 &&
+        elapsedSeconds >= targetDuration && // Replaced rem <= 0 with direct elapsed comparison
         !session.completedAt &&
         !playedSessionRef.current.has(session.id);
 
@@ -725,7 +619,147 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [currentUser?.id, getRemainingTime, getElapsedTime, triggerSessionComplete, getPausedTime, getExtraTime, stopAlarm, startExtraFocus, addNotification]); 
+  }, [currentUser?.id, getElapsedTime, getExtraTime, stopAlarm, startExtraFocus, addNotification]); 
+
+
+  // ============================================================================
+  // SYNCHRONOUS MUTATORS
+  // ============================================================================
+
+  const resumeSession = () => {
+    const sessionState = currentSessionRef.current;
+    if (!sessionState || !currentUser?.id) return;
+
+    const session = { ...sessionState };
+    
+    // HYDRATION SAFETY: Aggressively close ALL open segments when resuming
+    const segments = (session.pauseSegments || []).map(seg => {
+      if (!seg.end) return { ...seg, end: Date.now() };
+      return seg;
+    });
+
+    session.pauseSegments = segments;
+
+    currentSessionRef.current = session;
+    isActiveRef.current = true;
+    isPausedRef.current = false;
+    
+    setCurrentSession(session);
+    setIsActive(true);
+    setIsPaused(false);
+
+    localStorage.setItem(`focus_active_session_${currentUser.id}`, JSON.stringify(session));
+
+    (async () => {
+      try {
+        await (supabase as any).from("focus_active_sessions")
+          .update({ session, last_seen: new Date().toISOString() })
+          .eq("user_id", currentUser.id)
+          .throwOnError();
+      } catch (err) {}
+    })();
+  };
+
+  const stopSession = async (saveExtraTime = false) => {
+    setIsSessionComplete(false);
+    stopAlarm(); 
+
+    if (!currentUser?.id) return; 
+    
+    const latestRefSession = currentSessionRef.current;
+    if (!latestRefSession) return;
+
+    const latestSessionStr = localStorage.getItem(`focus_active_session_${currentUser.id}`);
+    let finalSession = { ...latestRefSession };
+    
+    if (latestSessionStr && latestRefSession) {
+      try {
+        const parsed = JSON.parse(latestSessionStr) as ExtendedActiveSession;
+        if (parsed.id === latestRefSession.id) { 
+          finalSession = parsed;
+        }
+      } catch (e) {}
+    }
+
+    const segments = finalSession.pauseSegments ? [...finalSession.pauseSegments] : [];
+    const lastSegment = segments[segments.length - 1];
+    if (lastSegment && !lastSegment.end) {
+      lastSegment.end = Date.now();
+      finalSession.pauseSegments = segments;
+    }
+
+    // STRICT ELAPSED EXTRACTION
+    const finalElapsed = Math.min(getElapsedTime(), finalSession.initialDuration || initialSessionTimeRef.current);
+    const finalExtraTime = (saveExtraTime && finalSession.extraStartTime) ? getExtraTime() : 0;
+    
+    const endTime = Date.now();
+    const totalDuration = (endTime - finalSession.startTime) / 1000;
+    const pausedTime = Math.max(0, totalDuration - (finalElapsed + finalExtraTime));
+
+    setIsActive(false);
+    setIsPaused(false);
+    setCurrentSession(null);
+    setFocusedTime(0);
+    setTotalElapsed(0);
+    setExtraTime(0);
+    
+    if (mode === "pomodoro") setTimeRemaining(MODE_DURATIONS.pomodoro);
+    if (mode === "deepWork") setTimeRemaining(MODE_DURATIONS.deepWork);
+
+    localStorage.removeItem(`focus_active_session_${currentUser.id}`);
+
+    if (saveExtraTime) {
+      localStorage.removeItem(`focus_complete_signal_${currentUser.id}`);
+      localStorage.setItem(`focus_complete_signal_${currentUser.id}`, JSON.stringify({ time: Date.now() }));
+      localStorage.removeItem(`focus_checkpoint_${currentUser.id}`); 
+    } else {
+      localStorage.removeItem(`focus_stop_signal_${currentUser.id}`);
+      localStorage.setItem(`focus_stop_signal_${currentUser.id}`, JSON.stringify({ time: Date.now(), type: "STOP" }));
+
+      localStorage.setItem(`focus_checkpoint_${currentUser.id}`, JSON.stringify({
+        sessionId: finalSession.id,
+        remaining: timeRemaining,
+        initialTime: initialSessionTime, 
+        stoppedAt: Date.now()
+      }));
+
+      if (acquireLock(`focus_abort_alert_${finalSession.id}`, 5000)) {
+        addNotification('focus', 'Session Ended', 'Logging your focus time to history.', 'medium', '/focus');
+      }
+    }
+
+    const finalDistractions = Array.isArray(finalSession.distractions) ? finalSession.distractions : [];
+    const score = calculateFocusScore(finalElapsed, finalDistractions);
+
+    const completedSession: FocusSession = {
+      ...finalSession,
+      initialDuration: finalSession.initialDuration || initialSessionTime,
+      endTime,
+      durationSeconds: finalElapsed,
+      totalSessionSeconds: totalDuration, 
+      extraDuration: finalExtraTime, 
+      actualDuration: finalElapsed + finalExtraTime,
+      date: new Date(finalSession.startTime).toISOString(),
+      score,
+      distractionCount: finalDistractions.length,
+      topDistraction: null, 
+      avgDistractionGap: 0, 
+      // @ts-ignore
+      pausedDuration: pausedTime 
+    };
+
+    setSessionHistory((prev) => {
+        const alreadySaved = prev.some(s => s.id === completedSession.id);
+        if (!alreadySaved) return [completedSession, ...prev];
+        return prev;
+    });
+
+    try {
+      await syncSessionToDB(completedSession, true);
+      await (supabase as any).from("focus_active_sessions").delete().eq("user_id", currentUser.id);
+      await fetchSessionsFromDB(); 
+    } catch (e) {}
+  };
 
   const setModeHandler = (newMode: FocusMode) => {
     if (isActive) return;
@@ -754,47 +788,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
           if (audioRef.current) audioRef.current.muted = false;
         })
         .catch(() => {});
-    }
-
-    const { data: existing } = await (supabase as any).from("focus_active_sessions")
-      .select("session")
-      .eq("user_id", currentUser.id)
-      .maybeSingle();
-
-    if (existing?.session) {
-      const remoteSession = existing.session as ExtendedActiveSession;
-      let updatedSession = { ...remoteSession };
-
-      const segments = updatedSession.pauseSegments || [];
-      const last = segments[segments.length - 1];
-
-      // Resume logic
-      if (last && !last.end) {
-        last.end = Date.now();
-        updatedSession.pauseSegments = segments;
-        
-        updatedSession.completedAt = undefined;
-        updatedSession.extraStartTime = undefined;
-      }
-
-      setCurrentSession(updatedSession);
-      currentSessionRef.current = updatedSession;
-      setIsActive(true);
-      isActiveRef.current = true;
-      setIsPaused(false);
-      isPausedRef.current = false;
-      setIsSessionComplete(false); 
-      
-      const sessionDuration = updatedSession.initialDuration || initialSessionTime;
-      setInitialSessionTime(sessionDuration);
-
-      localStorage.setItem(`focus_active_session_${currentUser.id}`, JSON.stringify(updatedSession));
-      
-      try {
-        await (supabase as any).from("focus_active_sessions").update({ session: updatedSession }).eq("user_id", currentUser.id).throwOnError();
-      } catch (err) {}
-
-      return; 
     }
 
     setIsActive(true);
@@ -857,30 +850,33 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         setInitialSessionTime, 
         setMode: setModeHandler, 
         setActiveTask: setActiveTaskId,
-        startSession, 
+        startSession,
+        resumeSession, 
         
         stopAlarm,
         startExtraFocus,
 
         pauseSession: () => {
-          if (!currentSession || isPausedRef.current || !currentUser?.id) return; 
+          const session = currentSessionRef.current;
+          if (!session || isPausedRef.current || !currentUser?.id) return; 
 
           setIsSessionComplete(false);
           stopAlarm(); 
 
           const updatedSession = {
-            ...currentSession,
+            ...session,
             pauseSegments: [
-              ...(currentSession.pauseSegments || []),
+              ...(session.pauseSegments || []),
               { start: Date.now() }
             ],
             completedAt: undefined, 
           };
 
-          setCurrentSession(updatedSession);
           currentSessionRef.current = updatedSession;
-          setIsPaused(true);
           isPausedRef.current = true;
+
+          setCurrentSession(updatedSession);
+          setIsPaused(true);
           
           localStorage.setItem(`focus_active_session_${currentUser.id}`, JSON.stringify(updatedSession));
           
