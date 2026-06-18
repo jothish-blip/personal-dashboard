@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Search, CheckCircle2, Circle, Pencil, Trash2, 
-  Target, ChevronDown, ChevronRight, CalendarDays
+  Target, ChevronDown, ChevronRight, CalendarDays,
+  Clock, AlertCircle, ArrowRight, RefreshCcw, Check
 } from "lucide-react";
 import { PlannerEvent, SystemLog } from "../../types/types";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -22,15 +23,14 @@ interface EventListProps {
   onEdit: (ev: PlannerEvent) => void;
   onAddClick: () => void;
   getDateLabel: (dateStr: string) => string;
+  onReschedule?: (id: string) => void; // Added for Recovery CTA
 }
 
 const formatTime12Hour = (time?: string) => {
   if (!time) return "No time";
-
   const [hours, minutes] = time.split(":");
   const date = new Date();
   date.setHours(Number(hours), Number(minutes));
-
   return date.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
@@ -49,13 +49,93 @@ const getActionLabel = (action: string) => {
   }
 };
 
+// 1. Live Countdown Engine
+const getEventStatusInfo = (date: string, time: string, status: string, isDarkMode: boolean) => {
+  if (status === "completed") {
+    return {
+      label: "✓ Completed",
+      colorClass: isDarkMode ? "text-emerald-400 bg-emerald-500/10" : "text-emerald-700 bg-emerald-50",
+      borderClass: isDarkMode ? "border-emerald-500/20" : "border-emerald-200",
+      urgency: "completed",
+      isOverdue: false
+    };
+  }
+
+  const now = new Date();
+  const target = new Date(`${date}T${time}`);
+  const diff = target.getTime() - now.getTime();
+
+  if (diff < 0 || status === "missed") {
+    const overdue = Math.abs(diff);
+    const mins = Math.floor(overdue / 60000);
+    const hrs = Math.floor(mins / 60);
+
+    const label = hrs > 24 ? `${Math.floor(hrs / 24)}d overdue` : `${hrs}h ${mins % 60}m overdue`;
+    return {
+      label,
+      colorClass: isDarkMode ? "text-red-400 bg-red-500/10" : "text-red-600 bg-red-50",
+      borderClass: isDarkMode ? "border-red-500/30" : "border-red-300",
+      urgency: "critical",
+      isOverdue: true
+    };
+  }
+
+  const mins = Math.floor(diff / 60000);
+  const hrs = Math.floor(mins / 60);
+
+  if (hrs < 1) {
+    return {
+      label: `Due in ${mins}m`,
+      colorClass: isDarkMode ? "text-red-400 bg-red-500/10" : "text-red-600 bg-red-50",
+      borderClass: isDarkMode ? "border-red-500/30" : "border-red-300",
+      urgency: "critical",
+      isOverdue: false
+    };
+  }
+
+  if (hrs < 2) {
+    return {
+      label: `Due in ${hrs}h ${mins % 60}m`,
+      colorClass: isDarkMode ? "text-orange-400 bg-orange-500/10" : "text-orange-600 bg-orange-50",
+      borderClass: isDarkMode ? "border-orange-500/30" : "border-orange-300",
+      urgency: "warning",
+      isOverdue: false
+    };
+  }
+
+  if (hrs < 24) {
+    return {
+      label: `Due in ${hrs}h ${mins % 60}m`,
+      colorClass: isDarkMode ? "text-blue-400 bg-blue-500/10" : "text-blue-600 bg-blue-50",
+      borderClass: isDarkMode ? "border-blue-500/20" : "border-blue-200",
+      urgency: "safe",
+      isOverdue: false
+    };
+  }
+
+  return {
+    label: `${Math.floor(hrs / 24)}d left`,
+    colorClass: isDarkMode ? "text-slate-400 bg-white/[0.04]" : "text-slate-600 bg-black/[0.03]",
+    borderClass: isDarkMode ? "border-white/[0.1]" : "border-black/[0.1]",
+    urgency: "safe",
+    isOverdue: false
+  };
+};
+
 export default function EventList({
-  activeTab, setActiveTab, searchQuery, setSearchQuery, filteredEvents, logs, toggleStatus, deleteWithUndo, onEdit, onAddClick, getDateLabel
+  activeTab, setActiveTab, searchQuery, setSearchQuery, filteredEvents, logs, toggleStatus, deleteWithUndo, onEdit, onAddClick, getDateLabel, onReschedule
 }: EventListProps) {
   
   const { isDarkMode } = useTheme();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [range, setRange] = useState({ start: "", end: "" });
+  
+  // Force re-render every minute for live countdowns
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   const toggleCollapse = (label: string) => {
     setCollapsed(prev => ({ ...prev, [label]: !prev[label] }));
@@ -69,7 +149,29 @@ export default function EventList({
   };
   const todayStr = getDateStr(today);
 
-  const filterByDate = (events: PlannerEvent[]) => {
+  // 9. Sort by Urgency Engine
+  const getUrgencyWeight = (ev: PlannerEvent) => {
+    if (ev.status === "completed") return -1000;
+    
+    let score = 0;
+    const now = new Date().getTime();
+    const target = new Date(`${ev.date}T${ev.time}`).getTime();
+    const diffMins = Math.floor((target - now) / 60000);
+
+    if (diffMins < 0 || ev.status === "missed") score += 10000; // Overdue is top priority
+    else if (diffMins > 0 && diffMins <= 60) score += 5000; // Due < 1h
+    else if (ev.date === todayStr) score += 3000; // Due today
+    
+    if (ev.priority === "high") score += 500;
+    if (ev.priority === "medium") score += 200;
+    
+    // Sort closer events higher within the same bracket
+    score -= diffMins; 
+    
+    return score;
+  };
+
+  const filterAndSortByDate = (events: PlannerEvent[]) => {
     const yesterday = new Date();
     yesterday.setDate(today.getDate() - 1);
     const yesterdayStr = getDateStr(yesterday);
@@ -78,36 +180,38 @@ export default function EventList({
     tomorrow.setDate(today.getDate() + 1);
     const tomorrowStr = getDateStr(tomorrow);
 
+    let filtered = events;
+
     switch (activeTab) {
       case "today":
-        return events.filter(e => e.date === todayStr);
+        filtered = events.filter(e => e.date === todayStr);
+        break;
       case "yesterday":
-        return events.filter(e => e.date === yesterdayStr);
+        filtered = events.filter(e => e.date === yesterdayStr);
+        break;
       case "tomorrow":
-        return events.filter(e => e.date === tomorrowStr);
+        filtered = events.filter(e => e.date === tomorrowStr);
+        break;
       case "range":
-        if (!range.start || !range.end) return events;
-        return events.filter(e => e.date >= range.start && e.date <= range.end);
+        if (range.start && range.end) {
+          filtered = events.filter(e => e.date >= range.start && e.date <= range.end);
+        }
+        break;
       case "objectives":
-        return events
-          .filter(e => e.status !== "completed")
-          .sort((a, b) => {
-            const getWeight = (ev: PlannerEvent) => {
-              let score = 0;
-              if (ev.status === "missed") score += 100;
-              if (ev.date === todayStr) score += 70;
-              if (ev.priority === "high") score += 40;
-              if (ev.priority === "medium") score += 20;
-              return score;
-            };
-            return getWeight(b) - getWeight(a);
-          });
-      default:
-        return events;
+        filtered = events.filter(e => e.status !== "completed");
+        break;
     }
+
+    // Apply execution coach sorting
+    return filtered.sort((a, b) => getUrgencyWeight(b) - getUrgencyWeight(a));
   };
 
-  const visibleEvents = filterByDate(filteredEvents);
+  const visibleEvents = filterAndSortByDate(filteredEvents);
+
+  // Extract the "Next Up" event (most urgent pending task)
+  const nextUpEvent = (activeTab === "today" || activeTab === "objectives") 
+    ? visibleEvents.find(e => e.status !== "completed")
+    : null;
 
   const grouped = visibleEvents.reduce((acc: Record<string, PlannerEvent[]>, ev) => {
     const label = getDateLabel(ev.date);
@@ -168,18 +272,13 @@ export default function EventList({
         {activeTab === "objectives" ? (
           <header className="space-y-3">
             <h1 className={`text-[2rem] font-semibold tracking-[-0.04em] ${isDarkMode ? "text-white" : "text-slate-900"}`}>
-              Open Objectives
+              Execution Board
             </h1>
             <div className="flex flex-wrap items-center gap-4 text-sm font-medium">
               <span className={isDarkMode ? "text-white/60" : "text-slate-700"}>{visibleEvents.length} remaining</span>
               <span className="text-red-500">{visibleEvents.filter(e => e.priority === 'high').length} urgent</span>
               <span className="text-emerald-500">{visibleEvents.filter(e => e.date === todayStr).length} due today</span>
             </div>
-            {visibleEvents[0] && (
-              <p className={`text-sm font-medium ${isDarkMode ? "text-white/50" : "text-slate-500"}`}>
-                Next up: <span className={isDarkMode ? "text-white" : "text-slate-900"}>{visibleEvents[0].title} – {formatTime12Hour(visibleEvents[0].time)}</span>
-              </p>
-            )}
           </header>
         ) : (
           <header className="space-y-1">
@@ -216,7 +315,7 @@ export default function EventList({
         </div>
       </div>
 
-      {/* NAVIGATION TABS (Desktop) */}
+      {/* NAVIGATION TABS */}
       <div className={`hidden lg:flex p-1.5 rounded-2xl relative z-20 overflow-x-auto scrollbar-hide ${
         isDarkMode ? "bg-white/[0.02]" : "bg-black/[0.02]"
       }`}>
@@ -230,7 +329,7 @@ export default function EventList({
                 : (isDarkMode ? "bg-transparent text-white/45 hover:text-white/70" : "bg-transparent text-slate-500 hover:text-slate-800")
             }`}
           >
-            {tab === "objectives" ? "Open Objectives" : tab === "range" ? "Timeline" : tab === "logs" ? "History" : tab}
+            {tab === "objectives" ? "Execution Board" : tab === "range" ? "Timeline" : tab === "logs" ? "History" : tab}
           </button>
         ))}
       </div>
@@ -249,35 +348,52 @@ export default function EventList({
                 : (isDarkMode ? "bg-white/[0.04] text-white/50" : "bg-black/[0.03] text-slate-600")
             }`}
           >
-            {tab === "objectives" ? "Open Objectives" : tab === "range" ? "Timeline" : tab === "logs" ? "History" : tab}
+            {tab === "objectives" ? "Execution Board" : tab === "range" ? "Timeline" : tab === "logs" ? "History" : tab}
           </button>
         ))}
       </div>
 
-      {/* CUSTOM RANGE CONTROLS */}
-      {activeTab === "range" && (
-        <div className={`flex items-center gap-3 p-4 rounded-[1.5rem] border backdrop-blur-[20px] relative z-20 animate-in slide-in-from-top-4 ${
-          isDarkMode ? "bg-white/[0.02] border-white/[0.04]" : "bg-white/[0.7] border-black/[0.04] shadow-sm"
+      {/* 5. NEXT UP FOCUS CARD */}
+      {!searchQuery && nextUpEvent && (
+        <div className={`relative overflow-hidden rounded-[2rem] p-6 md:p-8 border shadow-lg transition-all animate-in fade-in slide-in-from-bottom-4 ${
+          isDarkMode ? "bg-gradient-to-br from-orange-500/10 to-transparent border-orange-500/20" : "bg-gradient-to-br from-orange-50 to-white border-orange-200"
         }`}>
-          <CalendarDays size={20} className={`shrink-0 hidden sm:block ${isDarkMode ? "text-white/40" : "text-slate-400"}`} />
-          <div className="flex-1 flex gap-2">
-            <input 
-              type="date" 
-              value={range.start} 
-              onChange={(e) => setRange({...range, start: e.target.value})} 
-              className={`w-full border text-sm font-medium px-4 py-2.5 rounded-xl outline-none focus:border-orange-500 transition-colors ${
-                isDarkMode ? "bg-white/[0.04] border-transparent text-white color-scheme-dark" : "bg-black/[0.03] border-transparent text-slate-700"
-              }`}
-            />
-            <input 
-              type="date" 
-              value={range.end} 
-              onChange={(e) => setRange({...range, end: e.target.value})} 
-              className={`w-full border text-sm font-medium px-4 py-2.5 rounded-xl outline-none focus:border-orange-500 transition-colors ${
-                isDarkMode ? "bg-white/[0.04] border-transparent text-white color-scheme-dark" : "bg-black/[0.03] border-transparent text-slate-700"
-              }`}
-            />
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+              <span className={`text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}>Next Up</span>
+            </div>
+            <span className={`text-sm font-medium flex items-center gap-1.5 ${isDarkMode ? "text-white/60" : "text-slate-500"}`}>
+              <Clock size={14} /> {formatTime12Hour(nextUpEvent.time)}
+            </span>
           </div>
+          
+          <h2 className={`text-2xl md:text-3xl font-semibold tracking-tight mb-2 ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+            {nextUpEvent.title}
+          </h2>
+          
+          <div className="flex flex-wrap items-center gap-3 mt-4">
+            {(() => {
+              const status = getEventStatusInfo(nextUpEvent.date, nextUpEvent.time, nextUpEvent.status, isDarkMode);
+              return (
+                <span className={`px-3 py-1.5 rounded-xl text-sm font-semibold ${status.colorClass}`}>
+                  {status.label}
+                </span>
+              );
+            })()}
+            <span className={`px-3 py-1.5 rounded-xl text-sm font-medium border ${
+              isDarkMode ? "bg-white/[0.05] border-transparent text-white/70" : "bg-white border-slate-200 text-slate-700"
+            }`}>
+              {nextUpEvent.type}
+            </span>
+          </div>
+
+          <button 
+            onClick={() => toggleStatus(nextUpEvent.id)}
+            className="mt-6 w-full md:w-auto px-8 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-sm font-semibold shadow-[0_8px_20px_rgba(249,115,22,0.25)] transition-all active:scale-95 flex items-center justify-center gap-2"
+          >
+            <CheckCircle2 size={18} /> Complete Task
+          </button>
         </div>
       )}
 
@@ -343,6 +459,7 @@ export default function EventList({
 
                     {events.map((ev: PlannerEvent, index: number) => {
                       const isCompleted = ev.status === 'completed';
+                      const statusInfo = getEventStatusInfo(ev.date, ev.time, ev.status, isDarkMode);
                       
                       return (
                         <div 
@@ -351,15 +468,17 @@ export default function EventList({
                           transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] z-20 relative backdrop-blur-[20px] border
                           hover:-translate-y-0.5 hover:shadow-md
                           ${isCompleted 
-                            ? (isDarkMode ? 'opacity-70 grayscale-[15%] bg-white/[0.01] border-transparent hover:shadow-none hover:translate-y-0' : 'opacity-70 grayscale-[15%] bg-black/[0.01] border-transparent hover:shadow-none hover:translate-y-0')
-                            : (isDarkMode ? 'bg-white/[0.03] hover:bg-white/[0.045] border-white/[0.04]' : 'bg-white/[0.7] hover:bg-white border-black/[0.04] shadow-sm')
+                            ? (isDarkMode ? 'opacity-80 bg-emerald-500/[0.02] border-emerald-500/10 hover:shadow-none hover:translate-y-0' : 'opacity-90 bg-emerald-50/50 border-emerald-100 hover:shadow-none hover:translate-y-0')
+                            : statusInfo.isOverdue 
+                              ? (isDarkMode ? 'bg-red-500/[0.02] border-red-500/20' : 'bg-red-50 border-red-100 shadow-sm')
+                              : (isDarkMode ? 'bg-white/[0.03] hover:bg-white/[0.045] border-white/[0.04]' : 'bg-white/[0.7] hover:bg-white border-black/[0.04] shadow-sm')
                           }
                           `}
                         >
                           <div className={`flex items-start md:items-center gap-4 min-w-0 w-full border-l-[3px] pl-4 transition-colors duration-300 ${
-                            ev.status === 'missed' ? 'border-red-400' :
-                            isCompleted ? 'border-emerald-400/50' :
-                            ev.priority === 'high' ? 'border-orange-500' :
+                            statusInfo.isOverdue ? 'border-red-500' :
+                            isCompleted ? 'border-emerald-400' :
+                            statusInfo.urgency === 'warning' ? 'border-orange-500' :
                             (isDarkMode ? 'border-white/[0.15]' : 'border-black/[0.1]')
                           }`}>
                             
@@ -372,12 +491,12 @@ export default function EventList({
                               className={`shrink-0 mt-0.5 md:mt-0 relative z-10 transition-transform duration-300 ${!isCompleted && 'active:scale-75 hover:scale-110'}`}
                             >
                               {isCompleted ? (
-                                <CheckCircle2 className="text-emerald-500/80" size={28} />
-                              ) : ev.status === 'missed' ? (
-                                 <Circle className={isDarkMode ? "text-red-900/60" : "text-red-200"} size={28} />
+                                <CheckCircle2 className="text-emerald-500" size={28} />
+                              ) : statusInfo.isOverdue ? (
+                                 <AlertCircle className={isDarkMode ? "text-red-500/80" : "text-red-500"} size={28} />
                               ) : (
                                 <Circle className={`transition-colors duration-300 ${
-                                  isDarkMode ? 'text-white/20 group-hover:text-orange-400' : 'text-slate-200 group-hover:text-orange-400'
+                                  isDarkMode ? 'text-white/20 group-hover:text-orange-400' : 'text-slate-300 group-hover:text-orange-400'
                                 }`} size={28} />
                               )}
                             </button>
@@ -386,41 +505,55 @@ export default function EventList({
                               <div className="flex flex-wrap items-center gap-2">
                                 <h3 className={`text-base md:text-[1.1rem] font-medium tracking-[-0.01em] truncate transition-all duration-300 ${
                                   isCompleted 
-                                    ? (isDarkMode ? 'text-white/30 line-through' : 'text-slate-400 line-through') 
+                                    ? (isDarkMode ? 'text-white/50 line-through' : 'text-slate-500 line-through') 
                                     : (isDarkMode ? 'text-white' : 'text-slate-900')
                                 }`}>
                                   {ev.title}
                                 </h3>
-                                
-                                {ev.status === 'missed' && (
-                                  <span className={`shrink-0 px-2 py-0.5 text-[10px] font-semibold uppercase rounded-md tracking-wider border ${
-                                    isDarkMode ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-red-50 text-red-500 border-transparent"
-                                  }`}>Overdue</span>
-                                )}
                               </div>
                               
-                              <div className="flex flex-col mt-2 gap-1.5">
-                                <div className={`flex flex-wrap items-center gap-3 text-[10px] font-medium uppercase tracking-[0.15em] ${isDarkMode ? "text-white/50" : "text-slate-400"}`}>
-                                  <span className={`px-3 py-1.5 rounded-xl text-xs font-semibold tracking-wide ${
-                                    isDarkMode
-                                      ? "bg-orange-500/10 text-orange-300"
-                                      : "bg-orange-50 text-orange-700"
-                                  }`}>
-                                    🕒 {formatTime12Hour(ev.time)}
-                                  </span>
+                              <div className="flex flex-col mt-2 gap-2">
+                                <div className={`flex flex-wrap items-center gap-2 md:gap-3 text-[11px] font-medium uppercase tracking-[0.1em] ${isDarkMode ? "text-white/50" : "text-slate-400"}`}>
                                   
+                                  {/* 2 & 8. Time + Live Urgency Ring/Badge */}
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="flex items-center gap-1">
+                                      <Clock size={12} /> {formatTime12Hour(ev.time)}
+                                    </span>
+                                    
+                                    <span className={`px-2 py-1 rounded-md border ${statusInfo.colorClass} ${statusInfo.borderClass}`}>
+                                      {statusInfo.label}
+                                    </span>
+                                  </div>
+
+                                  <span className="hidden md:inline px-1">•</span>
                                   <span>{ev.type}</span>
                                   
-                                  <span className={`px-2 py-1 rounded-md transition-colors border ${
-                                    ev.priority === 'high' 
-                                      ? (isDarkMode ? 'bg-red-500/10 text-red-400 border-transparent' : 'bg-red-50 text-red-600 border-transparent')
-                                      : ev.priority === 'medium' 
-                                        ? (isDarkMode ? 'bg-orange-500/10 text-orange-400 border-transparent' : 'bg-orange-50 text-orange-600 border-transparent')
-                                        : (isDarkMode ? 'bg-white/[0.04] text-white/50 border-transparent' : 'bg-black/[0.03] text-slate-500 border-transparent')
-                                  }`}>
-                                    {ev.priority}
-                                  </span>
+                                  {ev.priority === 'high' && !isCompleted && (
+                                    <span className={`px-2 py-0.5 rounded border ${
+                                      isDarkMode ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-orange-50 text-orange-600 border-orange-200'
+                                    }`}>
+                                      High Priority
+                                    </span>
+                                  )}
                                 </div>
+
+                                {/* 3 & 7. Recovery CTA directly inside overdue cards */}
+                                {statusInfo.isOverdue && !isCompleted && onReschedule && (
+                                  <div className="mt-1 flex items-center gap-3">
+                                    <span className={`text-xs font-medium ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>
+                                      Suggested: Tomorrow 9:00 AM
+                                    </span>
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); onReschedule(ev.id); }}
+                                      className={`text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all active:scale-95 ${
+                                        isDarkMode ? "bg-red-500/20 text-red-400 hover:bg-red-500/30" : "bg-red-100 text-red-700 hover:bg-red-200"
+                                      }`}
+                                    >
+                                      <RefreshCcw size={12} /> Recover
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
