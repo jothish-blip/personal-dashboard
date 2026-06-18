@@ -333,18 +333,16 @@ export default function DistractionTracker() {
         </div>
       </div>
 
-      {/* MOBILE LOGGING SHEET PORTAL CONTAINER */}
+      {/* MOBILE LOGGING SHEET PORTAL CONTAINER - Fully Centered Modal */}
       {isLogging && mounted && createPortal(
         <div 
-          className={`fixed inset-0 z-[999999] flex flex-col justify-end md:hidden animate-in fade-in duration-200 ${
-            isDarkMode ? "bg-black" : "bg-black/80"
-          }`}
+          className="fixed inset-0 z-[999999] flex items-center justify-center p-4 md:hidden animate-in fade-in duration-200 bg-black/70 backdrop-blur-md"
           onTouchMove={(e) => e.stopPropagation()}
           onClick={() => setIsLogging(false)}
         >
           <div 
-            className={`rounded-t-3xl p-5 pb-8 max-h-[85vh] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom-full duration-300 border-t ${
-              isDarkMode ? "bg-black shadow-[0_-10px_40px_rgba(0,0,0,0.8)] border-white/[0.04]" : "bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.15)] border-gray-100"
+            className={`w-full max-w-md rounded-3xl p-5 pb-8 max-h-[85vh] overflow-y-auto overscroll-contain touch-pan-y animate-in zoom-in-95 duration-200 border ${
+              isDarkMode ? "bg-black shadow-[0_10px_40px_rgba(0,0,0,0.8)] border-white/[0.08]" : "bg-white shadow-[0_10px_40px_rgba(0,0,0,0.15)] border-gray-100"
             }`}
             onClick={(e) => e.stopPropagation()}
           >
@@ -356,7 +354,7 @@ export default function DistractionTracker() {
                   setIsLogging(false);
                 }}
                 className={`rounded-full w-8 h-8 flex items-center justify-center transition-colors border ${
-                  isDarkMode ? "text-zinc-400 hover:text-zinc-300 bg-black hover:bg-white/[0.04] border-white/[0.04]" : "text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 border-transparent"
+                  isDarkMode ? "text-zinc-400 hover:text-zinc-300 bg-black hover:bg-white/[0.04] border-white/[0.08]" : "text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 border-transparent"
                 }`}
               >
                 ✕
@@ -369,7 +367,7 @@ export default function DistractionTracker() {
                   key={r.id}
                   onClick={() => handleLogDistraction(r.label)}
                   className={`py-4 px-3 text-sm font-semibold rounded-xl border transition-all shadow-sm active:scale-95 ${
-                    isDarkMode ? "bg-black border-white/[0.04] text-zinc-300 hover:border-white/[0.06] active:bg-white/[0.04]" : "bg-gray-50 border-gray-200 text-gray-800 hover:border-gray-300 active:bg-gray-100"
+                    isDarkMode ? "bg-black border-white/[0.08] text-zinc-300 hover:border-white/[0.12] active:bg-white/[0.04]" : "bg-gray-50 border-gray-200 text-gray-800 hover:border-gray-300 active:bg-gray-100"
                   }`}
                 >
                   {r.label}

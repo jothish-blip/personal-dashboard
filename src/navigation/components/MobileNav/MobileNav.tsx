@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutGrid,
@@ -54,11 +54,11 @@ export default function MobileNav(props: MobileNavProps) {
   const safePaths = activePaths || {};
   const { isDarkMode } = useTheme();
   const pathname = usePathname();
+  const router = useRouter();
   
   const [mounted, setMounted] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isNavExpanded, setIsNavExpanded] = useState(false);
-  const [showHint, setShowHint] = useState(false);
   
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const navigatingRef = useRef(false);
@@ -76,10 +76,6 @@ export default function MobileNav(props: MobileNavProps) {
 
   useEffect(() => {
     setMounted(true);
-    const hintSeen = localStorage.getItem("nexspace_nav_hint");
-    if (!hintSeen) {
-      setShowHint(true);
-    }
   }, []);
 
   useEffect(() => {
@@ -107,11 +103,6 @@ export default function MobileNav(props: MobileNavProps) {
     }
     setIsProfileMenuOpen(false);
     setIsNavExpanded(true);
-    
-    if (showHint) {
-      setShowHint(false);
-      localStorage.setItem("nexspace_nav_hint", "true");
-    }
   };
 
   useEffect(() => {
@@ -135,11 +126,6 @@ export default function MobileNav(props: MobileNavProps) {
 
   if (!mounted) return null;
 
-  // Identify Active Context
-  const activeIndex = NAV_ITEMS.findIndex(item => Boolean(safePaths[item.key]));
-  const prevModule = activeIndex > 0 ? NAV_ITEMS[activeIndex - 1] : null;
-  const nextModule = activeIndex !== -1 && activeIndex < NAV_ITEMS.length - 1 ? NAV_ITEMS[activeIndex + 1] : null;
-
   return (
     <div className="mobile-nav-root">
       <header className="md:hidden w-full flex items-center justify-between px-6 pt-6 pb-2 relative z-[100] select-none">
@@ -149,7 +135,7 @@ export default function MobileNav(props: MobileNavProps) {
             e.preventDefault();
             e.stopPropagation();
             closeAllMenus();
-            setTimeout(() => { window.location.href = "/"; }, 100);
+            setTimeout(() => { router.push("/"); }, 100);
           }}
           style={{ touchAction: "manipulation" }}
         >
@@ -222,7 +208,9 @@ export default function MobileNav(props: MobileNavProps) {
                     </div>
 
                     <div className="space-y-1">
-                      <div className={`flex items-center justify-between px-3 py-3 rounded-2xl mb-2 ${isDarkMode ? "bg-white/[0.03]" : "bg-black/5"}`}>
+                      
+                      {/* RESTORED THEME TOGGLE */}
+                      <div className={`flex items-center justify-between px-4 py-3.5 rounded-2xl mb-1 ${isDarkMode ? "bg-white/[0.03]" : "bg-black/5"}`}>
                         <span className="text-[13px] font-medium tracking-wide">Theme</span>
                         <div 
                           onClick={(e) => e.stopPropagation()}
@@ -232,13 +220,13 @@ export default function MobileNav(props: MobileNavProps) {
                           <ThemeToggle />
                         </div>
                       </div>
-                      
+
                       <button
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           closeAllMenus();
-                          setTimeout(() => { handleNav("/settings"); }, 150);
+                          setTimeout(() => { router.push("/settings"); }, 150);
                         }}
                         style={{ touchAction: "manipulation" }}
                         className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-medium text-[13px] transition-colors ${
@@ -313,18 +301,6 @@ export default function MobileNav(props: MobileNavProps) {
                   style={{ touchAction: "manipulation" }}
                   className="pointer-events-auto cursor-pointer p-4 relative flex flex-col items-center justify-center"
                 >
-                  <AnimatePresence>
-                    {showHint && (
-                      <motion.span
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 5 }}
-                        className="absolute -top-3 text-[10px] font-medium tracking-wide text-zinc-500 dark:text-zinc-400"
-                      >
-                        Swipe up
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
                   <motion.div 
                     className="w-20 h-2.5 bg-orange-500 rounded-full transition-shadow mt-2"
                     animate={{ opacity: [0.6, 1, 0.6] }}
@@ -361,12 +337,6 @@ export default function MobileNav(props: MobileNavProps) {
                     <div className="w-10 h-1.5 rounded-full bg-zinc-500/30" />
                   </div>
 
-                  {/* Context Header */}
-                  <div className="flex justify-between w-full px-8 text-[11px] font-semibold uppercase tracking-widest text-zinc-500 mb-6">
-                    <span className={prevModule ? "opacity-100" : "opacity-0"}>← {prevModule?.label}</span>
-                    <span className={nextModule ? "opacity-100" : "opacity-0"}>{nextModule?.label} →</span>
-                  </div>
-
                   <div className="grid grid-cols-2 max-w-[280px] mx-auto gap-y-6 gap-x-6 px-6 pb-12">
                     {NAV_ITEMS.map((item, index) => {
                       const Icon = item.icon;
@@ -380,9 +350,8 @@ export default function MobileNav(props: MobileNavProps) {
                             e.preventDefault();
                             e.stopPropagation();
                             closeAllMenus();
-                            // Hard redirect for modules to completely bypass Framer Motion unmount freezing
                             setTimeout(() => {
-                              window.location.href = item.path;
+                              router.push(item.path);
                             }, 100);
                           }}
                           onPointerDown={(e) => e.stopPropagation()}

@@ -323,6 +323,15 @@ export function useDiarySystem() {
   const notificationQueue = useRef<string[]>([]);
   const notificationTimeouts = useRef<NodeJS.Timeout[]>([]);
 
+  // NEW REFS for Realtime Callback
+  const selectedDateRef = useRef(selectedDate);
+  const currentEntryRef = useRef(currentEntry);
+
+  useEffect(() => {
+    selectedDateRef.current = selectedDate;
+    currentEntryRef.current = currentEntry;
+  }, [selectedDate, currentEntry]);
+
   const pushNotification = useCallback(
     (
       msgKey: string,
@@ -648,15 +657,16 @@ export function useDiarySystem() {
         );
       }
 
+      // FIXED: Prevents mutating object references
       if (!entriesMap[actualTomorrow]) {
-        entriesMap[actualTomorrow] = DEFAULT_ENTRY;
+        entriesMap[actualTomorrow] = { ...DEFAULT_ENTRY };
       }
 
       const dates = Object.keys(entriesMap).sort().reverse();
 
       setAllEntries(entriesMap);
-      setCurrentEntry(entriesMap[actualToday] || DEFAULT_ENTRY);
-      lastSavedRef.current = JSON.stringify(entriesMap[actualToday] || DEFAULT_ENTRY);
+      setCurrentEntry(entriesMap[actualToday] || { ...DEFAULT_ENTRY });
+      lastSavedRef.current = JSON.stringify(entriesMap[actualToday] || { ...DEFAULT_ENTRY });
       setIsLoaded(true);
     };
 
@@ -688,8 +698,8 @@ export function useDiarySystem() {
       setCurrentEntry(mapped);
       lastSavedRef.current = JSON.stringify(mapped);
     } else {
-      setCurrentEntry(DEFAULT_ENTRY);
-      lastSavedRef.current = JSON.stringify(DEFAULT_ENTRY);
+      setCurrentEntry({ ...DEFAULT_ENTRY });
+      lastSavedRef.current = JSON.stringify({ ...DEFAULT_ENTRY });
     }
 
     setDirty(false);
@@ -875,9 +885,11 @@ export function useDiarySystem() {
   };
 
   const handleTagToggle = (tag: string) => {
-    const newTags = currentEntry.tags.includes(tag)
-      ? currentEntry.tags.filter((t) => t !== tag)
-      : [...currentEntry.tags, tag];
+    // FIXED: Safely default to an empty array to prevent undefined errors
+    const tags = currentEntry.tags || [];
+    const newTags = tags.includes(tag)
+      ? tags.filter((t) => t !== tag)
+      : [...tags, tag];
 
     updateEntry({ tags: newTags });
   };
@@ -937,11 +949,20 @@ export function useDiarySystem() {
     if (newD <= actualToday) setSelectedDate(newD);
   };
 
+  // FIXED: Realtime setup isolated to user, protecting against state closure staleness
   useEffect(() => {
-    if (!supabase || !currentUser) return;
+    if (!supabase || !currentUser?.id) return;
+
+    const channelName = `diary-${currentUser.id}`;
+
+    // Clean up existing duplicates before subscribing to prevent dev mode overlapping
+    supabase
+      .getChannels()
+      .filter((c) => c.topic === `realtime:${channelName}`)
+      .forEach((c) => supabase.removeChannel(c));
 
     const channel = supabase
-      .channel(`diary-${currentUser.id}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
@@ -956,10 +977,13 @@ export function useDiarySystem() {
           if (!row) return;
           if (isEditingRef.current) return;
 
+          // Checking against ref to access accurate timing
+          const currentUpdatedAt = currentEntryRef.current.updatedAt;
+
           if (
-            currentEntry.updatedAt &&
+            currentUpdatedAt &&
             row.updated_at &&
-            new Date(row.updated_at) < new Date(currentEntry.updatedAt)
+            new Date(row.updated_at) < new Date(currentUpdatedAt)
           ) {
             return;
           }
@@ -995,7 +1019,8 @@ export function useDiarySystem() {
             [row.entry_date]: mapped,
           }));
 
-          if (row.entry_date === selectedDate) {
+          // Read latest current date selected by user using ref
+          if (row.entry_date === selectedDateRef.current) {
             setCurrentEntry(mapped);
             lastSavedRef.current = JSON.stringify(mapped);
           }
@@ -1006,7 +1031,7 @@ export function useDiarySystem() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, currentUser, selectedDate]);
+  }, [supabase, currentUser?.id]);
 
   const filteredHistory = useMemo(() => {
     let dates = allDates.filter((d) => d <= actualToday).sort().reverse();

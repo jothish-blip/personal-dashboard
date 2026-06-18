@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Save, Lock, Loader2, Plus, 
-  ChevronDown, X, Check
-} from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Loader2, Plus, ChevronDown, X, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from "@/theme/ThemeProvider";
 
 interface HeaderProps {
@@ -42,8 +41,8 @@ const formatMonthDisplay = (monthStr: string) => {
 
 // Unified Status & Color Engine
 const getStatusIntelligence = (tasksLength: number, completed: number, percentage: number) => {
-  if (tasksLength === 0) return { text: "Setup Required", colorClass: "text-gray-500", bgClass: "bg-gray-300 dark:bg-gray-800" };
-  if (completed === 0) return { text: "Inactive", colorClass: "text-gray-500", bgClass: "bg-gray-300 dark:bg-gray-800" };
+  if (tasksLength === 0) return { text: "Setup Required", colorClass: "text-slate-500", bgClass: "bg-slate-200 dark:bg-slate-800" };
+  if (completed === 0) return { text: "Inactive", colorClass: "text-slate-500", bgClass: "bg-slate-200 dark:bg-slate-800" };
   if (percentage <= 30) return { text: "Low Momentum", colorClass: "text-red-500", bgClass: "bg-red-500" };
   if (percentage <= 70) return { text: "Building Momentum", colorClass: "text-orange-500", bgClass: "bg-orange-500" };
   if (percentage <= 99) return { text: "Strong Momentum", colorClass: "text-blue-500", bgClass: "bg-blue-500" };
@@ -57,6 +56,7 @@ export default function Header({
 }: HeaderProps) {
   const { isDarkMode } = useTheme();
   
+  const [mounted, setMounted] = useState(false);
   const [taskName, setTaskName] = useState('');
   const [taskGroup, setTaskGroup] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -70,11 +70,12 @@ export default function Header({
   const selectedMonth = initialMonth || todayMonth;
 
   useEffect(() => {
+    setMounted(true);
     if (!initialMonth) setMonthYear(todayMonth);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Escape key and scroll lock
+  // Escape key and strict scroll/touch lock (document.documentElement handles desktop scroll)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -85,13 +86,19 @@ export default function Header({
 
     if (showLockModal || showAddModal) {
       document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      document.documentElement.style.overflow = "hidden";
       window.addEventListener('keydown', handleKeyDown);
     } else {
       document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+      document.documentElement.style.overflow = "";
     }
     
     return () => { 
       document.body.style.overflow = ""; 
+      document.body.style.touchAction = "";
+      document.documentElement.style.overflow = "";
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [showLockModal, showAddModal]);
@@ -131,184 +138,229 @@ export default function Header({
   const status = getStatusIntelligence(tasksLength, todayDataLength, progressPercentage);
   const isPerfect = progressPercentage === 100 && tasksLength > 0;
 
-  // Real Liquid Morphism Classes (OLED Black in Dark Mode)
-  const liquidModalClass = isDarkMode 
-    ? "bg-gradient-to-b from-white/[0.05] to-white/[0.015] backdrop-blur-[50px] saturate-[180%] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_32px_rgba(0,0,0,0.25)] border-none" 
-    : "bg-white/80 backdrop-blur-[50px] saturate-[150%] shadow-[inset_0_1px_0_rgba(255,255,255,1),0_8px_32px_rgba(0,0,0,0.08)] border-none";
+  // Solid, clean surfacing (Pure black in Dark Mode)
+  const surfaceClass = isDarkMode 
+    ? "bg-black border-white/[0.08]" 
+    : "bg-white border-black/[0.05]";
+    
+  const modalSurfaceClass = isDarkMode 
+    ? "bg-black border border-white/[0.08] shadow-2xl" 
+    : "bg-white border border-black/[0.05] shadow-xl";
 
-  const liquidHeaderClass = isDarkMode 
-    ? "bg-gradient-to-b from-white/[0.05] to-white/[0.015] backdrop-blur-[50px] saturate-[180%] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_32px_rgba(0,0,0,0.25)] border-none" 
-    : "bg-gradient-to-b from-white/80 to-white/60 backdrop-blur-[50px] saturate-[150%] shadow-[inset_0_1px_0_rgba(255,255,255,1),0_8px_32px_rgba(0,0,0,0.06)] border-none";
+  const modalVariants = {
+    hidden: { opacity: 0, y: 8 },
+    visible: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: 8 }
+  };
+
+  const overlayVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1 },
+    exit: { opacity: 0 }
+  };
 
   return (
     <>
-      {/* 1. DEEP BLUR LOCK MODAL */}
-      {showLockModal && (
-        <div className={`fixed inset-0 z-[9999] flex items-center justify-center backdrop-blur-[50px] saturate-[180%] px-4 animate-in fade-in duration-300 ${
-          isDarkMode ? "bg-black/80" : "bg-black/20"
-        }`}>
-          <div className={`rounded-[24px] p-8 max-w-[400px] w-full animate-in zoom-in-95 duration-300 ${liquidModalClass}`}>
-            <h3 className={`text-xl font-medium mb-1 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              {isPerfect ? "Complete Day" : "Finalize Today"}
-            </h3>
-            <p className={`text-sm font-normal mb-6 ${isPerfect ? "text-emerald-500" : "text-red-500"}`}>
-              This action cannot be undone.
-            </p>
-            
-            <div className="space-y-4 mb-8">
-              <div className="flex justify-between items-center text-sm font-normal">
-                <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Total Objectives</span>
-                <span className={`font-medium ${isDarkMode ? "text-white" : "text-gray-900"}`}>{tasksLength}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm font-normal">
-                <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Completed</span>
-                <span className={`font-medium ${isDarkMode ? "text-white" : "text-gray-900"}`}>{todayDataLength}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm pt-2">
-                <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Final Score</span>
-                <span className={`text-lg font-medium ${isDarkMode ? "text-white" : "text-gray-900"}`}>{progressPercentage}%</span>
-              </div>
-            </div>
+      {/* 1. PORTAL: CLEAN LOCK MODAL */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {showLockModal && (
+            <motion.div 
+              variants={overlayVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              transition={{ duration: 0.2 }}
+              onClick={() => setShowLockModal(false)}
+              className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-black/80 backdrop-blur-md"
+            >
+              <motion.div 
+                variants={modalVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                onClick={(e) => e.stopPropagation()}
+                className={`rounded-2xl p-6 max-w-[420px] w-full ${modalSurfaceClass}`}
+              >
+                <h3 className={`text-lg font-semibold mb-1 tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+                  {isPerfect ? "Complete Day" : "Finalize Today"}
+                </h3>
+                <p className={`text-sm mb-6 ${isPerfect ? "text-emerald-500" : "text-blue-500"}`}>
+                  This action cannot be undone.
+                </p>
+                
+                <div className="space-y-3 mb-8">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className={isDarkMode ? "text-slate-400" : "text-slate-500"}>Total Objectives</span>
+                    <span className={`font-medium ${isDarkMode ? "text-white" : "text-slate-900"}`}>{tasksLength}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className={isDarkMode ? "text-slate-400" : "text-slate-500"}>Completed</span>
+                    <span className={`font-medium ${isDarkMode ? "text-white" : "text-slate-900"}`}>{todayDataLength}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm pt-2">
+                    <span className={isDarkMode ? "text-slate-400" : "text-slate-500"}>Final Score</span>
+                    <span className={`text-base font-semibold ${isDarkMode ? "text-white" : "text-slate-900"}`}>{progressPercentage}%</span>
+                  </div>
+                </div>
 
-            <div className="flex gap-4 justify-end items-center">
-              <button 
-                onClick={() => setShowLockModal(false)}
-                className={`px-5 py-2.5 text-sm font-medium transition-colors ${
-                  isDarkMode ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={confirmLock}
-                className={`px-6 py-2.5 text-sm font-medium rounded-full shadow-lg transition-all active:scale-95 hover:opacity-90 text-white ${
-                  isPerfect ? "bg-emerald-500 hover:bg-emerald-600" : "bg-red-500 hover:bg-red-600"
-                }`}
-              >
-                {isPerfect ? "Complete" : "Finalize"}
-              </button>
-            </div>
-          </div>
-        </div>
+                <div className="flex gap-3 justify-end items-center">
+                  <button 
+                    onClick={() => setShowLockModal(false)}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      isDarkMode ? "text-slate-300 hover:bg-white/[0.06]" : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={confirmLock}
+                    className={`px-5 py-2 text-sm font-medium rounded-lg transition-all active:scale-95 text-white ${
+                      isPerfect ? "bg-emerald-500 hover:bg-emerald-600" : "bg-blue-600 hover:bg-blue-700"
+                    }`}
+                  >
+                    {isPerfect ? "Complete" : "Finalize"}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
       )}
 
-      {/* 2. GLASS SHEET ADD MODAL */}
-      {showAddModal && (
-        <div className={`fixed inset-0 z-[9990] flex items-center justify-center backdrop-blur-[50px] saturate-[180%] px-4 animate-in fade-in duration-300 ${
-          isDarkMode ? "bg-black/80" : "bg-black/20"
-        }`}>
-          <div className={`rounded-[24px] p-6 max-w-[560px] w-full animate-in slide-in-from-bottom-8 duration-300 ${liquidModalClass}`}>
-            <div className="flex justify-between items-center mb-6">
-              <h3 className={`text-lg font-medium ${isDarkMode ? "text-white" : "text-gray-900"}`}>New Objective</h3>
-              <button onClick={() => setShowAddModal(false)} className={`transition-colors ${
-                isDarkMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
-              }`}>
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="flex flex-col mb-8">
-              <input 
-                ref={taskInputRef}
-                type="text" 
-                value={taskName} 
-                onChange={(e) => setTaskName(e.target.value)} 
-                onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
-                disabled={isAdding}
-                placeholder="What outcome do you want?" 
-                className={`w-full bg-transparent border-none outline-none text-xl font-normal disabled:opacity-50 transition-colors pb-4 ${
-                  isDarkMode ? "text-white placeholder:text-gray-600" : "text-gray-900 placeholder:text-gray-400"
-                }`}
-                autoFocus
-              />
-              
-              <hr className={`border-t mb-4 transition-colors ${isDarkMode ? "border-white/10" : "border-gray-200"}`} />
-              
-              <input 
-                type="text" 
-                value={taskGroup} 
-                onChange={(e) => setTaskGroup(e.target.value)} 
-                onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
-                disabled={isAdding}
-                placeholder="Area (optional)" 
-                className={`w-full bg-transparent border-none outline-none text-sm font-normal disabled:opacity-50 transition-colors ${
-                  isDarkMode ? "text-gray-400 placeholder:text-gray-600" : "text-gray-600 placeholder:text-gray-400"
-                }`} 
-              />
-            </div>
+      {/* 2. PORTAL: CLEAN ADD MODAL */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {showAddModal && (
+            <motion.div 
+              variants={overlayVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              transition={{ duration: 0.2 }}
+              onClick={() => setShowAddModal(false)}
+              className="fixed inset-0 z-[9990] flex items-center justify-center px-4 bg-black/80 backdrop-blur-md"
+            >
+              <motion.div 
+                variants={modalVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                onClick={(e) => e.stopPropagation()}
+                className={`rounded-2xl p-6 max-w-[520px] w-full ${modalSurfaceClass}`}
+              >
+                <div className="flex justify-between items-center mb-5">
+                  <h3 className={`text-lg font-semibold tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+                    New Objective
+                  </h3>
+                  <button onClick={() => setShowAddModal(false)} className={`p-1 rounded-md transition-colors ${
+                    isDarkMode ? "text-slate-400 hover:text-white hover:bg-white/10" : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                  }`}>
+                    <X size={18} />
+                  </button>
+                </div>
+                
+                <div className="flex flex-col mb-6">
+                  <input 
+                    ref={taskInputRef}
+                    type="text" 
+                    value={taskName} 
+                    onChange={(e) => setTaskName(e.target.value)} 
+                    onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+                    disabled={isAdding}
+                    placeholder="What outcome do you want?" 
+                    className={`w-full bg-transparent border-none outline-none text-[17px] font-medium disabled:opacity-50 transition-colors pb-3 ${
+                      isDarkMode ? "text-white placeholder:text-slate-600" : "text-slate-900 placeholder:text-slate-400"
+                    }`}
+                  />
+                  
+                  <div className={`h-[1px] w-full mb-3 ${isDarkMode ? "bg-white/10" : "bg-slate-200"}`} />
+                  
+                  <input 
+                    type="text" 
+                    value={taskGroup} 
+                    onChange={(e) => setTaskGroup(e.target.value)} 
+                    onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+                    disabled={isAdding}
+                    placeholder="Area (optional)" 
+                    className={`w-full bg-transparent border-none outline-none text-sm font-medium disabled:opacity-50 transition-colors ${
+                      isDarkMode ? "text-slate-300 placeholder:text-slate-600" : "text-slate-700 placeholder:text-slate-400"
+                    }`} 
+                  />
+                </div>
 
-            <div className="flex gap-3 justify-end items-center">
-              <button 
-                onClick={() => setShowAddModal(false)}
-                className={`px-5 py-2.5 text-sm font-medium transition-colors ${
-                  isDarkMode ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleAdd} 
-                disabled={isAdding || !taskName.trim()}
-                className="px-6 py-2.5 text-sm font-medium rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-30 flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white"
-              >
-                {isAdding && <Loader2 size={16} className="animate-spin" />}
-                Create
-              </button>
-            </div>
-          </div>
-        </div>
+                <div className="flex gap-2 justify-end items-center">
+                  <button 
+                    onClick={() => setShowAddModal(false)}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      isDarkMode ? "text-slate-300 hover:bg-white/[0.06]" : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleAdd} 
+                    disabled={isAdding || !taskName.trim()}
+                    className="px-5 py-2 text-sm font-medium rounded-lg transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white"
+                  >
+                    {isAdding && <Loader2 size={16} className="animate-spin" />}
+                    Create
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
       )}
 
-      {/* 3. PURE LIQUID WORKSPACE HEADER */}
-      <div className="max-w-[1400px] w-full mx-auto px-4 md:px-8 pt-6 pb-2 z-40 relative">
-        <div className={`rounded-[24px] p-6 flex flex-col gap-5 transition-colors duration-300 ${liquidHeaderClass}`}>
+      {/* 3. HIGH-DENSITY WORKSPACE HEADER */}
+      <div className="max-w-[1600px] w-full mx-auto px-4 md:px-8 pt-6 pb-2 z-40 relative">
+        <div className={`rounded-2xl border p-6 md:p-8 flex flex-col gap-6 ${surfaceClass}`}>
           
-          {/* Level 1 & 2: Score and Status */}
-          <div className="flex flex-col">
-            <h1 className={`text-2xl md:text-3xl font-medium tracking-tight transition-colors ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}>
-              {progressPercentage}% Complete
+          {/* Level 1: Score and Status */}
+          <div className="flex flex-col gap-1">
+            <h1 className={`text-4xl md:text-5xl font-semibold tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+              {progressPercentage}%
             </h1>
-            <div className="text-sm font-medium mt-1 transition-colors">
-              <span className={status.colorClass}>
-                Status: {status.text}
-              </span>
+            <div className={`text-[15px] font-medium tracking-wide mt-1 ${status.colorClass}`}>
+              {status.text}
             </div>
           </div>
 
-          {/* Liquid Progress Bar */}
-          <div className={`h-1.5 w-full rounded-full overflow-hidden transition-colors ${
-            isDarkMode ? "bg-gray-800/50" : "bg-gray-200"
-          }`}>
+          {/* Progress Bar */}
+          <div className={`h-1.5 w-full rounded-full overflow-hidden ${isDarkMode ? "bg-white/[0.06]" : "bg-black/[0.04]"}`}>
             <div 
               className={`h-full rounded-full transition-all duration-1000 ease-out ${status.bgClass}`}
               style={{ width: `${progressPercentage}%` }} 
             />
           </div>
 
-          {/* Level 3: Metrics & Actions (Stacked on Mobile, Spaced on Desktop) */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          {/* Level 3: Metrics & Actions */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pt-2">
             
-            {/* Left: Aligned Typography Metrics */}
-            <div className="flex flex-col gap-3">
+            {/* Left: Metrics */}
+            <div className="flex flex-col gap-2">
               <div className="flex flex-col gap-1.5 text-[13px]">
-                <div className="flex items-center justify-between w-[120px]">
-                  <span className={`transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Today</span>
-                  <span className={`font-medium transition-colors ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>
-                    {todayDataLength}/{tasksLength}
+                <div className="flex items-center justify-between w-[160px]">
+                  <span className={isDarkMode ? "text-slate-400" : "text-slate-500"}>Today</span>
+                  <span className={`font-semibold ${isDarkMode ? "text-slate-200" : "text-slate-800"}`}>
+                    {todayDataLength} / {tasksLength}
                   </span>
                 </div>
-                <div className="flex items-center justify-between w-[120px]">
-                  <span className={`transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Yesterday</span>
-                  <span className={`font-medium transition-colors ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>
-                    {yesterdayDataLength}/{tasksLength}
+                <div className="flex items-center justify-between w-[160px]">
+                  <span className={isDarkMode ? "text-slate-400" : "text-slate-500"}>Yesterday</span>
+                  <span className={`font-semibold ${isDarkMode ? "text-slate-200" : "text-slate-800"}`}>
+                    {yesterdayDataLength} / {tasksLength}
                   </span>
                 </div>
               </div>
               
-              <div className={`relative inline-flex items-center gap-1.5 text-[13px] font-medium hover:opacity-70 cursor-pointer transition-opacity w-fit ${
-                isDarkMode ? "text-gray-200" : "text-gray-900"
+              <div className={`relative inline-flex items-center gap-1.5 text-[12px] font-medium hover:opacity-70 cursor-pointer transition-opacity w-fit mt-1.5 ${
+                isDarkMode ? "text-slate-400" : "text-slate-500"
               }`}>
                 {formatMonthDisplay(selectedMonth)} <ChevronDown size={14} className="opacity-50" />
                 <input 
@@ -320,42 +372,37 @@ export default function Header({
               </div>
             </div>
 
-            {/* Right: Actions (Stacked Vertically on Desktop & Mobile) */}
-            <div className="flex flex-col items-center md:items-end gap-3 md:gap-2 w-full md:w-auto mt-4 md:mt-0">
+            {/* Right: Actions */}
+            <div className="flex flex-row items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
               
               {!isLocked && (
                 <button 
                   onClick={() => setShowAddModal(true)} 
-                  className="w-full md:w-auto flex justify-center items-center gap-2 px-6 h-[44px] md:h-[40px] text-sm font-medium rounded-full transition-colors bg-orange-500 hover:bg-orange-600 text-white shadow-sm"
+                  className="flex-1 md:flex-none flex justify-center items-center gap-2 px-5 h-[40px] text-[13px] font-medium rounded-lg transition-colors bg-orange-500 hover:bg-orange-600 text-white"
                 >
                   <Plus size={16} /> 
-                  <span className="md:hidden">Add</span>
-                  <span className="hidden md:inline">Add Objective</span>
+                  <span>Add</span>
                 </button>
               )}
               
               {!isLocked && tasksLength > 0 && (
                 <button 
                   onClick={() => setShowLockModal(true)} 
-                  className={`w-fit md:w-auto flex justify-center items-center gap-1.5 px-4 h-[36px] md:h-[40px] text-[13px] md:text-sm font-medium transition-all hover:scale-[0.98]
-                    ${isPerfect 
-                      ? "text-emerald-500 md:text-white md:bg-emerald-500 md:hover:bg-emerald-600 md:rounded-full md:shadow-sm" 
-                      : "text-red-500 md:text-white md:bg-red-500 md:hover:bg-red-600 md:rounded-full md:shadow-sm"
-                    }
-                  `}
+                  className={`flex-1 md:flex-none flex justify-center items-center gap-1.5 px-5 h-[40px] text-[13px] font-medium rounded-lg transition-all active:scale-95 text-white ${
+                    isPerfect 
+                      ? "bg-emerald-500 hover:bg-emerald-600" 
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }`}
                 >
-                  {/* Visual Checkmark for smaller footprint */}
-                  <Check size={14} className="md:w-4 md:h-4" /> 
-                  <span className="md:hidden">{isPerfect ? "Complete" : "Finalize"}</span>
-                  <span className="hidden md:inline">{isPerfect ? "Complete Day" : "Finalize Day"}</span>
+                  <Check size={15} /> 
+                  <span>{isPerfect ? "Complete" : "Finalize"}</span>
                 </button>
               )}
               
               {isLocked && (
-                <div className="w-fit md:w-auto flex justify-center items-center gap-2 px-4 h-[36px] md:h-[40px] text-[13px] md:text-sm font-medium rounded-full transition-colors bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <div className="flex-1 md:flex-none flex justify-center items-center gap-2 px-5 h-[40px] text-[13px] font-medium rounded-lg transition-colors bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   <Check size={16} /> 
-                  <span className="md:hidden">Finalized</span>
-                  <span className="hidden md:inline">Day Finalized</span>
+                  <span>Day Finalized</span>
                 </div>
               )}
 

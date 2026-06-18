@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { PanInfo } from "framer-motion";
 import { MODULES, NATIVE_SWIPE_SETTINGS } from "./config";
@@ -9,16 +9,19 @@ export function useModuleSwipe() {
   const router = useRouter();
   const pathname = usePathname();
   
-  // 1 = sliding left (going to next), -1 = sliding right (going to prev)
   const [direction, setDirection] = useState(0);
 
-  // Case-insensitive match to guarantee we find the current index
   const currentIndex = MODULES.findIndex(
     (m) => m.path.toLowerCase() === pathname.toLowerCase()
   );
   
   const nextModule = MODULES[currentIndex + 1] || null;
   const prevModule = MODULES[currentIndex - 1] || null;
+
+  useEffect(() => {
+    if (nextModule) router.prefetch(nextModule.path);
+    if (prevModule) router.prefetch(prevModule.path);
+  }, [nextModule, prevModule, router]);
 
   const handleDragEnd = useCallback(
     (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
@@ -27,7 +30,6 @@ export function useModuleSwipe() {
 
       const { DRAG_THRESHOLD, VELOCITY_THRESHOLD } = NATIVE_SWIPE_SETTINGS;
 
-      // Swipe Left (finger moves left) -> Go Next
       if (offset < -DRAG_THRESHOLD || velocity < -VELOCITY_THRESHOLD) {
         if (nextModule) {
           setDirection(1);
@@ -35,7 +37,6 @@ export function useModuleSwipe() {
           router.push(nextModule.path);
         }
       } 
-      // Swipe Right (finger moves right) -> Go Prev
       else if (offset > DRAG_THRESHOLD || velocity > VELOCITY_THRESHOLD) {
         if (prevModule) {
           setDirection(-1);
@@ -49,7 +50,7 @@ export function useModuleSwipe() {
 
   return {
     currentIndex,
-    nextModule,
+    nextModule, 
     prevModule,
     direction,
     handleDragEnd,
