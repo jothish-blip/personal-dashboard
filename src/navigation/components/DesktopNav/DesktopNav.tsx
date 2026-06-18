@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
@@ -27,48 +28,23 @@ interface DesktopNavProps {
 }
 
 const DEFAULT_NAV_ITEMS = [
-  {
-    label: "Tasks",
-    tooltip: "Execution Engine",
-    path: "/",
-    key: "isTasks",
-  },
-  {
-    label: "Focus",
-    tooltip: "Deep Work System",
-    path: "/focus",
-    key: "isFocus",
-  },
-  {
-    label: "Planner",
-    tooltip: "Strategic Intelligence",
-    path: "/Planner",
-    key: "isCalendar",
-  },
-  {
-    label: "Journal",
-    tooltip: "Reflection Archive",
-    path: "/diary",
-    key: "isDiary",
-  },
-  {
-    label: "Workspace",
-    tooltip: "Operations Dashboard",
-    path: "/Workspace",
-    key: "isMini",
-  },
+  { label: "Tasks", path: "/", key: "isTasks" },
+  { label: "Focus", path: "/focus", key: "isFocus" },
+  { label: "Planner", path: "/Planner", key: "isCalendar" },
+  { label: "Journal", path: "/diary", key: "isDiary" },
+  { label: "Workspace", path: "/Workspace", key: "isMini" },
 ];
 
 export default function DesktopNav(props: DesktopNavProps) {
   const {
     activePaths = {},
-    handleNav = () => {},
     handleLogout = () => {},
     userProfile = null,
   } = props;
 
   const safePaths = activePaths || {};
   const { isDarkMode } = useTheme();
+  const router = useRouter();
   
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -76,11 +52,11 @@ export default function DesktopNav(props: DesktopNavProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const navigatingRef = useRef(false);
 
-  // Safe navigation lock to prevent spam clicking
+  // Safe navigation lock to prevent spam clicking and perform smooth routing
   const safeNavigate = (path: string) => {
     if (navigatingRef.current) return;
     navigatingRef.current = true;
-    handleNav(path);
+    router.push(path);
     setTimeout(() => {
       navigatingRef.current = false;
     }, 300);
@@ -90,7 +66,7 @@ export default function DesktopNav(props: DesktopNavProps) {
     setMounted(true);
   }, []);
 
-  // Handle Keyboard Shortcuts
+  // Handle hidden Keyboard Shortcuts for power users
   useEffect(() => {
     const handleShortcuts = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
@@ -103,7 +79,7 @@ export default function DesktopNav(props: DesktopNavProps) {
     };
     window.addEventListener("keydown", handleShortcuts);
     return () => window.removeEventListener("keydown", handleShortcuts);
-  }, []);
+  }, [router]);
 
   // Handle Dropdown Positioning & Esc/Resize Events
   useEffect(() => {
@@ -138,13 +114,14 @@ export default function DesktopNav(props: DesktopNavProps) {
     <>
       <div className="hidden md:block w-full px-4 lg:px-6 mt-4 relative z-[1000] select-none">
         <div
-          className={`relative w-full max-w-[1800px] mx-auto rounded-[24px] transition-all duration-500 ${
+          className={`relative w-full max-w-[1600px] mx-auto rounded-[24px] transition-all duration-500 ${
             isDarkMode
               ? "bg-[#000000] border border-white/[0.04] shadow-none"
               : "bg-white border border-zinc-200/80 shadow-[0_8px_24px_rgba(0,0,0,0.01)]"
           }`}
         >
-          <div className="relative h-[82px] px-6 flex items-center justify-between">
+          {/* Reduced height for a denser, more professional feel */}
+          <div className="relative h-[74px] px-6 flex items-center justify-between">
             
             <div className="flex items-center flex-shrink-0">
               <div 
@@ -181,13 +158,7 @@ export default function DesktopNav(props: DesktopNavProps) {
                   >
                     <span className="relative z-10">{item.label}</span>
 
-                    {/* Desktop Hover Tooltip */}
-                    <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1 rounded-md text-[11px] font-medium tracking-wider whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${
-                      isDarkMode ? "bg-zinc-800 text-zinc-300 border border-white/5" : "bg-zinc-800 text-white shadow-md"
-                    }`}>
-                      {item.tooltip}
-                    </div>
-
+                    {/* Active Pill only - orange dot removed for cleanliness */}
                     {isActive && (
                       <motion.div
                         layoutId="desktop-active-pill"
@@ -196,14 +167,6 @@ export default function DesktopNav(props: DesktopNavProps) {
                             ? "bg-white/[0.03] border border-white/[0.05] shadow-[0_0_30px_rgba(249,115,22,0.08)]" 
                             : "bg-zinc-100 border border-zinc-200/50 shadow-[0_0_20px_rgba(249,115,22,0.05)]"
                         }`}
-                        transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                      />
-                    )}
-
-                    {isActive && (
-                      <motion.div 
-                        layoutId="desktop-active-dot"
-                        className="absolute bottom-[-2px] left-1/2 -translate-x-1/2 w-3 h-[1.5px] bg-orange-500 rounded-full"
                         transition={{ type: "spring", stiffness: 400, damping: 32 }}
                       />
                     )}
@@ -260,7 +223,7 @@ export default function DesktopNav(props: DesktopNavProps) {
                 initial={{ opacity: 0, scale: 0.96, y: -4 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96, y: -4 }}
-                transition={{ duration: 0.16, ease: "easeOut" }}
+                transition={{ type: "spring", stiffness: 500, damping: 35 }}
                 style={{ 
                   position: 'fixed',
                   top: `${dropdownCoords.top}px`,

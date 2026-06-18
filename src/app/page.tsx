@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/theme/ThemeProvider";
-import { motion, AnimatePresence } from "framer-motion";
 import nextDynamic from "next/dynamic";
 
 // Tasks Engine
@@ -43,11 +42,17 @@ export default function Home() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   
-  // FIX 1: Hydration safe session storage check
+  // Hydration safe session storage check
   const [hasSessionLoaded, setHasSessionLoaded] = useState(false);
 
   useEffect(() => {
     setHasSessionLoaded(sessionStorage.getItem("nexspace_session_loaded") === "true");
+  }, []);
+
+  // ─── PRELOAD TABS FOR ZERO-LATENCY SWITCHING ───
+  useEffect(() => {
+    import("@/modules/tasks/analytics/AnalyticsView");
+    import("@/modules/tasks/audit/AuditView");
   }, []);
 
   const isMini = pathname === "/Workspace";
@@ -161,14 +166,8 @@ export default function Home() {
   if (shouldBlockRender) {
     if (!hasSessionLoaded) {
       return (
-        // FIX 3: Removed JS-based ternary for theme colors to prevent Server/Client hydration mismatch.
-        // Using Tailwind dark mode classes instead so CSS handles it purely.
-        <div className="min-h-screen flex items-center justify-center bg-[#F9FAFB] dark:bg-[#000000] text-gray-500 dark:text-gray-400 transition-colors duration-300">
-          <div className="flex flex-col items-center gap-3 animate-pulse">
-            <span className="text-sm font-bold uppercase tracking-widest text-orange-500">
-              Initializing Workspace...
-            </span>
-          </div>
+        <div className="min-h-screen flex items-center justify-center bg-[var(--background)] transition-colors duration-300">
+          <div className="w-8 h-8 border-2 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
         </div>
       );
     }
@@ -193,50 +192,41 @@ export default function Home() {
             />
           </div>
 
-          {/* Sub-tab view transition for Matrix, Analytics, Audit */}
+          {/* Sub-tab view container - Hidden/Block for native-level performance */}
           <div className="flex-1 max-w-[1600px] w-full mx-auto px-4 relative">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.15 }}
-                className="w-full"
-              >
-                {activeTab === "matrix" && (
-                  <MatrixView
-                    tasks={state.tasks}
-                    meta={state.meta}
-                    addTask={addTask}
-                    deleteTask={deleteTask}
-                    toggleTask={toggleTask}
-                    renameTask={renameTask}   
-                    renameGroup={renameGroup}  
-                    lockToday={lockToday}
-                    setMonthYear={setMonthYear}
-                    userName={currentUser?.user_metadata?.full_name || currentUser?.email || "User"}
-                  />
-                )}
+            
+            <div className={`w-full ${activeTab === "matrix" ? "block" : "hidden"}`}>
+              <MatrixView
+                tasks={state.tasks}
+                meta={state.meta}
+                addTask={addTask}
+                deleteTask={deleteTask}
+                toggleTask={toggleTask}
+                renameTask={renameTask}   
+                renameGroup={renameGroup}  
+                lockToday={lockToday}
+                setMonthYear={setMonthYear}
+                userName={currentUser?.user_metadata?.full_name || currentUser?.email || "User"}
+              />
+            </div>
 
-                {activeTab === "analytics" && (
-                  <AnalyticsView
-                    tasks={state.tasks}
-                    meta={state.meta}
-                  />
-                )}
+            <div className={`w-full ${activeTab === "analytics" ? "block" : "hidden"}`}>
+              <AnalyticsView
+                tasks={state.tasks}
+                meta={state.meta}
+              />
+            </div>
 
-                {activeTab === "audit" && (
-                  <AuditView
-                    logs={state.logs}
-                    meta={state.meta}
-                    taskCount={state.tasks.length}
-                    clearLogs={() => {}}
-                    deleteLog={() => {}}
-                  />
-                )}
-              </motion.div>
-            </AnimatePresence>
+            <div className={`w-full ${activeTab === "audit" ? "block" : "hidden"}`}>
+              <AuditView
+                logs={state.logs}
+                meta={state.meta}
+                taskCount={state.tasks.length}
+                clearLogs={() => {}}
+                deleteLog={() => {}}
+              />
+            </div>
+
           </div>
         </div>
       ) : (

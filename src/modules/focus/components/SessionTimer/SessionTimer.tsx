@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useFocusSystem } from "../../engine/useFocusSystem";
 import { Play, Pause, Square, Check, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "@/theme/ThemeProvider";
 
 export default function SessionTimer() {
@@ -20,12 +22,21 @@ export default function SessionTimer() {
     getRemainingTime,
     currentSession,
     extraTime,
+    activeTaskId,
   } = useFocusSystem();
 
   const { isDarkMode } = useTheme();
 
-  // Custom Modal State
+  const [mounted, setMounted] = useState(false);
   const [activeModal, setActiveModal] = useState<"pause" | "endNormal" | "endExtra" | null>(null);
+  
+  // Prevents the background timer from instantly snapping to 25:00 while the modal animates out
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const lastTimeRef = useRef(initialSessionTime);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (currentSession) {
@@ -34,27 +45,48 @@ export default function SessionTimer() {
     }
   }, [currentSession, getRemainingTime, setTimeRemaining]);
 
-  useEffect(() => {
-    if (isActive && !currentSession) {
-      console.error("SessionTimer: Active state true but currentSession is null. State desync detected.");
-    }
-  }, [isActive, currentSession]);
-
   const isExtraMode = !!currentSession?.completedAt;
 
-  // Reset to initial time when session is completely inactive and not paused
+  // Strict scroll and touch lock when any modal is open
+  useEffect(() => {
+    if (activeModal) {
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      document.documentElement.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+      document.documentElement.style.overflow = "";
+    }
+    
+    return () => { 
+      document.body.style.overflow = ""; 
+      document.body.style.touchAction = "";
+      document.documentElement.style.overflow = "";
+    };
+  }, [activeModal]);
+
+  // Anti-Jump Display Logic
   const displayTime = useMemo(() => {
+    let time;
     if (!isActive && !isPaused && !isExtraMode) {
-      return initialSessionTime;
+      time = initialSessionTime;
+    } else if (currentSession?.completedAt) {
+      time = extraTime;
+    } else if (currentSession) {
+      time = getRemainingTime();
+    } else {
+      time = timeRemaining;
     }
-    if (currentSession?.completedAt) {
-      return extraTime;
+
+    // Freeze display if a modal is open or animating closed to prevent visual flash
+    if ((activeModal || isTransitioning) && !isActive && !isPaused && !isExtraMode) {
+      return lastTimeRef.current;
     }
-    if (currentSession) {
-      return getRemainingTime();
-    }
-    return timeRemaining;
-  }, [currentSession, getRemainingTime, timeRemaining, extraTime, isActive, isPaused, isExtraMode, initialSessionTime]);
+
+    lastTimeRef.current = time;
+    return time;
+  }, [isActive, isPaused, isExtraMode, currentSession, extraTime, getRemainingTime, timeRemaining, initialSessionTime, activeModal, isTransitioning]);
 
   // Subtle Haptic feedback when time is running out (mobile only)
   useEffect(() => {
@@ -67,15 +99,17 @@ export default function SessionTimer() {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === "INPUT") return;
-      if (activeModal) return; // Disable spacebar toggle when a modal is open
+      if (activeModal) return; 
       
       if (e.code === "Space") {
         e.preventDefault();
         if (isExtraMode) return;
-        if (!isActive || isPaused) {
+        if (!isActive) {
           startSession();
+        } else if (isPaused) {
+          handleResume();
         } else {
-          handlePause();
+          setActiveModal("pause");
         }
       }
     };
@@ -90,10 +124,12 @@ export default function SessionTimer() {
   };
 
   const getModeLabel = () => {
-    if (mode === "pomodoro") return "Pomodoro • Goal: 25 min";
-    if (mode === "deepWork") return "Deep Work • Goal: 90 min";
+    const taskName = currentSession?.taskTitle || activeTaskId || "Focus Session";
     const mins = Math.floor(initialSessionTime / 60);
-    return `Custom • Goal: ${mins} min`;
+
+    if (mode === "pomodoro") return `${taskName} • 25 min`;
+    if (mode === "deepWork") return `${taskName} • 90 min`;
+    return `${taskName} • ${mins} min`;
   };
 
   const getDynamicColor = () => {
@@ -110,14 +146,28 @@ export default function SessionTimer() {
     return "You're in flow";
   };
 
-  const handlePause = () => {
-    pauseSession();
-    setActiveModal("pause");
-  };
-
+  // State Mutators mapping to distinct UX flows
   const handleResume = () => {
     startSession();
+  };
+
+  const confirmPause = () => {
+    pauseSession();
     setActiveModal(null);
+  };
+
+  const confirmEndNormal = () => {
+    setIsTransitioning(true);
+    stopSession(false);
+    setActiveModal(null);
+    setTimeout(() => setIsTransitioning(false), 300);
+  };
+
+  const confirmEndExtra = (save: boolean) => {
+    setIsTransitioning(true);
+    stopSession(save);
+    setActiveModal(null);
+    setTimeout(() => setIsTransitioning(false), 300);
   };
 
   const circleRadius = 110;
@@ -132,6 +182,23 @@ export default function SessionTimer() {
   const progress = Math.min(Math.max(rawProgress, 0), 1);
   const strokeDashoffset = circumference * (1 - progress);
   const isInterrupted = !isActive && currentSession && !isSessionComplete;
+
+  // Unified Modal UI Constants
+  const modalSurfaceClass = isDarkMode 
+    ? "bg-black border border-white/[0.08] shadow-2xl" 
+    : "bg-white border border-black/[0.05] shadow-xl";
+
+  const overlayVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1 },
+    exit: { opacity: 0 }
+  };
+
+  const modalVariants = {
+    hidden: { opacity: 0, y: 8 },
+    visible: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: 8 }
+  };
 
   return (
     <>
@@ -260,18 +327,16 @@ export default function SessionTimer() {
         </div>
 
         {/* PRIMARY CONTROLS */}
-        <div className="flex flex-col sm:flex-row gap-3 w-full max-w-[280px] sm:max-w-none sm:w-auto px-4 sm:px-0 z-10">
+        <div className="flex flex-col sm:flex-row gap-3 w-full max-w-[280px] sm:max-w-none sm:w-auto px-4 sm:px-0 z-10 transition-all">
           {isExtraMode ? (
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out">
-              <button
-                onClick={() => setActiveModal("endExtra")}
-                className={`w-full sm:w-auto px-10 py-3.5 flex items-center justify-center gap-2 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] ${
-                  isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
-                }`}
-              >
-                <Check size={18} /> Complete Session
-              </button>
-            </div>
+            <button
+              onClick={() => setActiveModal("endExtra")}
+              className={`w-full sm:w-auto px-10 py-3.5 flex items-center justify-center gap-2 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] ${
+                isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
+              }`}
+            >
+              <Check size={18} /> Complete Session
+            </button>
           ) : (
             <>
               {!isActive || isPaused ? (
@@ -285,9 +350,9 @@ export default function SessionTimer() {
                 </button>
               ) : (
                 <button
-                  onClick={handlePause}
+                  onClick={() => setActiveModal("pause")}
                   className={`w-full sm:w-auto px-10 py-3.5 border flex items-center justify-center gap-2 font-semibold rounded-xl transition-all active:scale-[0.98] ${
-                    isDarkMode ? "bg-black border-white/[0.04] text-gray-300 hover:bg-white/[0.03]" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                    isDarkMode ? "bg-black border-white/[0.08] text-gray-300 hover:bg-white/[0.04]" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   <Pause size={18} className="fill-current" /> Pause
@@ -295,16 +360,14 @@ export default function SessionTimer() {
               )}
 
               {isActive && (
-                <div className="flex sm:flex-row gap-3 w-full sm:w-auto">
-                  <button
-                    onClick={() => setActiveModal("endNormal")}
-                    className={`flex-1 sm:flex-none px-6 py-3.5 border flex items-center justify-center gap-2 font-semibold rounded-xl transition-all active:scale-[0.98] ${
-                      isDarkMode ? "bg-red-500/15 border-red-500/40 text-red-400 hover:bg-red-500/25" : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
-                    }`}
-                  >
-                    <Square size={16} className="fill-current" /> End
-                  </button>
-                </div>
+                <button
+                  onClick={() => setActiveModal("endNormal")}
+                  className={`flex-1 sm:flex-none px-6 py-3.5 border flex items-center justify-center gap-2 font-semibold rounded-xl transition-all active:scale-[0.98] ${
+                    isDarkMode ? "bg-red-500/15 border-red-500/40 text-red-400 hover:bg-red-500/25" : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
+                  }`}
+                >
+                  <Square size={16} className="fill-current" /> End
+                </button>
               )}
             </>
           )}
@@ -313,7 +376,7 @@ export default function SessionTimer() {
         <div className={`hidden sm:block absolute bottom-4 text-[10px] font-medium z-10 transition-colors opacity-50 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
           Press{" "}
           <kbd className={`px-1.5 py-0.5 border rounded font-mono shadow-sm mx-0.5 transition-colors ${
-            isDarkMode ? "bg-black border-white/[0.04] text-gray-400" : "bg-gray-100 border-gray-200 text-gray-500"
+            isDarkMode ? "bg-black border-white/[0.08] text-gray-400" : "bg-gray-100 border-gray-200 text-gray-500"
           }`}>
             Space
           </kbd>{" "}
@@ -322,157 +385,197 @@ export default function SessionTimer() {
       </div>
 
       {/* =======================================================================
-          UPGRADED GLASSMORPHISM MODALS (BLACK-OUT ISOLATED OVERLAYS)
+          UNIFIED PORTAL MODALS
       ========================================================================*/}
-
-      {/* 1. Pause Modal */}
-      {activeModal === "pause" && (
-        <div className="fixed inset-0 z-[999999] bg-black flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
-          <div className={`max-w-md w-full border shadow-2xl rounded-3xl p-8 text-center flex flex-col items-center animate-in zoom-in-95 duration-200 ${
-            isDarkMode ? "bg-black border-white/[0.04]" : "bg-white border-gray-200"
-          }`}>
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors ${
-              isDarkMode ? "bg-orange-500/10 text-orange-500" : "bg-orange-100 text-orange-600"
-            }`}>
-              <Pause size={28} className="fill-current" />
-            </div>
-            <h2 className={`text-2xl md:text-3xl font-bold mb-2 tracking-tight transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              Taking a break?
-            </h2>
-            <p className={`mb-8 text-sm md:text-base transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-              You still have <span className={`font-bold transition-colors ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}>{formatTime(displayTime)}</span> remaining.
-            </p>
-
-            <div className="flex flex-col gap-3 w-full">
-              <button
-                onClick={handleResume}
-                className={`w-full px-6 py-4 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] text-base flex items-center justify-center gap-2 ${
-                  isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
-                }`}
+      
+      {mounted && createPortal(
+        <AnimatePresence>
+          
+          {/* 1. Pause Modal */}
+          {activeModal === "pause" && (
+            <motion.div
+              variants={overlayVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              transition={{ duration: 0.2 }}
+              onClick={() => setActiveModal(null)}
+              className="fixed inset-0 z-[999999] flex items-center justify-center px-4 bg-black/80 backdrop-blur-md"
+            >
+              <motion.div
+                variants={modalVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                onClick={(e) => e.stopPropagation()}
+                className={`w-full max-w-[440px] rounded-3xl p-8 text-center flex flex-col items-center ${modalSurfaceClass}`}
               >
-                <Play size={18} className="fill-current" /> Resume Focus
-              </button>
-              <button
-                onClick={() => {
-                  setActiveModal(null);
-                  stopSession(false);
-                }}
-                className={`w-full px-6 py-4 border font-semibold rounded-xl transition-all active:scale-[0.98] ${
-                  isDarkMode ? "bg-black border-white/[0.04] text-gray-300 hover:bg-white/[0.03]" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                End Session Early
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors ${
+                  isDarkMode ? "bg-amber-500/10 text-amber-500" : "bg-amber-100 text-amber-600"
+                }`}>
+                  <Pause size={28} className="fill-current" />
+                </div>
+                <h2 className={`text-2xl md:text-3xl font-bold mb-2 tracking-tight transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  Taking a break?
+                </h2>
+                <p className={`mb-8 text-sm md:text-base transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  You still have <span className={`font-bold transition-colors ${isDarkMode ? "text-orange-400" : "text-orange-600"}`}>{formatTime(displayTime)}</span> remaining.
+                </p>
 
-      {/* 2. End Normal Session Modal */}
-      {activeModal === "endNormal" && (
-        <div className="fixed inset-0 z-[999999] bg-black flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
-          <div className={`max-w-md w-full border shadow-2xl rounded-3xl p-8 text-center flex flex-col items-center animate-in zoom-in-95 duration-200 ${
-            isDarkMode ? "bg-black border-white/[0.04]" : "bg-white border-gray-200"
-          }`}>
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors ${
-              isDarkMode ? "bg-red-500/10 text-red-500" : "bg-red-50 text-red-600"
-            }`}>
-              <Square size={24} className="fill-current" />
-            </div>
-            <h2 className={`text-2xl md:text-3xl font-bold mb-2 tracking-tight transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              End Session?
-            </h2>
-            <p className={`mb-8 text-sm md:text-base transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-              You haven't reached your target yet. Are you sure you want to stop?
-            </p>
+                <div className="flex flex-col gap-3 w-full">
+                  <button
+                    onClick={handleResume}
+                    className={`w-full px-6 py-4 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] text-base flex items-center justify-center gap-2 ${
+                      isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
+                    }`}
+                  >
+                    <Play size={18} className="fill-current" /> Resume Focus
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveModal(null);
+                      stopSession(false);
+                    }}
+                    className={`w-full px-6 py-4 border font-semibold rounded-xl transition-all active:scale-[0.98] ${
+                      isDarkMode ? "bg-black border-white/[0.08] text-gray-300 hover:bg-white/[0.04]" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    End Session Early
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
 
-            <div className="flex flex-col gap-3 w-full">
-              <button
-                onClick={() => {
-                  setActiveModal(null);
-                  stopSession(false);
-                }}
-                className={`w-full px-6 py-4 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] text-base border ${
-                  isDarkMode ? "bg-red-500/15 border-red-500/40 text-red-400 hover:bg-red-500/25" : "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
-                }`}
+          {/* 2. End Normal Session Modal */}
+          {activeModal === "endNormal" && (
+            <motion.div
+              variants={overlayVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              transition={{ duration: 0.2 }}
+              onClick={() => setActiveModal(null)}
+              className="fixed inset-0 z-[999999] flex items-center justify-center px-4 bg-black/80 backdrop-blur-md"
+            >
+              <motion.div
+                variants={modalVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                onClick={(e) => e.stopPropagation()}
+                className={`w-full max-w-[440px] rounded-3xl p-8 text-center flex flex-col items-center ${modalSurfaceClass}`}
               >
-                Yes, End Session
-              </button>
-              <button
-                onClick={() => setActiveModal(null)}
-                className={`w-full px-6 py-4 border font-semibold rounded-xl transition-all active:scale-[0.98] ${
-                  isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
-                }`}
-              >
-                Cancel & Continue
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors ${
+                  isDarkMode ? "bg-red-500/10 text-red-500" : "bg-red-50 text-red-600"
+                }`}>
+                  <Square size={24} className="fill-current" />
+                </div>
+                <h2 className={`text-2xl md:text-3xl font-bold mb-2 tracking-tight transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  End Session?
+                </h2>
+                <p className={`mb-8 text-sm md:text-base transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  You haven't reached your target yet. Are you sure you want to stop?
+                </p>
 
-      {/* 3. End Extra Focus Modal */}
-      {activeModal === "endExtra" && (
-        <div className="fixed inset-0 z-[999999] bg-black flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
-          <div className={`max-w-md w-full border shadow-2xl rounded-3xl p-8 text-center flex flex-col items-center animate-in zoom-in-95 duration-200 ${
-            isDarkMode ? "bg-black border-white/[0.04]" : "bg-white border-gray-200"
-          }`}>
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors ${
-              isDarkMode ? "bg-purple-500/10 text-purple-400" : "bg-purple-100 text-purple-600"
-            }`}>
-              <Sparkles size={28} className="fill-current" />
-            </div>
-            <h2 className={`text-2xl md:text-3xl font-bold mb-2 tracking-tight transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              Goal Reached
-            </h2>
-            <p className={`mb-6 text-sm md:text-base transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-              You successfully pushed beyond your planned focus time.
-            </p>
+                <div className="flex flex-col gap-3 w-full">
+                  <button
+                    onClick={confirmEndNormal}
+                    className={`w-full px-6 py-4 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] text-base border ${
+                      isDarkMode ? "bg-red-500 text-white hover:bg-red-600" : "bg-red-600 text-white hover:bg-red-700"
+                    }`}
+                  >
+                    Yes, End Session
+                  </button>
+                  <button
+                    onClick={() => setActiveModal(null)}
+                    className={`w-full px-6 py-4 border font-semibold rounded-xl transition-all active:scale-[0.98] ${
+                      isDarkMode ? "bg-black border-white/[0.08] text-gray-300 hover:bg-white/[0.04]" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    Cancel & Continue
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
 
-            <div className={`rounded-2xl p-5 w-full mb-8 flex flex-col gap-3 text-left shadow-inner border transition-colors ${
-              isDarkMode ? "bg-black border-white/[0.04] shadow-none" : "bg-gray-50 border-gray-200"
-            }`}>
-              <div className="flex justify-between items-center text-sm font-medium">
-                <span className="text-gray-500">Target Goal:</span>
-                <span className={`transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>{Math.floor(initialSessionTime / 60)} min</span>
-              </div>
-              <div className="flex justify-between items-center text-sm font-semibold">
-                <span className={`transition-colors ${isDarkMode ? "text-purple-400" : "text-purple-600"}`}>Extra Focus:</span>
-                <span className={`transition-colors ${isDarkMode ? "text-purple-400" : "text-purple-600"}`}>+{formatTime(extraTime)}</span>
-              </div>
-              <div className={`h-px w-full my-1 transition-colors ${isDarkMode ? "bg-white/[0.04]" : "bg-gray-200"}`}></div>
-              <div className="flex justify-between items-center text-base font-bold">
-                <span className={`transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>Total Time:</span>
-                <span className={`transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>{formatTime(initialSessionTime + extraTime)}</span>
-              </div>
-            </div>
+          {/* 3. End Extra Focus Modal */}
+          {activeModal === "endExtra" && (
+            <motion.div
+              variants={overlayVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              transition={{ duration: 0.2 }}
+              onClick={() => setActiveModal(null)}
+              className="fixed inset-0 z-[999999] flex items-center justify-center px-4 bg-black/80 backdrop-blur-md"
+            >
+              <motion.div
+                variants={modalVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                onClick={(e) => e.stopPropagation()}
+                className={`w-full max-w-[520px] rounded-3xl p-8 text-center flex flex-col items-center ${modalSurfaceClass}`}
+              >
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors ${
+                  isDarkMode ? "bg-purple-500/10 text-purple-400" : "bg-purple-100 text-purple-600"
+                }`}>
+                  <Sparkles size={28} className="fill-current" />
+                </div>
+                <h2 className={`text-2xl md:text-3xl font-bold mb-2 tracking-tight transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  Goal Reached
+                </h2>
+                <p className={`mb-6 text-sm md:text-base transition-colors ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  You successfully pushed beyond your planned focus time.
+                </p>
 
-            <div className="flex flex-col gap-3 w-full">
-              <button
-                onClick={() => {
-                  setActiveModal(null);
-                  stopSession(true);
-                }}
-                className={`w-full px-6 py-4 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] text-base ${
-                  isDarkMode ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-900 text-white hover:bg-black"
-                }`}
-              >
-                Save Total Time & End
-              </button>
-              <button
-                onClick={() => {
-                  setActiveModal(null);
-                  stopSession(false); 
-                }}
-                className={`w-full px-6 py-4 border font-semibold rounded-xl transition-all active:scale-[0.98] ${
-                  isDarkMode ? "bg-black border-white/[0.04] text-gray-400 hover:bg-white/[0.03]" : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                Discard Extra Time
-              </button>
-            </div>
-          </div>
-        </div>
+                <div className={`rounded-2xl p-5 w-full mb-8 flex flex-col gap-3 text-left border transition-colors ${
+                  isDarkMode ? "bg-black border-white/[0.08]" : "bg-gray-50 border-gray-200"
+                }`}>
+                  <div className="flex justify-between items-center text-sm font-medium">
+                    <span className="text-gray-500">Target Goal:</span>
+                    <span className={`transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>{Math.floor(initialSessionTime / 60)} min</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm font-semibold">
+                    <span className={`transition-colors ${isDarkMode ? "text-purple-400" : "text-purple-600"}`}>Extra Focus:</span>
+                    <span className={`transition-colors ${isDarkMode ? "text-purple-400" : "text-purple-600"}`}>+{formatTime(extraTime)}</span>
+                  </div>
+                  <div className={`h-px w-full my-1 transition-colors ${isDarkMode ? "bg-white/[0.08]" : "bg-gray-200"}`}></div>
+                  <div className="flex justify-between items-center text-base font-bold">
+                    <span className={`transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>Total Time:</span>
+                    <span className={`transition-colors ${isDarkMode ? "text-white" : "text-gray-900"}`}>{formatTime(initialSessionTime + extraTime)}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 w-full">
+                  <button
+                    onClick={() => confirmEndExtra(true)}
+                    className={`w-full px-6 py-4 font-semibold rounded-xl transition-all shadow-md active:scale-[0.98] text-base ${
+                      isDarkMode ? "bg-purple-500 text-white hover:bg-purple-600" : "bg-purple-600 text-white hover:bg-purple-700"
+                    }`}
+                  >
+                    Save Total Time & End
+                  </button>
+                  <button
+                    onClick={() => confirmEndExtra(false)}
+                    className={`w-full px-6 py-4 border font-semibold rounded-xl transition-all active:scale-[0.98] ${
+                      isDarkMode ? "bg-black border-white/[0.08] text-gray-400 hover:bg-white/[0.04]" : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    Discard Extra Time
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+        </AnimatePresence>,
+        document.body
       )}
     </>
   );

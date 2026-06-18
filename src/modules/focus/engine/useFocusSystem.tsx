@@ -144,7 +144,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   const [sessionHistory, setSessionHistory] = useState<FocusSession[]>([]);
   
   const [isLoaded, setIsLoaded] = useState(false);
-  const [isFocusMode, setIsFocusMode] = useState(false);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
 
   const [dailyGoal, setDailyGoal] = useState(3 * 3600);
@@ -161,29 +160,34 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   const alarmTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fetchSessionsRef = useRef<() => Promise<boolean>>(async () => false);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const playedSessions = JSON.parse(localStorage.getItem("played_sessions") || "[]");
-      playedSessionRef.current = new Set(playedSessions);
-    }
-  }, []);
-
   useEffect(() => { currentSessionRef.current = currentSession; }, [currentSession]);
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
   useEffect(() => { initialSessionTimeRef.current = initialSessionTime; }, [initialSessionTime]);
 
+  // ─── LOCAL STORAGE: SCOPED TO CURRENT USER ───
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("daily_goal");
-      if (saved) setDailyGoal(Number(saved));
-    }
-  }, []);
+    if (typeof window !== "undefined" && currentUser?.id) {
+      // 1. Scoped played sessions
+      const playedSessions = JSON.parse(localStorage.getItem(`played_sessions_${currentUser.id}`) || "[]");
+      playedSessionRef.current = new Set(playedSessions);
 
-  const updateDailyGoal = (seconds: number) => {
-    setDailyGoal(seconds);
-    localStorage.setItem("daily_goal", seconds.toString());
-  };
+      // 2. Scoped daily goal
+      const savedGoal = localStorage.getItem(`daily_goal_${currentUser.id}`);
+      if (savedGoal) setDailyGoal(Number(savedGoal));
+      else setDailyGoal(3 * 3600); // Default to 3 hrs if not set
+    }
+  }, [currentUser?.id]);
+
+  const updateDailyGoal = useCallback((seconds: number) => {
+    // Math checks guardrail inputs (between 1 hour and 16 hours limit)
+    const safeSeconds = Math.max(3600, Math.min(16 * 3600, seconds)); 
+    setDailyGoal(safeSeconds);
+    
+    if (currentUser?.id) {
+      localStorage.setItem(`daily_goal_${currentUser.id}`, safeSeconds.toString());
+    }
+  }, [currentUser?.id]);
 
   const stopAlarm = useCallback(() => {
     if (audioRef.current) {
@@ -197,7 +201,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const startExtraFocus = useCallback(() => {
-    if (!isActiveRef.current) return;
+    if (!isActiveRef.current || !currentUser?.id) return;
 
     stopAlarm();
 
@@ -208,17 +212,16 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     const MAX = 20;
     const updated = Array.from(playedSessionRef.current).slice(-MAX);
     playedSessionRef.current = new Set(updated);
-    localStorage.setItem("played_sessions", JSON.stringify(updated));
+    
+    localStorage.setItem(`played_sessions_${currentUser.id}`, JSON.stringify(updated));
 
     if (!session.extraStartTime) {
       const s = { ...session, extraStartTime: Date.now() };
       setCurrentSession(s);
       currentSessionRef.current = s;
-      localStorage.setItem("focus_active_session", JSON.stringify(s));
+      localStorage.setItem(`focus_active_session_${currentUser.id}`, JSON.stringify(s));
       
-      if (currentUser?.id) {
-        (supabase as any).from("focus_active_sessions").update({ session: s }).eq("user_id", currentUser.id).then();
-      }
+      (supabase as any).from("focus_active_sessions").update({ session: s }).eq("user_id", currentUser.id).then();
     }
   }, [currentUser?.id, stopAlarm]);
 
@@ -262,22 +265,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   const calculateFocusScore = (duration: number, distractions: Distraction[]) => {
     const distractionPenalty = distractions.length * 10;
     return Math.max(0, Math.round(100 - distractionPenalty + (Math.min(duration / 60, 100) * 0.2)));
-  };
-
-  const exitFocusMode = () => {
-    setIsFocusMode(false);
-    if (typeof document !== 'undefined' && document.fullscreenElement) {
-      document.exitFullscreen?.().catch(() => {});
-    }
-  };
-
-  const enterFocusMode = () => {
-    setIsFocusMode(true);
-    if (typeof document !== 'undefined' && !document.fullscreenElement) {
-      document.documentElement.requestFullscreen?.().catch((err) => {
-        console.warn("Focus Mode fullscreen blocked:", err);
-      });
-    }
   };
 
   const fetchSessionsFromDB = useCallback(async (): Promise<boolean> => {
@@ -347,10 +334,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
   const syncSessionToDB = async (session: FocusSession, isCompleted: boolean, retries = 2) => {
     try {
-      if (!currentUser?.id) {
-        console.error("❌ No user → abort save");
-        return;
-      }
+      if (!currentUser?.id) return;
 
       const payload = {
         id: session.id,
@@ -404,7 +388,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       setIsSessionComplete(false);
       setExtraTime(0);
       setIsLoaded(true);
-      localStorage.removeItem("focus_active_session"); 
+      // Clean up generic state, but scoped states stay orphaned until login again
     }
   }, [currentUser, authInitialized, fetchSessionsFromDB]);
 
@@ -416,7 +400,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         Notification.requestPermission();
       }
     }
-    // Cleanup audio explicitly
     return () => stopAlarm();
   }, [stopAlarm]);
 
@@ -488,8 +471,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
             setCurrentSession(null);
             setIsSessionComplete(false);
             setExtraTime(0);
-            exitFocusMode();
-            localStorage.removeItem("focus_active_session"); 
+            localStorage.removeItem(`focus_active_session_${currentUser.id}`); 
           } else if (payload.new?.session) {
             const remoteSession = payload.new.session as ExtendedActiveSession;
             const merged = mergeSessions(currentSessionRef.current, remoteSession);
@@ -509,7 +491,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
               triggerSessionComplete(merged.id);
             }
 
-            localStorage.setItem("focus_active_session", JSON.stringify(merged));
+            localStorage.setItem(`focus_active_session_${currentUser.id}`, JSON.stringify(merged));
           }
         }
       )
@@ -520,11 +502,12 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     };
   }, [currentUser?.id, triggerSessionComplete]); 
 
+  // ─── SCOPED MULTI-TAB SYNC ───
   useEffect(() => {
     const handleStorageSync = (e: StorageEvent) => {
-      if (!e.newValue) return;
+      if (!e.newValue || !currentUser?.id) return;
 
-      if (e.key === "focus_stop_signal") {
+      if (e.key === `focus_stop_signal_${currentUser.id}`) {
         try {
           const data = JSON.parse(e.newValue);
           if (data.type === "STOP") {
@@ -535,13 +518,12 @@ export function FocusProvider({ children }: { children: ReactNode }) {
             setCurrentSession(null);
             setFocusedTime(0);
             setTotalElapsed(0);
-            exitFocusMode();
-            localStorage.removeItem("focus_active_session");
+            localStorage.removeItem(`focus_active_session_${currentUser.id}`);
           }
         } catch (err) {}
       }
       
-      if (e.key === "focus_complete_signal") {
+      if (e.key === `focus_complete_signal_${currentUser.id}`) {
         stopAlarm(); 
         setIsSessionComplete(false);
       }
@@ -549,22 +531,18 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener("storage", handleStorageSync);
     return () => window.removeEventListener("storage", handleStorageSync);
-  }, [stopAlarm]); 
+  }, [stopAlarm, currentUser?.id]); 
 
-  // 🔥 FIX: Extracted exact `saveExtraTime` intent from UI
   const stopSession = async (saveExtraTime = false) => {
     setIsSessionComplete(false);
     stopAlarm(); 
 
-    if (!currentUser?.id) {
-      console.error("❌ No user → abort save");
-      return; 
-    }
+    if (!currentUser?.id) return; 
     
     const latestRefSession = currentSessionRef.current;
     if (!latestRefSession) return;
 
-    const latestSessionStr = localStorage.getItem("focus_active_session");
+    const latestSessionStr = localStorage.getItem(`focus_active_session_${currentUser.id}`);
     let finalSession = latestRefSession;
     
     if (latestSessionStr && latestRefSession) {
@@ -577,8 +555,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     }
 
     const finalElapsed = Math.min(getElapsedTime(), finalSession.initialDuration || initialSessionTimeRef.current);
-    
-    // 🔥 FIX: Accurately dismiss extra time calculation if user clicks 'Discard'
     const finalExtraTime = (saveExtraTime && finalSession.extraStartTime) ? getExtraTime() : 0;
     
     const endTime = Date.now();
@@ -592,19 +568,18 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
     setIsActive(false);
     setIsPaused(false);
-    exitFocusMode();
 
-    localStorage.removeItem("focus_active_session");
+    localStorage.removeItem(`focus_active_session_${currentUser.id}`);
 
     if (saveExtraTime) {
-      localStorage.removeItem("focus_complete_signal");
-      localStorage.setItem("focus_complete_signal", JSON.stringify({ time: Date.now() }));
-      localStorage.removeItem("focus_checkpoint"); 
+      localStorage.removeItem(`focus_complete_signal_${currentUser.id}`);
+      localStorage.setItem(`focus_complete_signal_${currentUser.id}`, JSON.stringify({ time: Date.now() }));
+      localStorage.removeItem(`focus_checkpoint_${currentUser.id}`); 
     } else {
-      localStorage.removeItem("focus_stop_signal");
-      localStorage.setItem("focus_stop_signal", JSON.stringify({ time: Date.now(), type: "STOP" }));
+      localStorage.removeItem(`focus_stop_signal_${currentUser.id}`);
+      localStorage.setItem(`focus_stop_signal_${currentUser.id}`, JSON.stringify({ time: Date.now(), type: "STOP" }));
 
-      localStorage.setItem("focus_checkpoint", JSON.stringify({
+      localStorage.setItem(`focus_checkpoint_${currentUser.id}`, JSON.stringify({
         sessionId: finalSession.id,
         remaining: timeRemaining,
         initialTime: initialSessionTime, 
@@ -632,7 +607,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       distractionCount: finalDistractions.length,
       topDistraction: null, 
       avgDistractionGap: 0, 
-      // @ts-ignore: Extending session to hold pause duration history tracking
+      // @ts-ignore
       pausedDuration: pausedTime 
     };
 
@@ -695,7 +670,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         !session.completedAt &&
         !playedSessionRef.current.has(session.id);
 
-      if (isActuallyComplete) {
+      if (isActuallyComplete && currentUser?.id) {
         const now = Date.now();
         
         const updatedSession: ExtendedActiveSession = {
@@ -706,11 +681,10 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         setCurrentSession(updatedSession);
         currentSessionRef.current = updatedSession; 
         
-        localStorage.setItem("focus_active_session", JSON.stringify(updatedSession));
+        localStorage.setItem(`focus_active_session_${currentUser.id}`, JSON.stringify(updatedSession));
         
         setIsSessionComplete(true);
 
-        // 🔥 FIX: Ensures audio plays only when it reaches exactly zero the first time
         if (audioRef.current) {
           audioRef.current.loop = true;
           audioRef.current.volume = 1.0;
@@ -752,14 +726,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
     return () => clearInterval(interval);
   }, [currentUser?.id, getRemainingTime, getElapsedTime, triggerSessionComplete, getPausedTime, getExtraTime, stopAlarm, startExtraFocus, addNotification]); 
-
-  useEffect(() => {
-    const handleFsChange = () => { if (!document.fullscreenElement) setIsFocusMode(false); };
-    if (typeof document !== "undefined") {
-      document.addEventListener("fullscreenchange", handleFsChange);
-      return () => document.removeEventListener("fullscreenchange", handleFsChange);
-    }
-  }, []);
 
   const setModeHandler = (newMode: FocusMode) => {
     if (isActive) return;
@@ -822,7 +788,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       const sessionDuration = updatedSession.initialDuration || initialSessionTime;
       setInitialSessionTime(sessionDuration);
 
-      localStorage.setItem("focus_active_session", JSON.stringify(updatedSession));
+      localStorage.setItem(`focus_active_session_${currentUser.id}`, JSON.stringify(updatedSession));
       
       try {
         await (supabase as any).from("focus_active_sessions").update({ session: updatedSession }).eq("user_id", currentUser.id).throwOnError();
@@ -838,7 +804,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     setIsSessionComplete(false);
     setExtraTime(0);
     
-    localStorage.removeItem("focus_checkpoint");
+    localStorage.removeItem(`focus_checkpoint_${currentUser.id}`);
     setInitialSessionTime(timeRemaining);
     
     const newSession: ExtendedActiveSession = {
@@ -853,13 +819,11 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     };
     
     playedSessionRef.current.delete(newSession.id);
-    localStorage.setItem("played_sessions", JSON.stringify(Array.from(playedSessionRef.current)));
+    localStorage.setItem(`played_sessions_${currentUser.id}`, JSON.stringify(Array.from(playedSessionRef.current)));
     
     setCurrentSession(newSession);
     currentSessionRef.current = newSession;
-    localStorage.setItem("focus_active_session", JSON.stringify(newSession));
-    
-    enterFocusMode();
+    localStorage.setItem(`focus_active_session_${currentUser.id}`, JSON.stringify(newSession));
 
     if (acquireLock(`focus_start_alert_${newSession.id}`, 5000)) {
       addNotification('focus', 'Deep Work Initiated', 'Distractions suppressed. Maintain your focus.', 'low', '/focus');
@@ -879,7 +843,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       value={{
         currentUser, 
         isActive, isPaused, mode, timeRemaining, initialSessionTime, focusedTime,
-        totalElapsed, activeTaskId, isFocusMode,
+        totalElapsed, activeTaskId,
         currentSession,
         extraTime, 
         distractions: Array.isArray(currentSession?.distractions) ? currentSession.distractions : [],
@@ -889,7 +853,6 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         dailyGoal, 
         updateDailyGoal, 
         setIsSessionComplete, 
-        enterFocusMode, exitFocusMode,
         setTimeRemaining, 
         setInitialSessionTime, 
         setMode: setModeHandler, 
@@ -899,9 +862,8 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         stopAlarm,
         startExtraFocus,
 
-        // Synchronous pause handling forces instantaneous state ref push to stop interval leaks
         pauseSession: () => {
-          if (!currentSession || isPausedRef.current) return; 
+          if (!currentSession || isPausedRef.current || !currentUser?.id) return; 
 
           setIsSessionComplete(false);
           stopAlarm(); 
@@ -920,7 +882,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
           setIsPaused(true);
           isPausedRef.current = true;
           
-          localStorage.setItem("focus_active_session", JSON.stringify(updatedSession));
+          localStorage.setItem(`focus_active_session_${currentUser.id}`, JSON.stringify(updatedSession));
           
           if (currentUser?.id) {
             (async () => {
@@ -940,6 +902,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         getExtraTime,   
 
         addDistraction: (reason: string) => {
+          if (!currentUser?.id) return;
           setCurrentSession((prev) => {
             if (!prev) return prev;
             
@@ -959,7 +922,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
               distractions: updatedDistractions,
             };
         
-            localStorage.setItem("focus_active_session", JSON.stringify(updated));
+            localStorage.setItem(`focus_active_session_${currentUser.id}`, JSON.stringify(updated));
             
             if (currentUser?.id) {
               (async () => {
@@ -983,6 +946,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
           });
         },
         undoDistraction: () => {
+          if (!currentUser?.id) return;
           setCurrentSession((prev) => {
             if (!prev) return prev;
             
@@ -993,7 +957,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
               distractions: list.length > 0 ? list.slice(0, -1) : [],
             };
             
-            localStorage.setItem("focus_active_session", JSON.stringify(updated));
+            localStorage.setItem(`focus_active_session_${currentUser.id}`, JSON.stringify(updated));
             
             if (currentUser?.id) {
               (async () => {
