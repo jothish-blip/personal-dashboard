@@ -31,8 +31,24 @@ export default function Navbar({
 
   const [userProfile, setUserProfile] = useState<any>(null);
   const lastNavigationRef = useRef<number>(0);
+  const logoutRef = useRef<boolean>(false);
 
   const mergedProfile = userProfile || currentUser;
+
+  // ─── AUTH STATE LISTENER (REAL-TIME LOGOUT DETECTION) ───
+  useEffect(() => {
+    if (!supabase) return;
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_, session) => {
+      if (!session) {
+        router.replace("/login");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase, router]);
 
   // ─── CACHE & PROFILE CONTAINER LOADING ───
   useEffect(() => {
@@ -72,6 +88,9 @@ export default function Navbar({
 
   // ─── TERMINATE ACTIVE ENVIRONMENT SESSION ───
   const handleLogout = useCallback(async () => {
+    if (logoutRef.current) return;
+    logoutRef.current = true;
+
     try {
       if (!supabase) return;
       
@@ -79,12 +98,14 @@ export default function Navbar({
         localStorage.removeItem(`nexspace_profile_${currentUser.id}`);
       }
 
-      await supabase.auth.signOut();
+      sessionStorage.clear();
 
       router.replace("/login");
-      router.refresh();
+
+      await supabase.auth.signOut();
     } catch (error) {
       console.error("Logout runtime error:", error);
+      logoutRef.current = false; // unlock on error so user can try again
     }
   }, [supabase, currentUser, router]);
 

@@ -22,7 +22,7 @@ import ProfileStreakSwitcher from "@/navigation/components/ProfileStreakSwitcher
 interface MobileNavProps {
   activePaths?: Record<string, boolean> | null;
   handleNav?: (path: string) => void;
-  handleLogout?: () => void;
+  handleLogout?: () => Promise<void>;
   userProfile?: any;
   currentStreak?: number;
 }
@@ -46,7 +46,7 @@ export default function MobileNav(props: MobileNavProps) {
   const {
     activePaths = {},
     handleNav = () => {},
-    handleLogout = () => {},
+    handleLogout,
     userProfile = null,
     currentStreak = 0,
   } = props;
@@ -62,6 +62,7 @@ export default function MobileNav(props: MobileNavProps) {
   
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const navigatingRef = useRef(false);
+  const loggingOutRef = useRef(false);
 
   const closeAllMenus = () => {
     setIsNavExpanded(false);
@@ -241,8 +242,17 @@ export default function MobileNav(props: MobileNavProps) {
                         onClick={async (e) => {
                           e.preventDefault();
                           e.stopPropagation();
+
+                          if (loggingOutRef.current) return;
+                          loggingOutRef.current = true;
+
                           closeAllMenus();
-                          if (handleLogout) await handleLogout();
+
+                          try {
+                            if (handleLogout) await handleLogout();
+                          } finally {
+                            loggingOutRef.current = false;
+                          }
                         }}
                         style={{ touchAction: "manipulation" }}
                         className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-medium text-[13px] transition-colors mt-1 ${

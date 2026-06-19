@@ -7,8 +7,6 @@ import { FaGithub, FaDiscord } from "react-icons/fa";
 import Image from "next/image";
 import { 
   Loader2, 
-  Sun, 
-  Moon, 
   ArrowRight,
   ShieldCheck,
   Zap,
@@ -72,7 +70,7 @@ function Reveal({ children, delay = 0, direction = "up" }: { children: ReactNode
 // Fallback for missing screenshots during dev
 const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, isDarkMode: boolean, name: string) => {
   e.currentTarget.style.display = 'none';
-  e.currentTarget.parentElement!.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-[12px] font-medium tracking-widest uppercase ${isDarkMode ? 'text-zinc-600 bg-zinc-900/50' : 'text-zinc-400 bg-zinc-100/50'}">[ Screenshot: ${name} ]</div>`;
+  e.currentTarget.parentElement!.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-[12px] font-medium tracking-widest uppercase text-center p-4 ${isDarkMode ? 'text-zinc-600 bg-zinc-900/50' : 'text-zinc-400 bg-zinc-100/50'}">[ Screenshot: ${name} ]</div>`;
 };
 
 // ============================================================================
@@ -81,17 +79,20 @@ const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, isDa
 
 function LandingExperience() {
   const router = useRouter();
-  const { isDarkMode, toggleTheme } = useTheme(); 
+  const { isDarkMode } = useTheme(); 
   
   const [checkingSession, setCheckingSession] = useState(true);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
+  const [oauthStarted, setOauthStarted] = useState(false);
   const [error, setError] = useState("");
 
+  // 1. Initial Session Check
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getSession();
-      if (data.session) {
+      if (data.session?.user) {
         router.replace("/");
+        return;
       } else {
         setCheckingSession(false);
       }
@@ -99,10 +100,51 @@ function LandingExperience() {
     checkUser();
   }, [router]);
 
+  // 2. Realtime Auth State Change Detection
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_, session) => {
+      if (session?.user) {
+        router.replace("/");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
+
+  // 3. Page Visibility Detection
+  useEffect(() => {
+    const handleVisibility = async () => {
+      if (document.visibilityState !== "visible") return;
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        router.replace("/");
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [router]);
+
+  // Handle Social Login Execution
   const handleSocialLogin = async (provider: string) => {
-    if (loadingProvider) return; 
+    if (oauthStarted || loadingProvider) return; 
+
+    setOauthStarted(true);
     setLoadingProvider(provider);
     setError("");
+
+    // OAuth Timeout Fallback
+    const timeout = setTimeout(() => {
+      setLoadingProvider(null);
+      setOauthStarted(false);
+      setError("Connection timed out. Please try again.");
+    }, 15000);
     
     try {
       const { error: authError } = await supabase.auth.signInWithOAuth({ 
@@ -111,7 +153,9 @@ function LandingExperience() {
       });
       if (authError) throw authError;
     } catch (err: any) {
+      clearTimeout(timeout);
       setError(err.message?.toLowerCase().includes("popup_closed") ? "Registration cancelled." : "Connection failed. Please try again.");
+      setOauthStarted(false);
       setLoadingProvider(null);
     }
   };
@@ -159,10 +203,10 @@ function LandingExperience() {
 
       {/* Loading Overlay */}
       {loadingProvider && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-md animate-in fade-in">
-          <div className={`px-6 py-3.5 rounded-full flex items-center gap-3 shadow-2xl border ${isDarkMode ? "bg-[#0A0A0A] border-white/10 text-zinc-200" : "bg-white border-zinc-200 text-zinc-800"}`}>
-            <Loader2 className={`w-4 h-4 animate-spin ${isDarkMode ? "text-orange-500" : "text-orange-500"}`} />
-            <span className="font-medium text-[13px]">Connecting to {loadingProvider === 'google' ? 'Google' : loadingProvider === 'github' ? 'GitHub' : 'Discord'}...</span>
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-md animate-in fade-in p-4">
+          <div className={`px-6 py-3.5 rounded-full flex items-center gap-3 shadow-2xl border max-w-[90vw] overflow-hidden ${isDarkMode ? "bg-[#0A0A0A] border-white/10 text-zinc-200" : "bg-white border-zinc-200 text-zinc-800"}`}>
+            <Loader2 className={`w-4 h-4 animate-spin shrink-0 ${isDarkMode ? "text-orange-500" : "text-orange-500"}`} />
+            <span className="font-medium text-[13px] truncate">Connecting to {loadingProvider === 'google' ? 'Google' : loadingProvider === 'github' ? 'GitHub' : 'Discord'}...</span>
           </div>
         </div>
       )}
@@ -182,13 +226,13 @@ function LandingExperience() {
 
 <div
   onClick={() => router.push("/")}
-  className="flex items-center cursor-pointer select-none"
+  className="flex items-center cursor-pointer select-none shrink-0"
 >
   <Image
     src={isDarkMode ? "/logo-dark.png" : "/logo-light.png"}
     alt="NexSpace"
-    width={600}
-    height={140}
+    width={160}
+    height={40}
     priority
     className={`
       w-auto
@@ -197,17 +241,17 @@ function LandingExperience() {
       transition-all
       duration-300
       hover:scale-105
-      h-[140px]
-      sm:h-[160px]
-      lg:h-[180px]
-      ${isDarkMode ? "translate-y-2 sm:translate-y-2" : ""}
+      h-[32px]
+      sm:h-[40px]
+      lg:h-[48px]
+      ${isDarkMode ? "translate-y-0.5" : ""}
     `}
   />
 </div>
 
       {/* Center: subtle trust indicator */}
       <div
-        className={`hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-2 lg:gap-3 text-[11px] lg:text-[12px] font-medium whitespace-nowrap ${
+        className={`hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-2 lg:gap-3 text-[11px] lg:text-[12px] font-medium whitespace-nowrap ${
           isDarkMode ? "text-zinc-500" : "text-zinc-500"
         }`}
       >
@@ -226,29 +270,10 @@ function LandingExperience() {
       {/* Right Actions */}
       <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
 
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className={`group h-10 w-10 sm:h-11 sm:w-11 lg:h-12 lg:w-12 rounded-[18px] sm:rounded-2xl flex items-center justify-center border transition-all duration-300 active:scale-95 ${
-            isDarkMode
-              ? "bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.06] text-zinc-400 hover:text-white"
-              : "bg-white border-zinc-200 hover:bg-zinc-50 text-zinc-500 hover:text-zinc-900"
-          }`}
-          aria-label="Toggle theme"
-        >
-          <div className="transition-transform duration-500 group-hover:rotate-12">
-            {isDarkMode ? (
-              <Sun size={15} />
-            ) : (
-              <Moon size={15} />
-            )}
-          </div>
-        </button>
-
         {/* Sign In */}
         <button
           onClick={() => router.push("/login")}
-          className={`flex h-10 sm:h-11 lg:h-12 px-3 sm:px-4 lg:px-5 rounded-[18px] sm:rounded-2xl items-center justify-center text-[12px] sm:text-[13px] font-semibold transition-all duration-300 active:scale-95 whitespace-nowrap ${
+          className={`flex h-10 sm:h-11 lg:h-12 px-3 sm:px-4 lg:px-5 rounded-[18px] sm:rounded-2xl items-center justify-center text-[12px] sm:text-[13px] font-semibold transition-all duration-300 active:scale-95 whitespace-nowrap shrink-0 ${
             isDarkMode
               ? "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
               : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
@@ -263,7 +288,7 @@ function LandingExperience() {
         {/* Primary CTA */}
         <button
           onClick={scrollToHeroAuth}
-          className="group relative overflow-hidden h-10 sm:h-11 lg:h-12 px-4 sm:px-5 lg:px-6 rounded-[18px] sm:rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-[12px] sm:text-[13px] lg:text-[14px] font-semibold transition-all duration-300 active:scale-95 shadow-[0_8px_30px_rgba(249,115,22,0.28)] whitespace-nowrap"
+          className="group relative overflow-hidden h-10 sm:h-11 lg:h-12 px-4 sm:px-5 lg:px-6 rounded-[18px] sm:rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-[12px] sm:text-[13px] lg:text-[14px] font-semibold transition-all duration-300 active:scale-95 shadow-[0_8px_30px_rgba(249,115,22,0.28)] whitespace-nowrap shrink-0"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-50" />
 
@@ -292,7 +317,7 @@ function LandingExperience() {
 {/* ========================================================= */}
 {/* 2. HERO SECTION */}
 {/* ========================================================= */}
-<section className="min-h-[100vh] flex flex-col lg:flex-row items-center justify-between px-6 lg:px-12 max-w-[1450px] mx-auto gap-16 lg:gap-20 pt-10 lg:pt-0">
+<section className="min-h-[100vh] lg:min-h-[90vh] flex flex-col lg:flex-row items-center justify-between px-6 lg:px-12 max-w-[1450px] mx-auto gap-16 lg:gap-20 pt-10 lg:pt-0 pb-20 lg:pb-0">
 
   {/* ========================================================= */}
   {/* LEFT SIDE */}
@@ -312,7 +337,7 @@ function LandingExperience() {
 
     {/* Heading */}
     <h1
-      className={`text-[48px] sm:text-[64px] lg:text-[74px] font-semibold tracking-[-0.05em] leading-[0.98] mb-7 ${
+      className={`text-[42px] sm:text-[56px] lg:text-[74px] font-semibold tracking-[-0.05em] leading-[0.98] mb-7 ${
         isDarkMode ? "text-white" : "text-zinc-900"
       }`}
     >
@@ -329,7 +354,7 @@ function LandingExperience() {
 
     {/* Description */}
     <p
-      className={`text-[17px] sm:text-[19px] leading-[1.8] mb-10 max-w-[520px] font-medium ${
+      className={`text-[16px] sm:text-[18px] lg:text-[19px] leading-[1.8] mb-10 max-w-[520px] font-medium ${
         isDarkMode ? "text-zinc-400" : "text-zinc-600"
       }`}
     >
@@ -347,14 +372,14 @@ function LandingExperience() {
   className={`p-2.5 rounded-[30px] border mb-4 overflow-hidden ${premiumGlass}`}
 >
   {/* Fixed responsive layout */}
-  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
 
     {/* ========================================================= */}
     {/* Google */}
     {/* ========================================================= */}
     <button
       onClick={() => handleSocialLogin("google")}
-      disabled={!!loadingProvider}
+      disabled={!!loadingProvider || oauthStarted}
       className={`group relative overflow-hidden flex items-center justify-center gap-2 h-[58px] sm:h-[56px] rounded-[20px] text-[14px] font-semibold transition-all duration-300 active:scale-[0.98] border ${
         isDarkMode
           ? "bg-white/[0.04] border-white/[0.03] hover:bg-white/[0.08] text-white"
@@ -377,7 +402,7 @@ function LandingExperience() {
     {/* ========================================================= */}
     <button
       onClick={() => handleSocialLogin("github")}
-      disabled={!!loadingProvider}
+      disabled={!!loadingProvider || oauthStarted}
       className={`group relative overflow-hidden flex items-center justify-center gap-2 h-[58px] sm:h-[56px] rounded-[20px] text-[14px] font-semibold transition-all duration-300 active:scale-[0.98] border ${
         isDarkMode
           ? "bg-white/[0.04] border-white/[0.03] hover:bg-white/[0.08] text-white"
@@ -400,8 +425,8 @@ function LandingExperience() {
     {/* ========================================================= */}
     <button
       onClick={() => handleSocialLogin("discord")}
-      disabled={!!loadingProvider}
-      className={`group relative overflow-hidden col-span-2 sm:col-span-1 flex items-center justify-center gap-2 h-[58px] sm:h-[56px] rounded-[20px] text-[14px] font-semibold transition-all duration-300 active:scale-[0.98] border ${
+      disabled={!!loadingProvider || oauthStarted}
+      className={`group relative overflow-hidden flex items-center justify-center gap-2 h-[58px] sm:h-[56px] rounded-[20px] text-[14px] font-semibold transition-all duration-300 active:scale-[0.98] border ${
         isDarkMode
           ? "bg-white/[0.04] border-white/[0.03] hover:bg-[#5865F2]/10 hover:text-[#7289DA] text-white"
           : "bg-white border-zinc-200/80 hover:bg-[#5865F2]/5 hover:text-[#5865F2] text-zinc-800 shadow-sm"
@@ -421,7 +446,7 @@ function LandingExperience() {
 </div>
       {/* Trust */}
       <div
-        className={`flex flex-wrap items-center gap-4 text-[12px] font-medium tracking-wide ${
+        className={`flex flex-wrap items-center gap-3 sm:gap-4 text-[11px] sm:text-[12px] font-medium tracking-wide ${
           isDarkMode
             ? "text-zinc-500"
             : "text-zinc-500"
@@ -445,13 +470,13 @@ function LandingExperience() {
 
     {/* Audience */}
     <div
-      className={`mt-14 text-[13px] font-medium ${
+      className={`mt-10 sm:mt-14 text-[12px] sm:text-[13px] font-medium ${
         isDarkMode
           ? "text-zinc-600"
           : "text-zinc-400"
       }`}
     >
-      <div className="flex flex-wrap gap-4 sm:gap-6">
+      <div className="flex flex-wrap gap-3 sm:gap-6">
         <span>Students</span>
         <span className="opacity-30">•</span>
         <span>Creators</span>
@@ -469,8 +494,8 @@ function LandingExperience() {
   <div className="w-full lg:w-[58%] relative flex items-center justify-center animate-in fade-in zoom-in-[0.98] duration-1000 delay-200">
 
     {/* ================= MOBILE ================= */}
-    <div className="lg:hidden w-full overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4">
-      <div className="flex gap-5 w-max px-1">
+    <div className="lg:hidden w-full overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4 -mx-6 px-6">
+      <div className="flex gap-5 w-max">
 
         {[
           "/images/module-tasks.png",
@@ -481,13 +506,14 @@ function LandingExperience() {
         ].map((image, index) => (
           <div
             key={index}
-            className={`snap-center shrink-0 w-[88vw] rounded-[32px] overflow-hidden border ${premiumGlass}`}
+            className={`snap-center shrink-0 w-[85vw] sm:w-[60vw] rounded-[32px] overflow-hidden border ${premiumGlass}`}
           >
             <div className="relative aspect-[16/10]">
               <img
                 src={image}
                 alt="module"
                 className="w-full h-full object-cover"
+                onError={(e) => handleImageError(e, isDarkMode, `Module ${index + 1}`)}
               />
             </div>
           </div>
@@ -513,7 +539,9 @@ function LandingExperience() {
       >
         <img
           src="/images/module-planner.png"
+          alt="Planner Module"
           className="w-full h-full object-cover aspect-[16/10]"
+          onError={(e) => handleImageError(e, isDarkMode, "Planner")}
         />
       </div>
 
@@ -527,7 +555,9 @@ function LandingExperience() {
       >
         <img
           src="/images/module-diary.png"
+          alt="Diary Module"
           className="w-full h-full object-cover aspect-[16/10]"
+          onError={(e) => handleImageError(e, isDarkMode, "Diary")}
         />
       </div>
 
@@ -541,7 +571,9 @@ function LandingExperience() {
       >
         <img
           src="/images/module-tasks.png"
+          alt="Tasks Dashboard"
           className="w-full h-full object-cover aspect-[16/10]"
+          onError={(e) => handleImageError(e, isDarkMode, "Main Dashboard")}
         />
       </div>
 
@@ -555,7 +587,9 @@ function LandingExperience() {
       >
         <img
           src="/images/module-focus.png"
+          alt="Focus Module"
           className="w-full h-full object-cover aspect-[16/10]"
+          onError={(e) => handleImageError(e, isDarkMode, "Focus")}
         />
       </div>
 
@@ -569,7 +603,9 @@ function LandingExperience() {
       >
         <img
           src="/images/module-workspace.png"
+          alt="Workspace Module"
           className="w-full h-full object-cover aspect-square"
+          onError={(e) => handleImageError(e, isDarkMode, "Workspace")}
         />
       </div>
     </div>
@@ -581,7 +617,7 @@ function LandingExperience() {
 {/* ========================================================= */}
 <section
   id="problem"
-  className={`relative py-32 lg:py-40 px-6 overflow-hidden border-t ${
+  className={`relative py-20 lg:py-40 px-6 overflow-hidden border-t ${
     isDarkMode
       ? "border-white/[0.04] bg-[#020202]"
       : "border-zinc-200 bg-zinc-50/50"
@@ -599,7 +635,7 @@ function LandingExperience() {
     {/* SECTION HEADING */}
     {/* ========================================================= */}
     <Reveal>
-      <div className="max-w-[850px] mx-auto text-center mb-24" style={{ animationDelay: "200ms" }}>
+      <div className="max-w-[850px] mx-auto text-center mb-16 lg:mb-24" style={{ animationDelay: "200ms" }}>
 
         <div
           className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border mb-8 text-[12px] font-semibold tracking-wide ${
@@ -612,7 +648,7 @@ function LandingExperience() {
         </div>
 
         <h2
-          className={`text-[38px] sm:text-[52px] lg:text-[62px] font-semibold tracking-[-0.04em] leading-[1.05] mb-8 ${
+          className={`text-[34px] sm:text-[46px] lg:text-[62px] font-semibold tracking-[-0.04em] leading-[1.1] lg:leading-[1.05] mb-8 ${
             isDarkMode
               ? "text-white"
               : "text-zinc-900"
@@ -627,7 +663,7 @@ function LandingExperience() {
         </h2>
 
         <p
-          className={`text-[17px] sm:text-[19px] leading-[1.9] max-w-[760px] mx-auto ${
+          className={`text-[16px] sm:text-[18px] lg:text-[19px] leading-[1.8] lg:leading-[1.9] max-w-[760px] mx-auto ${
             isDarkMode
               ? "text-zinc-400"
               : "text-zinc-600"
@@ -645,36 +681,36 @@ function LandingExperience() {
     {/* ========================================================= */}
     {/* CONTENT */}
     {/* ========================================================= */}
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-20 lg:gap-0 items-start">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_auto_1fr] gap-12 sm:gap-8 lg:gap-0 items-start">
 
       {/* ========================================================= */}
       {/* ITEM 1 */}
       {/* ========================================================= */}
       <Reveal delay={100}>
-          <div className="flex flex-col w-full max-w-[360px] justify-self-start">
+          <div className="flex flex-col w-full max-w-[360px] mx-auto lg:mx-0 lg:justify-self-start text-center lg:text-left items-center lg:items-start">
 
           {/* Icon */}
-          <div className="mb-8">
+          <div className="mb-6 lg:mb-8">
             <div className="relative">
-              <div className="absolute inset-0 w-[82px] h-[82px] rounded-full bg-orange-500/20 blur-[22px]" />
+              <div className="absolute inset-0 w-[70px] lg:w-[82px] h-[70px] lg:h-[82px] rounded-full bg-orange-500/20 blur-[22px]" />
 
-              <div className="relative w-[82px] h-[82px] rounded-full bg-orange-500 flex items-center justify-center shadow-[0_25px_60px_rgba(249,115,22,0.24)]">
+              <div className="relative w-[70px] lg:w-[82px] h-[70px] lg:h-[82px] rounded-full bg-orange-500 flex items-center justify-center shadow-[0_25px_60px_rgba(249,115,22,0.24)]">
                 <ShieldCheck
-                  size={28}
-                  className="text-white"
+                  size={24}
+                  className="text-white lg:w-7 lg:h-7"
                 />
               </div>
             </div>
           </div>
 
           {/* Label */}
-          <span className="text-[12px] uppercase tracking-[0.22em] font-semibold text-orange-500 mb-5">
+          <span className="text-[11px] lg:text-[12px] uppercase tracking-[0.22em] font-semibold text-orange-500 mb-4 lg:mb-5">
             Execution System
           </span>
 
           {/* Title */}
           <h3
-            className={`text-[34px] sm:text-[40px] lg:text-[42px] font-semibold tracking-[-0.04em] leading-[1.04] mb-8 ${
+            className={`text-[28px] sm:text-[32px] lg:text-[42px] font-semibold tracking-[-0.04em] leading-[1.1] lg:leading-[1.04] mb-6 lg:mb-8 ${
               isDarkMode
                 ? "text-white"
                 : "text-zinc-900"
@@ -687,7 +723,7 @@ function LandingExperience() {
 
           {/* Content */}
           <p
-            className={`text-[16px] leading-[1.95] mb-6 max-w-[370px] ${
+            className={`text-[15px] lg:text-[16px] leading-[1.8] lg:leading-[1.95] mb-4 lg:mb-6 max-w-[370px] ${
               isDarkMode
                 ? "text-zinc-400"
                 : "text-zinc-600"
@@ -701,7 +737,7 @@ function LandingExperience() {
           </p>
 
           <p
-            className={`text-[16px] leading-[1.95] max-w-[370px] ${
+            className={`text-[15px] lg:text-[16px] leading-[1.8] lg:leading-[1.95] max-w-[370px] ${
               isDarkMode
                 ? "text-zinc-500"
                 : "text-zinc-500"
@@ -719,30 +755,30 @@ function LandingExperience() {
       {/* ITEM 2 */}
       {/* ========================================================= */}
       <Reveal delay={200}>
-          <div className="flex flex-col w-[360px] justify-self-center">
+          <div className="flex flex-col w-full max-w-[360px] mx-auto lg:mx-0 lg:justify-self-center text-center lg:text-left items-center lg:items-start">
 
           {/* Icon */}
-          <div className="mb-8">
+          <div className="mb-6 lg:mb-8">
             <div className="relative">
-              <div className="absolute inset-0 w-[82px] h-[82px] rounded-full bg-orange-500/20 blur-[22px]" />
+              <div className="absolute inset-0 w-[70px] lg:w-[82px] h-[70px] lg:h-[82px] rounded-full bg-orange-500/20 blur-[22px]" />
 
-              <div className="relative w-[82px] h-[82px] rounded-full bg-orange-500 flex items-center justify-center shadow-[0_25px_60px_rgba(249,115,22,0.24)]">
+              <div className="relative w-[70px] lg:w-[82px] h-[70px] lg:h-[82px] rounded-full bg-orange-500 flex items-center justify-center shadow-[0_25px_60px_rgba(249,115,22,0.24)]">
                 <Target
-                  size={28}
-                  className="text-white"
+                  size={24}
+                  className="text-white lg:w-7 lg:h-7"
                 />
               </div>
             </div>
           </div>
 
           {/* Label */}
-          <span className="text-[12px] uppercase tracking-[0.22em] font-semibold text-orange-500 mb-5">
+          <span className="text-[11px] lg:text-[12px] uppercase tracking-[0.22em] font-semibold text-orange-500 mb-4 lg:mb-5">
             Sustainable Consistency
           </span>
 
           {/* Title */}
           <h3
-            className={`text-[34px] sm:text-[40px] lg:text-[42px] font-semibold tracking-[-0.04em] leading-[1.04] mb-8 ${
+            className={`text-[28px] sm:text-[32px] lg:text-[42px] font-semibold tracking-[-0.04em] leading-[1.1] lg:leading-[1.04] mb-6 lg:mb-8 ${
               isDarkMode
                 ? "text-white"
                 : "text-zinc-900"
@@ -755,7 +791,7 @@ function LandingExperience() {
 
           {/* Content */}
           <p
-            className={`text-[16px] leading-[1.95] mb-6 max-w-[370px] ${
+            className={`text-[15px] lg:text-[16px] leading-[1.8] lg:leading-[1.95] mb-4 lg:mb-6 max-w-[370px] ${
               isDarkMode
                 ? "text-zinc-400"
                 : "text-zinc-600"
@@ -768,7 +804,7 @@ function LandingExperience() {
           </p>
 
           <p
-            className={`text-[16px] leading-[1.95] max-w-[370px] ${
+            className={`text-[15px] lg:text-[16px] leading-[1.8] lg:leading-[1.95] max-w-[370px] ${
               isDarkMode
                 ? "text-zinc-500"
                 : "text-zinc-500"
@@ -786,30 +822,30 @@ function LandingExperience() {
       {/* ITEM 3 */}
       {/* ========================================================= */}
       <Reveal delay={300}>
-         <div className="flex flex-col w-full max-w-[360px] justify-self-end">
+         <div className="flex flex-col w-full max-w-[360px] mx-auto lg:mx-0 sm:col-span-2 lg:col-span-1 lg:justify-self-end text-center lg:text-left items-center lg:items-start">
 
           {/* Icon */}
-          <div className="mb-8">
+          <div className="mb-6 lg:mb-8">
             <div className="relative">
-              <div className="absolute inset-0 w-[82px] h-[82px] rounded-full bg-orange-500/20 blur-[22px]" />
+              <div className="absolute inset-0 w-[70px] lg:w-[82px] h-[70px] lg:h-[82px] rounded-full bg-orange-500/20 blur-[22px]" />
 
-              <div className="relative w-[82px] h-[82px] rounded-full bg-orange-500 flex items-center justify-center shadow-[0_25px_60px_rgba(249,115,22,0.24)]">
+              <div className="relative w-[70px] lg:w-[82px] h-[70px] lg:h-[82px] rounded-full bg-orange-500 flex items-center justify-center shadow-[0_25px_60px_rgba(249,115,22,0.24)]">
                 <Zap
-                  size={28}
-                  className="text-white"
+                  size={24}
+                  className="text-white lg:w-7 lg:h-7"
                 />
               </div>
             </div>
           </div>
 
           {/* Label */}
-          <span className="text-[12px] uppercase tracking-[0.22em] font-semibold text-orange-500 mb-5">
+          <span className="text-[11px] lg:text-[12px] uppercase tracking-[0.22em] font-semibold text-orange-500 mb-4 lg:mb-5">
             One Connected Flow
           </span>
 
           {/* Title */}
           <h3
-            className={`text-[34px] sm:text-[40px] lg:text-[42px] font-semibold tracking-[-0.04em] leading-[1.04] mb-8 ${
+            className={`text-[28px] sm:text-[32px] lg:text-[42px] font-semibold tracking-[-0.04em] leading-[1.1] lg:leading-[1.04] mb-6 lg:mb-8 ${
               isDarkMode
                 ? "text-white"
                 : "text-zinc-900"
@@ -822,7 +858,7 @@ function LandingExperience() {
 
           {/* Content */}
           <p
-            className={`text-[16px] leading-[1.95] mb-6 max-w-[370px] ${
+            className={`text-[15px] lg:text-[16px] leading-[1.8] lg:leading-[1.95] mb-4 lg:mb-6 max-w-[370px] ${
               isDarkMode
                 ? "text-zinc-400"
                 : "text-zinc-600"
@@ -835,7 +871,7 @@ function LandingExperience() {
           </p>
 
           <p
-            className={`text-[16px] leading-[1.95] max-w-[370px] ${
+            className={`text-[15px] lg:text-[16px] leading-[1.8] lg:leading-[1.95] max-w-[370px] ${
               isDarkMode
                 ? "text-zinc-500"
                 : "text-zinc-500"
@@ -854,7 +890,7 @@ function LandingExperience() {
         {/* ========================================================= */}
         {/* 4. MODULES (70/30 VISUAL HEAVY) */}
         {/* ========================================================= */}
-        <section id="modules" className="py-32 px-6 max-w-[1400px] mx-auto space-y-32">
+        <section id="modules" className="py-20 lg:py-32 px-6 max-w-[1400px] mx-auto space-y-24 lg:space-y-32">
           
 {/* ========================================================= */}
 {/* TASKS — EXECUTION ENGINE */}
@@ -862,7 +898,7 @@ function LandingExperience() {
 <Reveal>
   <section className="relative">
 
-    <div className="grid lg:grid-cols-[42%,58%] gap-16 lg:gap-20 items-center">
+    <div className="grid grid-cols-1 lg:grid-cols-[42%,58%] gap-12 lg:gap-20 items-center">
 
       {/* ========================================================= */}
       {/* LEFT CONTENT */}
@@ -871,7 +907,7 @@ function LandingExperience() {
 
         {/* Badge */}
         <div
-          className={`inline-flex items-center gap-2 w-fit px-4 py-2 rounded-full border mb-7 text-[12px] font-semibold tracking-wide ${
+          className={`inline-flex items-center gap-2 w-fit px-4 py-2 rounded-full border mb-6 lg:mb-7 text-[11px] lg:text-[12px] font-semibold tracking-wide ${
             isDarkMode
               ? "bg-white/[0.03] border-white/[0.06] text-zinc-500"
               : "bg-white border-zinc-200 text-zinc-500"
@@ -882,7 +918,7 @@ function LandingExperience() {
 
         {/* Heading */}
         <h2
-          className={`text-[38px] sm:text-[48px] lg:text-[58px] font-semibold tracking-[-0.04em] leading-[1.02] mb-7 ${
+          className={`text-[32px] sm:text-[42px] lg:text-[58px] font-semibold tracking-[-0.04em] leading-[1.1] lg:leading-[1.02] mb-5 lg:mb-7 ${
             isDarkMode
               ? "text-white"
               : "text-zinc-900"
@@ -895,7 +931,7 @@ function LandingExperience() {
 
         {/* Paragraphs */}
         <p
-          className={`text-[17px] sm:text-[18px] leading-[1.9] mb-7 ${
+          className={`text-[16px] sm:text-[17px] lg:text-[18px] leading-[1.8] lg:leading-[1.9] mb-5 lg:mb-7 ${
             isDarkMode
               ? "text-zinc-400"
               : "text-zinc-600"
@@ -908,7 +944,7 @@ function LandingExperience() {
         </p>
 
         <p
-          className={`text-[17px] sm:text-[18px] leading-[1.9] mb-10 ${
+          className={`text-[16px] sm:text-[17px] lg:text-[18px] leading-[1.8] lg:leading-[1.9] mb-8 lg:mb-10 ${
             isDarkMode
               ? "text-zinc-500"
               : "text-zinc-500"
@@ -921,7 +957,7 @@ function LandingExperience() {
         </p>
 
         {/* Features */}
-        <div className="space-y-5 mb-10">
+        <div className="space-y-4 lg:space-y-5 mb-8 lg:mb-10">
           {[
             {
               title: "Priority-based workflow",
@@ -942,13 +978,13 @@ function LandingExperience() {
           ].map((item, index) => (
             <div
               key={index}
-              className="flex gap-4"
+              className="flex gap-3 lg:gap-4"
             >
               <div className="mt-2 w-2 h-2 rounded-full bg-orange-500 shrink-0" />
 
               <div>
                 <div
-                  className={`text-[15px] font-semibold mb-1 ${
+                  className={`text-[14px] lg:text-[15px] font-semibold mb-1 ${
                     isDarkMode
                       ? "text-zinc-100"
                       : "text-zinc-900"
@@ -958,7 +994,7 @@ function LandingExperience() {
                 </div>
 
                 <div
-                  className={`text-[14px] leading-relaxed ${
+                  className={`text-[13px] lg:text-[14px] leading-relaxed ${
                     isDarkMode
                       ? "text-zinc-500"
                       : "text-zinc-500"
@@ -972,7 +1008,7 @@ function LandingExperience() {
         </div>
 
         {/* Chips */}
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2 lg:gap-3">
           {[
             "Execution",
             "Consistency",
@@ -981,7 +1017,7 @@ function LandingExperience() {
           ].map((chip) => (
             <div
               key={chip}
-              className={`px-4 py-2 rounded-full text-[12px] font-medium ${
+              className={`px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-[11px] lg:text-[12px] font-medium ${
                 isDarkMode
                   ? "bg-white/[0.04] text-zinc-400 border border-white/[0.05]"
                   : "bg-zinc-100 text-zinc-600 border border-zinc-200"
@@ -996,14 +1032,14 @@ function LandingExperience() {
       {/* ========================================================= */}
       {/* RIGHT VISUAL SYSTEM */}
       {/* ========================================================= */}
-      <div className="relative">
+      <div className="relative mt-8 lg:mt-0">
 
         {/* ================= MOBILE ================= */}
         <div className="lg:hidden flex flex-col gap-5">
 
           {/* Main Tasks Image */}
           <div
-            className={`rounded-[30px] overflow-hidden border shadow-[0_25px_80px_rgba(0,0,0,0.18)] ${premiumGlass}`}
+            className={`rounded-[24px] overflow-hidden border shadow-[0_20px_60px_rgba(0,0,0,0.18)] ${premiumGlass}`}
           >
             <img
               src="/images/module-tasks.png"
@@ -1019,31 +1055,20 @@ function LandingExperience() {
             />
           </div>
 
-          {/* Secondary Tasks Image */}
-          <div
-            className={`rounded-[26px] overflow-hidden border ${premiumGlass}`}
-          >
-            <img
-              src="/images/module-tasks.png"
-              alt="Task Insights"
-              className="w-full aspect-[16/10] object-cover opacity-90"
-            />
-          </div>
-
           {/* Stats */}
           <div
-            className={`rounded-[26px] border p-5 backdrop-blur-xl ${
+            className={`rounded-[20px] border p-4 backdrop-blur-xl ${
               isDarkMode
                 ? "bg-black/40 border-white/[0.08]"
                 : "bg-white/80 border-zinc-200"
             }`}
           >
-            <div className="text-[12px] text-orange-500 font-semibold mb-2">
+            <div className="text-[11px] text-orange-500 font-semibold mb-1.5">
               Daily Momentum
             </div>
 
             <div
-              className={`text-[28px] font-semibold mb-1 ${
+              className={`text-[24px] font-semibold mb-1 ${
                 isDarkMode
                   ? "text-white"
                   : "text-zinc-900"
@@ -1053,7 +1078,7 @@ function LandingExperience() {
             </div>
 
             <div
-              className={`text-[13px] ${
+              className={`text-[12px] ${
                 isDarkMode
                   ? "text-zinc-500"
                   : "text-zinc-500"
@@ -1084,6 +1109,7 @@ function LandingExperience() {
               src="/images/module-tasks.png"
               alt="Task Insights"
               className="w-full aspect-[16/10] object-cover opacity-90"
+              onError={(e) => handleImageError(e, isDarkMode, "Insights")}
             />
           </div>
 
@@ -1174,21 +1200,21 @@ function LandingExperience() {
 {/* FOCUS — DEEP WORK ENVIRONMENT */}
 {/* ========================================================= */}
 <Reveal>
-  <section className="relative">
+  <section className="relative mt-20 lg:mt-32">
 
-    <div className="grid lg:grid-cols-[58%,42%] gap-16 lg:gap-20 items-center">
+    <div className="grid grid-cols-1 lg:grid-cols-[58%,42%] gap-12 lg:gap-20 items-center">
 
       {/* ========================================================= */}
       {/* LEFT VISUAL SYSTEM */}
       {/* ========================================================= */}
-      <div className="relative order-2 lg:order-1">
+      <div className="relative order-2 lg:order-1 mt-8 lg:mt-0">
 
         {/* ================= MOBILE ================= */}
         <div className="lg:hidden flex flex-col gap-5">
 
           {/* Main Focus Screenshot */}
           <div
-            className={`rounded-[30px] overflow-hidden border shadow-[0_25px_80px_rgba(0,0,0,0.18)] ${premiumGlass}`}
+            className={`rounded-[24px] overflow-hidden border shadow-[0_20px_60px_rgba(0,0,0,0.18)] ${premiumGlass}`}
           >
             <img
               src="/images/module-focus.png"
@@ -1204,31 +1230,20 @@ function LandingExperience() {
             />
           </div>
 
-          {/* Secondary Focus Screenshot */}
-          <div
-            className={`rounded-[26px] overflow-hidden border ${premiumGlass}`}
-          >
-            <img
-              src="/images/module-focus.png"
-              alt="Focus Insights"
-              className="w-full aspect-[16/10] object-cover opacity-90"
-            />
-          </div>
-
           {/* Stats Card */}
           <div
-            className={`rounded-[26px] border p-5 backdrop-blur-xl ${
+            className={`rounded-[20px] border p-4 backdrop-blur-xl ${
               isDarkMode
                 ? "bg-black/40 border-white/[0.08]"
                 : "bg-white/80 border-zinc-200"
             }`}
           >
-            <div className="text-[12px] text-orange-500 font-semibold mb-2">
+            <div className="text-[11px] text-orange-500 font-semibold mb-1.5">
               Focus Session
             </div>
 
             <div
-              className={`text-[28px] font-semibold mb-1 ${
+              className={`text-[24px] font-semibold mb-1 ${
                 isDarkMode
                   ? "text-white"
                   : "text-zinc-900"
@@ -1238,7 +1253,7 @@ function LandingExperience() {
             </div>
 
             <div
-              className={`text-[13px] ${
+              className={`text-[12px] ${
                 isDarkMode
                   ? "text-zinc-500"
                   : "text-zinc-500"
@@ -1269,6 +1284,7 @@ function LandingExperience() {
               src="/images/module-focus.png"
               alt="Focus Insights"
               className="w-full aspect-[16/10] object-cover opacity-90"
+              onError={(e) => handleImageError(e, isDarkMode, "Insights")}
             />
           </div>
 
@@ -1359,7 +1375,7 @@ function LandingExperience() {
 
         {/* Badge */}
         <div
-          className={`inline-flex items-center gap-2 w-fit px-4 py-2 rounded-full border mb-7 text-[12px] font-semibold tracking-wide ${
+          className={`inline-flex items-center gap-2 w-fit px-4 py-2 rounded-full border mb-6 lg:mb-7 text-[11px] lg:text-[12px] font-semibold tracking-wide ${
             isDarkMode
               ? "bg-white/[0.03] border-white/[0.06] text-zinc-500"
               : "bg-white border-zinc-200 text-zinc-500"
@@ -1370,7 +1386,7 @@ function LandingExperience() {
 
         {/* Heading */}
         <h2
-          className={`text-[38px] sm:text-[48px] lg:text-[58px] font-semibold tracking-[-0.04em] leading-[1.02] mb-7 ${
+          className={`text-[32px] sm:text-[42px] lg:text-[58px] font-semibold tracking-[-0.04em] leading-[1.1] lg:leading-[1.02] mb-5 lg:mb-7 ${
             isDarkMode
               ? "text-white"
               : "text-zinc-900"
@@ -1383,7 +1399,7 @@ function LandingExperience() {
 
         {/* Paragraphs */}
         <p
-          className={`text-[17px] sm:text-[18px] leading-[1.9] mb-7 ${
+          className={`text-[16px] sm:text-[17px] lg:text-[18px] leading-[1.8] lg:leading-[1.9] mb-5 lg:mb-7 ${
             isDarkMode
               ? "text-zinc-400"
               : "text-zinc-600"
@@ -1396,7 +1412,7 @@ function LandingExperience() {
         </p>
 
         <p
-          className={`text-[17px] sm:text-[18px] leading-[1.9] mb-10 ${
+          className={`text-[16px] sm:text-[17px] lg:text-[18px] leading-[1.8] lg:leading-[1.9] mb-8 lg:mb-10 ${
             isDarkMode
               ? "text-zinc-500"
               : "text-zinc-500"
@@ -1410,7 +1426,7 @@ function LandingExperience() {
         </p>
 
         {/* Features */}
-        <div className="space-y-5 mb-10">
+        <div className="space-y-4 lg:space-y-5 mb-8 lg:mb-10">
           {[
             {
               title: "Dedicated focus sessions",
@@ -1431,13 +1447,13 @@ function LandingExperience() {
           ].map((item, index) => (
             <div
               key={index}
-              className="flex gap-4"
+              className="flex gap-3 lg:gap-4"
             >
               <div className="mt-2 w-2 h-2 rounded-full bg-orange-500 shrink-0" />
 
               <div>
                 <div
-                  className={`text-[15px] font-semibold mb-1 ${
+                  className={`text-[14px] lg:text-[15px] font-semibold mb-1 ${
                     isDarkMode
                       ? "text-zinc-100"
                       : "text-zinc-900"
@@ -1447,7 +1463,7 @@ function LandingExperience() {
                 </div>
 
                 <div
-                  className={`text-[14px] leading-relaxed ${
+                  className={`text-[13px] lg:text-[14px] leading-relaxed ${
                     isDarkMode
                       ? "text-zinc-500"
                       : "text-zinc-500"
@@ -1461,7 +1477,7 @@ function LandingExperience() {
         </div>
 
         {/* Chips */}
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2 lg:gap-3">
           {[
             "Deep Work",
             "Flow State",
@@ -1470,7 +1486,7 @@ function LandingExperience() {
           ].map((chip) => (
             <div
               key={chip}
-              className={`px-4 py-2 rounded-full text-[12px] font-medium ${
+              className={`px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-[11px] lg:text-[12px] font-medium ${
                 isDarkMode
                   ? "bg-white/[0.04] text-zinc-400 border border-white/[0.05]"
                   : "bg-zinc-100 text-zinc-600 border border-zinc-200"
@@ -1489,9 +1505,9 @@ function LandingExperience() {
 {/* PLANNER — DESIGN YOUR DAY */}
 {/* ========================================================= */}
 <Reveal>
-  <section className="relative">
+  <section className="relative mt-20 lg:mt-32">
 
-    <div className="grid lg:grid-cols-[42%,58%] gap-16 lg:gap-20 items-center">
+    <div className="grid grid-cols-1 lg:grid-cols-[42%,58%] gap-12 lg:gap-20 items-center">
 
       {/* ========================================================= */}
       {/* LEFT CONTENT */}
@@ -1500,7 +1516,7 @@ function LandingExperience() {
 
         {/* Badge */}
         <div
-          className={`inline-flex items-center gap-2 w-fit px-4 py-2 rounded-full border mb-7 text-[12px] font-semibold tracking-wide ${
+          className={`inline-flex items-center gap-2 w-fit px-4 py-2 rounded-full border mb-6 lg:mb-7 text-[11px] lg:text-[12px] font-semibold tracking-wide ${
             isDarkMode
               ? "bg-white/[0.03] border-white/[0.06] text-zinc-500"
               : "bg-white border-zinc-200 text-zinc-500"
@@ -1511,7 +1527,7 @@ function LandingExperience() {
 
         {/* Heading */}
         <h2
-          className={`text-[38px] sm:text-[48px] lg:text-[58px] font-semibold tracking-[-0.04em] leading-[1.02] mb-7 ${
+          className={`text-[32px] sm:text-[42px] lg:text-[58px] font-semibold tracking-[-0.04em] leading-[1.1] lg:leading-[1.02] mb-5 lg:mb-7 ${
             isDarkMode
               ? "text-white"
               : "text-zinc-900"
@@ -1524,7 +1540,7 @@ function LandingExperience() {
 
         {/* Paragraphs */}
         <p
-          className={`text-[17px] sm:text-[18px] leading-[1.9] mb-7 ${
+          className={`text-[16px] sm:text-[17px] lg:text-[18px] leading-[1.8] lg:leading-[1.9] mb-5 lg:mb-7 ${
             isDarkMode
               ? "text-zinc-400"
               : "text-zinc-600"
@@ -1536,7 +1552,7 @@ function LandingExperience() {
         </p>
 
         <p
-          className={`text-[17px] sm:text-[18px] leading-[1.9] mb-10 ${
+          className={`text-[16px] sm:text-[17px] lg:text-[18px] leading-[1.8] lg:leading-[1.9] mb-8 lg:mb-10 ${
             isDarkMode
               ? "text-zinc-500"
               : "text-zinc-500"
@@ -1549,7 +1565,7 @@ function LandingExperience() {
         </p>
 
         {/* Features */}
-        <div className="space-y-5 mb-10">
+        <div className="space-y-4 lg:space-y-5 mb-8 lg:mb-10">
           {[
             {
               title: "Intentional planning",
@@ -1570,13 +1586,13 @@ function LandingExperience() {
           ].map((item, index) => (
             <div
               key={index}
-              className="flex gap-4"
+              className="flex gap-3 lg:gap-4"
             >
               <div className="mt-2 w-2 h-2 rounded-full bg-orange-500 shrink-0" />
 
               <div>
                 <div
-                  className={`text-[15px] font-semibold mb-1 ${
+                  className={`text-[14px] lg:text-[15px] font-semibold mb-1 ${
                     isDarkMode
                       ? "text-zinc-100"
                       : "text-zinc-900"
@@ -1586,7 +1602,7 @@ function LandingExperience() {
                 </div>
 
                 <div
-                  className={`text-[14px] leading-relaxed ${
+                  className={`text-[13px] lg:text-[14px] leading-relaxed ${
                     isDarkMode
                       ? "text-zinc-500"
                       : "text-zinc-500"
@@ -1600,7 +1616,7 @@ function LandingExperience() {
         </div>
 
         {/* Chips */}
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2 lg:gap-3">
           {[
             "Planning",
             "Clarity",
@@ -1609,7 +1625,7 @@ function LandingExperience() {
           ].map((chip) => (
             <div
               key={chip}
-              className={`px-4 py-2 rounded-full text-[12px] font-medium ${
+              className={`px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-[11px] lg:text-[12px] font-medium ${
                 isDarkMode
                   ? "bg-white/[0.04] text-zinc-400 border border-white/[0.05]"
                   : "bg-zinc-100 text-zinc-600 border border-zinc-200"
@@ -1624,14 +1640,14 @@ function LandingExperience() {
       {/* ========================================================= */}
       {/* RIGHT VISUAL SYSTEM */}
       {/* ========================================================= */}
-      <div className="relative">
+      <div className="relative mt-8 lg:mt-0">
 
         {/* ================= MOBILE ================= */}
         <div className="lg:hidden flex flex-col gap-5">
 
           {/* Main Planner Screenshot */}
           <div
-            className={`rounded-[30px] overflow-hidden border shadow-[0_25px_80px_rgba(0,0,0,0.18)] ${premiumGlass}`}
+            className={`rounded-[24px] overflow-hidden border shadow-[0_20px_60px_rgba(0,0,0,0.18)] ${premiumGlass}`}
           >
             <img
               src="/images/module-planner.png"
@@ -1647,31 +1663,20 @@ function LandingExperience() {
             />
           </div>
 
-          {/* Supporting Planner Screenshot */}
-          <div
-            className={`rounded-[26px] overflow-hidden border ${premiumGlass}`}
-          >
-            <img
-              src="/images/module-planner.png"
-              alt="Planner Insights"
-              className="w-full aspect-[16/10] object-cover opacity-90"
-            />
-          </div>
-
           {/* Stats Card */}
           <div
-            className={`rounded-[26px] border p-5 backdrop-blur-xl ${
+            className={`rounded-[20px] border p-4 backdrop-blur-xl ${
               isDarkMode
                 ? "bg-black/40 border-white/[0.08]"
                 : "bg-white/80 border-zinc-200"
             }`}
           >
-            <div className="text-[12px] text-orange-500 font-semibold mb-2">
+            <div className="text-[11px] text-orange-500 font-semibold mb-1.5">
               Planned Today
             </div>
 
             <div
-              className={`text-[28px] font-semibold mb-1 ${
+              className={`text-[24px] font-semibold mb-1 ${
                 isDarkMode
                   ? "text-white"
                   : "text-zinc-900"
@@ -1681,7 +1686,7 @@ function LandingExperience() {
             </div>
 
             <div
-              className={`text-[13px] ${
+              className={`text-[12px] ${
                 isDarkMode
                   ? "text-zinc-500"
                   : "text-zinc-500"
@@ -1712,6 +1717,7 @@ function LandingExperience() {
               src="/images/module-planner.png"
               alt="Planner Insights"
               className="w-full aspect-[16/10] object-cover opacity-90"
+              onError={(e) => handleImageError(e, isDarkMode, "Insights")}
             />
           </div>
 
@@ -1801,9 +1807,9 @@ function LandingExperience() {
 {/* DIARY + WORKSPACE */}
 {/* ========================================================= */}
 <Reveal>
-  <section className="relative">
+  <section className="relative mt-20 lg:mt-32">
 
-    <div className="grid lg:grid-cols-2 gap-14 lg:gap-10 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-10 items-start">
 
       {/* ========================================================= */}
       {/* DIARY SYSTEM */}
@@ -1812,7 +1818,7 @@ function LandingExperience() {
 
         {/* Badge */}
         <div
-          className={`inline-flex items-center gap-2 w-fit px-4 py-2 rounded-full border mb-7 text-[12px] font-semibold tracking-wide ${
+          className={`inline-flex items-center gap-2 w-fit px-4 py-2 rounded-full border mb-6 lg:mb-7 text-[11px] lg:text-[12px] font-semibold tracking-wide ${
             isDarkMode
               ? "bg-white/[0.03] border-white/[0.06] text-zinc-500"
               : "bg-white border-zinc-200 text-zinc-500"
@@ -1823,7 +1829,7 @@ function LandingExperience() {
 
         {/* Heading */}
         <h2
-          className={`text-[34px] sm:text-[42px] lg:text-[48px] font-semibold tracking-[-0.04em] leading-[1.02] mb-6 ${
+          className={`text-[30px] sm:text-[38px] lg:text-[48px] font-semibold tracking-[-0.04em] leading-[1.1] lg:leading-[1.02] mb-5 lg:mb-6 ${
             isDarkMode
               ? "text-white"
               : "text-zinc-900"
@@ -1837,7 +1843,7 @@ function LandingExperience() {
 
         {/* Content */}
         <p
-          className={`text-[16px] sm:text-[17px] leading-[1.9] mb-6 ${
+          className={`text-[15px] sm:text-[16px] lg:text-[17px] leading-[1.8] lg:leading-[1.9] mb-4 lg:mb-6 ${
             isDarkMode
               ? "text-zinc-400"
               : "text-zinc-600"
@@ -1850,7 +1856,7 @@ function LandingExperience() {
         </p>
 
         <p
-          className={`text-[16px] sm:text-[17px] leading-[1.9] mb-8 ${
+          className={`text-[15px] sm:text-[16px] lg:text-[17px] leading-[1.8] lg:leading-[1.9] mb-6 lg:mb-8 ${
             isDarkMode
               ? "text-zinc-500"
               : "text-zinc-500"
@@ -1863,7 +1869,7 @@ function LandingExperience() {
         </p>
 
         {/* Features */}
-        <div className="space-y-4 mb-10">
+        <div className="space-y-3 lg:space-y-4 mb-8 lg:mb-10">
 
           {[
             "Morning & evening reflections",
@@ -1873,12 +1879,12 @@ function LandingExperience() {
           ].map((item) => (
             <div
               key={item}
-              className="flex items-center gap-3"
+              className="flex items-center gap-2 lg:gap-3"
             >
               <div className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
 
               <span
-                className={`text-[14px] ${
+                className={`text-[13px] lg:text-[14px] ${
                   isDarkMode
                     ? "text-zinc-300"
                     : "text-zinc-700"
@@ -1899,28 +1905,29 @@ function LandingExperience() {
           <div className="lg:hidden flex flex-col gap-4">
 
             <div
-              className={`rounded-[28px] overflow-hidden border shadow-[0_25px_80px_rgba(0,0,0,0.18)] ${premiumGlass}`}
+              className={`rounded-[24px] overflow-hidden border shadow-[0_20px_60px_rgba(0,0,0,0.18)] ${premiumGlass}`}
             >
               <img
                 src="/images/module-diary.png"
                 alt="Diary"
                 className="w-full aspect-[16/10] object-cover"
+                onError={(e) => handleImageError(e, isDarkMode, "Diary")}
               />
             </div>
 
             <div
-              className={`rounded-[24px] border p-5 ${
+              className={`rounded-[20px] border p-4 ${
                 isDarkMode
                   ? "bg-black/40 border-white/[0.08]"
                   : "bg-white/80 border-zinc-200"
               }`}
             >
-              <div className="text-[12px] text-orange-500 font-semibold mb-2">
+              <div className="text-[11px] text-orange-500 font-semibold mb-1.5">
                 Reflection Streak
               </div>
 
               <div
-                className={`text-[26px] font-semibold ${
+                className={`text-[24px] font-semibold ${
                   isDarkMode
                     ? "text-white"
                     : "text-zinc-900"
@@ -1947,6 +1954,7 @@ function LandingExperience() {
                 src="/images/module-diary.png"
                 alt="Diary"
                 className="w-full aspect-[16/10] object-cover"
+                onError={(e) => handleImageError(e, isDarkMode, "Diary")}
               />
             </div>
 
@@ -1993,7 +2001,7 @@ function LandingExperience() {
 
         {/* Badge */}
         <div
-          className={`inline-flex items-center gap-2 w-fit px-4 py-2 rounded-full border mb-7 text-[12px] font-semibold tracking-wide ${
+          className={`inline-flex items-center gap-2 w-fit px-4 py-2 rounded-full border mb-6 lg:mb-7 text-[11px] lg:text-[12px] font-semibold tracking-wide ${
             isDarkMode
               ? "bg-white/[0.03] border-white/[0.06] text-zinc-500"
               : "bg-white border-zinc-200 text-zinc-500"
@@ -2004,7 +2012,7 @@ function LandingExperience() {
 
         {/* Heading */}
         <h2
-          className={`text-[34px] sm:text-[42px] lg:text-[48px] font-semibold tracking-[-0.04em] leading-[1.02] mb-6 ${
+          className={`text-[30px] sm:text-[38px] lg:text-[48px] font-semibold tracking-[-0.04em] leading-[1.1] lg:leading-[1.02] mb-5 lg:mb-6 ${
             isDarkMode
               ? "text-white"
               : "text-zinc-900"
@@ -2017,7 +2025,7 @@ function LandingExperience() {
 
         {/* Content */}
         <p
-          className={`text-[16px] sm:text-[17px] leading-[1.9] mb-6 ${
+          className={`text-[15px] sm:text-[16px] lg:text-[17px] leading-[1.8] lg:leading-[1.9] mb-4 lg:mb-6 ${
             isDarkMode
               ? "text-zinc-400"
               : "text-zinc-600"
@@ -2029,7 +2037,7 @@ function LandingExperience() {
         </p>
 
         <p
-          className={`text-[16px] sm:text-[17px] leading-[1.9] mb-8 ${
+          className={`text-[15px] sm:text-[16px] lg:text-[17px] leading-[1.8] lg:leading-[1.9] mb-6 lg:mb-8 ${
             isDarkMode
               ? "text-zinc-500"
               : "text-zinc-500"
@@ -2042,7 +2050,7 @@ function LandingExperience() {
         </p>
 
         {/* Features */}
-        <div className="space-y-4 mb-10">
+        <div className="space-y-3 lg:space-y-4 mb-8 lg:mb-10">
 
           {[
             "Store files & resources",
@@ -2052,12 +2060,12 @@ function LandingExperience() {
           ].map((item) => (
             <div
               key={item}
-              className="flex items-center gap-3"
+              className="flex items-center gap-2 lg:gap-3"
             >
               <div className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
 
               <span
-                className={`text-[14px] ${
+                className={`text-[13px] lg:text-[14px] ${
                   isDarkMode
                     ? "text-zinc-300"
                     : "text-zinc-700"
@@ -2078,28 +2086,29 @@ function LandingExperience() {
           <div className="lg:hidden flex flex-col gap-4">
 
             <div
-              className={`rounded-[28px] overflow-hidden border shadow-[0_25px_80px_rgba(0,0,0,0.18)] ${premiumGlass}`}
+              className={`rounded-[24px] overflow-hidden border shadow-[0_20px_60px_rgba(0,0,0,0.18)] ${premiumGlass}`}
             >
               <img
                 src="/images/module-workspace.png"
                 alt="Workspace"
                 className="w-full aspect-[16/10] object-cover"
+                onError={(e) => handleImageError(e, isDarkMode, "Workspace")}
               />
             </div>
 
             <div
-              className={`rounded-[24px] border p-5 ${
+              className={`rounded-[20px] border p-4 ${
                 isDarkMode
                   ? "bg-black/40 border-white/[0.08]"
                   : "bg-white/80 border-zinc-200"
               }`}
             >
-              <div className="text-[12px] text-orange-500 font-semibold mb-2">
+              <div className="text-[11px] text-orange-500 font-semibold mb-1.5">
                 Workspace
               </div>
 
               <div
-                className={`text-[26px] font-semibold ${
+                className={`text-[24px] font-semibold ${
                   isDarkMode
                     ? "text-white"
                     : "text-zinc-900"
@@ -2126,6 +2135,7 @@ function LandingExperience() {
                 src="/images/module-workspace.png"
                 alt="Workspace"
                 className="w-full aspect-[16/10] object-cover"
+                onError={(e) => handleImageError(e, isDarkMode, "Workspace")}
               />
             </div>
 
@@ -2176,7 +2186,7 @@ function LandingExperience() {
 {/* ========================================================= */}
 <section
   id="rhythm"
-  className={`relative py-36 lg:py-44 px-6 border-y overflow-hidden ${
+  className={`relative py-24 lg:py-44 px-6 border-y overflow-hidden ${
     isDarkMode
       ? "border-white/[0.04] bg-[#020202]"
       : "border-zinc-200 bg-zinc-50/50"
@@ -2195,7 +2205,7 @@ function LandingExperience() {
     {/* HEADER */}
     {/* ========================================================= */}
     <Reveal>
-      <div className="max-w-[860px] mx-auto text-center mb-28">
+      <div className="max-w-[860px] mx-auto text-center mb-20 lg:mb-28">
 
         <div
           className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border mb-8 text-[12px] font-semibold tracking-wide ${
@@ -2208,7 +2218,7 @@ function LandingExperience() {
         </div>
 
         <h2
-          className={`text-[42px] sm:text-[56px] lg:text-[68px] font-semibold tracking-[-0.05em] leading-[1.02] mb-8 ${
+          className={`text-[36px] sm:text-[48px] lg:text-[68px] font-semibold tracking-[-0.05em] leading-[1.1] lg:leading-[1.02] mb-8 ${
             isDarkMode
               ? "text-white"
               : "text-zinc-900"
@@ -2220,7 +2230,7 @@ function LandingExperience() {
         </h2>
 
         <p
-          className={`text-[17px] sm:text-[19px] leading-[1.9] max-w-[760px] mx-auto ${
+          className={`text-[16px] sm:text-[18px] lg:text-[19px] leading-[1.8] lg:leading-[1.9] max-w-[760px] mx-auto ${
             isDarkMode
               ? "text-zinc-400"
               : "text-zinc-600"
@@ -2252,7 +2262,7 @@ function LandingExperience() {
           }`}
         />
 
-        <div className="grid lg:grid-cols-4 gap-16 lg:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 relative z-10">
 
           {[
             {
@@ -2282,27 +2292,26 @@ function LandingExperience() {
           ].map((item, index) => (
             <div
               key={item.title}
-              className="relative flex flex-col"
+              className="relative flex flex-col items-center text-center lg:items-start lg:text-left"
             >
 
               {/* Dot */}
-              <div className="relative z-10 mb-8">
-                <div className="w-[88px] h-[88px] rounded-full bg-orange-500 flex items-center justify-center shadow-[0_20px_60px_rgba(249,115,22,0.25)]">
-
-                  <span className="text-white text-[20px] font-semibold">
+              <div className="relative z-10 mb-6 lg:mb-8">
+                <div className="w-[70px] lg:w-[88px] h-[70px] lg:h-[88px] rounded-full bg-orange-500 flex items-center justify-center shadow-[0_20px_60px_rgba(249,115,22,0.25)] relative lg:-mt-0">
+                  <span className="text-white text-[18px] lg:text-[20px] font-semibold">
                     0{index + 1}
                   </span>
                 </div>
               </div>
 
               {/* Time */}
-              <span className="text-[12px] font-semibold tracking-[0.2em] uppercase text-orange-500 mb-4">
+              <span className="text-[11px] lg:text-[12px] font-semibold tracking-[0.2em] uppercase text-orange-500 mb-3 lg:mb-4">
                 {item.time}
               </span>
 
               {/* Title */}
               <h3
-                className={`text-[34px] sm:text-[38px] font-semibold tracking-tight mb-5 ${
+                className={`text-[28px] sm:text-[32px] lg:text-[38px] font-semibold tracking-tight mb-3 lg:mb-5 ${
                   isDarkMode
                     ? "text-white"
                     : "text-zinc-900"
@@ -2313,7 +2322,7 @@ function LandingExperience() {
 
               {/* Description */}
               <p
-                className={`text-[15px] leading-[1.9] max-w-[260px] ${
+                className={`text-[14px] lg:text-[15px] leading-[1.8] lg:leading-[1.9] max-w-[280px] lg:max-w-[260px] ${
                   isDarkMode
                     ? "text-zinc-400"
                     : "text-zinc-600"
@@ -2331,10 +2340,10 @@ function LandingExperience() {
     {/* END MESSAGE */}
     {/* ========================================================= */}
     <Reveal delay={200}>
-      <div className="max-w-[900px] mx-auto text-center mt-28">
+      <div className="max-w-[900px] mx-auto text-center mt-20 lg:mt-28">
 
         <h3
-          className={`text-[30px] sm:text-[42px] font-semibold tracking-[-0.04em] leading-[1.1] mb-6 ${
+          className={`text-[28px] sm:text-[36px] lg:text-[42px] font-semibold tracking-[-0.04em] leading-[1.15] lg:leading-[1.1] mb-5 lg:mb-6 ${
             isDarkMode
               ? "text-white"
               : "text-zinc-900"
@@ -2346,7 +2355,7 @@ function LandingExperience() {
         </h3>
 
         <p
-          className={`text-[16px] sm:text-[18px] leading-[1.9] max-w-[720px] mx-auto ${
+          className={`text-[15px] sm:text-[17px] lg:text-[18px] leading-[1.8] lg:leading-[1.9] max-w-[720px] mx-auto ${
             isDarkMode
               ? "text-zinc-400"
               : "text-zinc-600"
@@ -2383,11 +2392,11 @@ function LandingExperience() {
     {/* ========================================================= */}
     {/* CTA */}
     {/* ========================================================= */}
-    <div className="py-28 lg:py-36 text-center">
+    <div className="py-20 lg:py-36 text-center">
 
       <Reveal>
         <div
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border mb-8 text-[12px] font-semibold tracking-wide ${
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border mb-6 lg:mb-8 text-[11px] lg:text-[12px] font-semibold tracking-wide ${
             isDarkMode
               ? "bg-white/[0.03] border-white/[0.06] text-zinc-500"
               : "bg-white border-zinc-200 text-zinc-500"
@@ -2397,7 +2406,7 @@ function LandingExperience() {
         </div>
 
         <h2
-          className={`text-[40px] sm:text-[58px] lg:text-[72px] font-semibold tracking-[-0.05em] leading-[1.02] mb-8 ${
+          className={`text-[36px] sm:text-[48px] lg:text-[72px] font-semibold tracking-[-0.05em] leading-[1.1] lg:leading-[1.02] mb-6 lg:mb-8 ${
             isDarkMode
               ? "text-white"
               : "text-zinc-900"
@@ -2409,7 +2418,7 @@ function LandingExperience() {
         </h2>
 
         <p
-          className={`max-w-[760px] mx-auto text-[17px] sm:text-[19px] leading-[1.9] mb-12 ${
+          className={`max-w-[760px] mx-auto text-[16px] sm:text-[18px] lg:text-[19px] leading-[1.8] lg:leading-[1.9] mb-10 lg:mb-12 ${
             isDarkMode
               ? "text-zinc-400"
               : "text-zinc-600"
@@ -2425,7 +2434,7 @@ function LandingExperience() {
 
           <button
             onClick={scrollToHeroAuth}
-            className="px-8 py-4 rounded-2xl text-[15px] font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-all active:scale-95 shadow-[0_15px_50px_rgba(249,115,22,0.25)]"
+            className="w-full sm:w-auto px-8 py-4 rounded-2xl text-[14px] lg:text-[15px] font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-all active:scale-95 shadow-[0_15px_50px_rgba(249,115,22,0.25)]"
           >
             Start Free
           </button>
@@ -2438,7 +2447,7 @@ function LandingExperience() {
                   behavior: "smooth",
                 })
             }
-            className={`px-8 py-4 rounded-2xl text-[15px] font-semibold border transition-all active:scale-95 ${
+            className={`w-full sm:w-auto px-8 py-4 rounded-2xl text-[14px] lg:text-[15px] font-semibold border transition-all active:scale-95 ${
               isDarkMode
                 ? "border-white/[0.08] bg-white/[0.03] text-zinc-300 hover:bg-white/[0.05]"
                 : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
@@ -2456,19 +2465,19 @@ function LandingExperience() {
     {/* ========================================================= */}
     <Reveal>
       <footer
-        className={`border-t py-14 ${
+        className={`border-t py-10 lg:py-14 ${
           isDarkMode
             ? "border-white/[0.04]"
             : "border-zinc-200"
         }`}
       >
 
-        <div className="grid lg:grid-cols-[1.2fr,1fr,1fr,1fr] gap-14">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.2fr,1fr,1fr,1fr] gap-10 lg:gap-14">
 
           {/* Brand */}
           <div>
 
-            <div className="flex items-center gap-3 mb-5">
+            <div className="flex items-center gap-3 mb-4 lg:mb-5">
               <img
                 src="/favicon.ico"
                 alt="NexSpace"
@@ -2476,7 +2485,7 @@ function LandingExperience() {
               />
 
               <span
-                className={`font-semibold text-[18px] tracking-tight ${
+                className={`font-semibold text-[16px] lg:text-[18px] tracking-tight ${
                   isDarkMode
                     ? "text-white"
                     : "text-zinc-900"
@@ -2487,7 +2496,7 @@ function LandingExperience() {
             </div>
 
             <p
-              className={`text-[14px] leading-[1.9] max-w-[320px] ${
+              className={`text-[13px] lg:text-[14px] leading-[1.8] lg:leading-[1.9] max-w-[320px] ${
                 isDarkMode
                   ? "text-zinc-500"
                   : "text-zinc-600"
@@ -2503,7 +2512,7 @@ function LandingExperience() {
           {/* Product */}
           <div>
             <h4
-              className={`text-[14px] font-semibold mb-5 ${
+              className={`text-[13px] lg:text-[14px] font-semibold mb-4 lg:mb-5 ${
                 isDarkMode
                   ? "text-zinc-200"
                   : "text-zinc-900"
@@ -2512,7 +2521,7 @@ function LandingExperience() {
               Product
             </h4>
 
-            <div className="space-y-4 text-[14px]">
+            <div className="space-y-3 lg:space-y-4 text-[13px] lg:text-[14px]">
 
               {[
                 {
@@ -2556,7 +2565,7 @@ function LandingExperience() {
           {/* Navigation */}
           <div>
             <h4
-              className={`text-[14px] font-semibold mb-5 ${
+              className={`text-[13px] lg:text-[14px] font-semibold mb-4 lg:mb-5 ${
                 isDarkMode
                   ? "text-zinc-200"
                   : "text-zinc-900"
@@ -2565,7 +2574,7 @@ function LandingExperience() {
               Navigation
             </h4>
 
-            <div className="space-y-4 text-[14px]">
+            <div className="space-y-3 lg:space-y-4 text-[13px] lg:text-[14px]">
 
               {[
                 {
@@ -2603,7 +2612,7 @@ function LandingExperience() {
           </div>
 
           {/* Back to top */}
-          <div className="flex lg:justify-end items-start">
+          <div className="flex lg:justify-end items-start mt-4 sm:mt-0">
 
             <button
               onClick={() =>
@@ -2612,7 +2621,7 @@ function LandingExperience() {
                   behavior: "smooth",
                 })
               }
-              className={`group flex items-center gap-3 px-5 py-4 rounded-2xl border transition-all ${
+              className={`group flex items-center justify-center gap-3 w-full lg:w-auto px-5 py-3 lg:py-4 rounded-2xl border transition-all ${
                 isDarkMode
                   ? "bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.05]"
                   : "bg-white border-zinc-200 hover:bg-zinc-50"
@@ -2621,7 +2630,7 @@ function LandingExperience() {
               <ArrowUp size={16} />
 
               <span
-                className={`text-[14px] font-medium ${
+                className={`text-[13px] lg:text-[14px] font-medium ${
                   isDarkMode
                     ? "text-zinc-300"
                     : "text-zinc-700"
@@ -2635,7 +2644,7 @@ function LandingExperience() {
 
         {/* Bottom */}
         <div
-          className={`mt-14 pt-8 border-t flex flex-col sm:flex-row justify-between gap-4 text-[13px] ${
+          className={`mt-10 lg:mt-14 pt-6 lg:pt-8 border-t flex flex-col sm:flex-row justify-between items-center sm:items-start gap-4 text-[12px] lg:text-[13px] text-center sm:text-left ${
             isDarkMode
               ? "border-white/[0.04] text-zinc-600"
               : "border-zinc-200 text-zinc-500"
@@ -2659,8 +2668,8 @@ function LandingExperience() {
       {/* ========================================================= */}
       {/* 7. FOOTER */}
       {/* ========================================================= */}
-      <footer className={`py-12 text-center border-t ${isDarkMode ? "border-white/[0.04]" : "border-zinc-200"}`}>
-        <p className={`text-[12px] font-semibold tracking-widest uppercase ${isDarkMode ? "text-zinc-600" : "text-zinc-400"}`}>
+      <footer className={`py-8 lg:py-12 text-center border-t ${isDarkMode ? "border-white/[0.04]" : "border-zinc-200"}`}>
+        <p className={`text-[11px] lg:text-[12px] font-semibold tracking-widest uppercase ${isDarkMode ? "text-zinc-600" : "text-zinc-400"}`}>
           Harder to open. Harder to quit.
         </p>
       </footer>

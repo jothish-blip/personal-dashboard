@@ -27,52 +27,79 @@ export default function AuthCallbackInner() {
 
         const code = searchParams.get("code");
 
+        // Initial session check for back-navigation protection
+        const {
+          data: { session: existingSession },
+        } = await supabase.auth.getSession();
+
+        if (!code && !existingSession) {
+          router.replace("/login");
+          return;
+        }
+
         // Only exchange if code exists in the URL
         if (code) {
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
 
           if (error) {
             console.error("❌ Exchange failed:", error);
             router.replace("/login");
             return;
           }
+        }
 
-          const user = data?.user;
+        // Verify session existence after exchange
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-          if (user) {
-            // 1. Check if profile exists without overwriting current data
-            // (Using 'as any' bypasses outdated local TS schema errors)
-            const { data: existingProfile } = await (supabase as any)
-              .from("profiles")
-              .select("onboarding_completed")
-              .eq("id", user.id)
-              .maybeSingle();
+        if (!session) {
+          console.error("❌ Invalid session");
+          router.replace("/login");
+          return;
+        }
 
-            // 2. Safely insert a fresh profile if this is a brand new user
-            if (!existingProfile) {
-              const profileData: any = {
-                id: user.id,
-                full_name: user.user_metadata?.full_name ?? null,
-                avatar_url: user.user_metadata?.avatar_url ?? null,
-                updated_at: new Date().toISOString(),
-                onboarding_completed: false, 
-              };
+        if (!session.user) {
+          console.error("❌ Invalid user");
+          router.replace("/login");
+          return;
+        }
 
-              await (supabase as any).from("profiles").insert(profileData);
-            }
+        const user = session.user;
 
-            // 3. Fetch current status to route correctly
-            const { data: routingCheck } = await (supabase as any)
-              .from("profiles")
-              .select("onboarding_completed")
-              .eq("id", user.id)
-              .maybeSingle();
+        if (user) {
+          // 1. Check if profile exists without overwriting current data
+          // (Using 'as any' bypasses outdated local TS schema errors)
+          const { data: existingProfile } = await (supabase as any)
+            .from("profiles")
+            .select("onboarding_completed")
+            .eq("id", user.id)
+            .maybeSingle();
 
-            // 4. Redirect to onboarding if not completed
-            if (!routingCheck?.onboarding_completed) {
-              router.replace("/onboarding");
-              return; // Halt execution so we don't hit the home redirect
-            }
+          // 2. Safely insert a fresh profile if this is a brand new user
+          if (!existingProfile) {
+            const profileData: any = {
+              id: user.id,
+              full_name: user.user_metadata?.full_name ?? null,
+              avatar_url: user.user_metadata?.avatar_url ?? null,
+              updated_at: new Date().toISOString(),
+              onboarding_completed: false, 
+            };
+
+            await (supabase as any).from("profiles").insert(profileData);
+          }
+
+          // 3. Fetch current status to route correctly
+          const { data: routingCheck } = await (supabase as any)
+            .from("profiles")
+            .select("onboarding_completed")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          // 4. Redirect to onboarding if not completed
+          if (!routingCheck?.onboarding_completed) {
+            router.replace("/onboarding");
+            return; // Halt execution so we don't hit the home redirect
           }
         }
 
@@ -88,12 +115,10 @@ export default function AuthCallbackInner() {
   }, [router, searchParams]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--background)] transition-colors duration-300">
       <div className="flex flex-col items-center gap-3 animate-in fade-in duration-500">
-        {/* Spinner */}
-        <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-        {/* Minimalist Text */}
-        <div className="text-gray-400 text-sm font-medium tracking-wide">Securing session...</div>
+        {/* Premium Spinner */}
+        <div className="w-10 h-10 border-2 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
       </div>
     </div>
   );

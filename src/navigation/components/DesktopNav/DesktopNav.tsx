@@ -18,7 +18,7 @@ import { useTheme } from "@/theme/ThemeProvider";
 interface DesktopNavProps {
   activePaths?: Record<string, boolean> | null;
   handleNav?: (path: string) => void;
-  handleLogout?: () => void;
+  handleLogout?: () => Promise<void>;
   userProfile?: {
     full_name?: string;
     email?: string;
@@ -38,7 +38,7 @@ const DEFAULT_NAV_ITEMS = [
 export default function DesktopNav(props: DesktopNavProps) {
   const {
     activePaths = {},
-    handleLogout = () => {},
+    handleLogout,
     userProfile = null,
   } = props;
 
@@ -296,10 +296,21 @@ export default function DesktopNav(props: DesktopNavProps) {
 
                 <div>
                   <button
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.preventDefault();
+
+                      if (navigatingRef.current) return;
+                      navigatingRef.current = true;
+
                       setIsProfileOpen(false);
-                      if (handleLogout) handleLogout();
+
+                      try {
+                        if (handleLogout) {
+                          await handleLogout();
+                        }
+                      } finally {
+                        navigatingRef.current = false;
+                      }
                     }}
                     className={`w-full px-3 py-2.5 rounded-[14px] text-[13.5px] font-medium text-left flex items-center gap-3 transition-colors ${
                       isDarkMode ? "text-red-400/90 hover:bg-white/[0.03] hover:text-red-400" : "text-red-600 hover:bg-red-50 hover:text-red-700"
