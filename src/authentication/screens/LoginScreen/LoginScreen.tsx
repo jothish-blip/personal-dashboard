@@ -144,23 +144,23 @@ export default function LoginPage() {
             onClick={() => router.push("/")}
             className="cursor-pointer group"
           ><Image
-  src={isDarkMode ? "/logo-dark.png" : "/logo-light.png"}
-  alt="NexSpace"
-  width={280}
-  height={60}
-  priority
-  className="
-    h-10
-    sm:h-12
-    lg:h-14
-    xl:h-16
-    w-auto
-    object-contain
-    transition-transform
-    duration-300
-    group-hover:scale-105
-  "
-/>
+            src={isDarkMode ? "/logo-dark.png" : "/logo-light.png"}
+            alt="NexSpace"
+            width={280}
+            height={60}
+            priority
+            className="
+              h-10
+              sm:h-12
+              lg:h-14
+              xl:h-16
+              w-auto
+              object-contain
+              transition-transform
+              duration-300
+              group-hover:scale-105
+            "
+          />
           </div>
         </div>
 
@@ -182,20 +182,36 @@ export default function LoginPage() {
         {/* LEFT SIDE: Luxury Space & Layered Composition */}
         <div className="hidden lg:flex flex-col justify-start pt-[25vh] pl-24 pr-8 relative min-h-screen">
           
-          <div className="mb-10 relative z-20">
-            <h1 className="text-[52px] font-semibold leading-[1.1] tracking-[-0.04em] mb-5">
-              Welcome back.
+          <div className="mb-8 relative z-20">
+            <h1 className="text-[52px] font-semibold leading-[1.05] tracking-[-0.04em] mb-5">
+              Personal
+              <br />
+              Execution OS
               <br />
               <span className={`transition-colors duration-500 ${isDarkMode ? "text-zinc-500" : "text-zinc-400"}`}>
-                Continue where
-                <br />
-                you left off.
+                for focused lives.
               </span>
             </h1>
 
-            <p className={`text-[16px] max-w-[390px] leading-[1.75] font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-500"}`}>
-              Your tasks, focus sessions, plans and reflections are waiting. Let's keep the momentum going.
+            <p className={`text-[16px] max-w-[420px] leading-[1.75] font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-500"}`}>
+              A single system for thinking, planning, focusing, executing and growing.
             </p>
+
+            {/* Feature Chips for SEO and quick product understanding */}
+            <div className="flex flex-wrap gap-2.5 mt-8">
+              {["Focus", "Tasks", "Planner", "Diary", "Workspace", "Growth"].map((feature) => (
+                <span
+                  key={feature}
+                  className={`px-3.5 py-1.5 rounded-full text-[13px] font-medium border backdrop-blur-sm transition-colors ${
+                    isDarkMode
+                      ? "bg-white/[0.03] border-white/[0.08] text-zinc-300"
+                      : "bg-black/[0.03] border-black/[0.08] text-zinc-700"
+                  }`}
+                >
+                  {feature}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div className="relative h-[360px] w-full max-w-[480px] -mt-2 ml-4">
@@ -206,6 +222,7 @@ export default function LoginPage() {
               src="/images/module-planner.png"
               className="absolute top-[8%] right-[12%] w-[42%] rounded-[20px] border border-white/10 shadow-2xl z-0 filter brightness-[0.85]"
               style={{ animation: 'float-back 9s ease-in-out infinite' }}
+              alt="NexSpace Planning Workspace"
             />
 
             {/* Focus (Middle Layer - Subtler) */}
@@ -213,6 +230,7 @@ export default function LoginPage() {
               src="/images/module-focus.png"
               className="absolute bottom-[22%] right-[32%] w-[32%] rounded-[16px] border border-white/10 shadow-2xl z-10 filter brightness-[0.95]"
               style={{ animation: 'float-mid 7s ease-in-out infinite' }}
+              alt="NexSpace Focus Sessions"
             />
 
             {/* Tasks (Front Layer - Dominant anchor) */}
@@ -220,30 +238,46 @@ export default function LoginPage() {
               src="/images/module-tasks.png"
               className="absolute top-[16%] left-[-2%] w-[82%] rounded-[24px] border border-white/10 shadow-[0_40px_80px_rgba(0,0,0,0.5)] z-20"
               style={{ animation: 'float-front 8s ease-in-out infinite' }}
+              alt="NexSpace Task Management"
             />
           </div>
+
+          {/* Module Context for SEO & Screen Readers */}
+          <div className={`mt-8 ml-4 flex flex-wrap gap-x-5 gap-y-2 text-[12px] font-medium tracking-wide opacity-50 ${isDarkMode ? "text-zinc-400" : "text-zinc-500"}`}>
+            <span>Focus Sessions</span>
+            <span>•</span>
+            <span>Task Management</span>
+            <span>•</span>
+            <span>Planning Workspace</span>
+            <span>•</span>
+            <span>Personal Diary</span>
+            <span>•</span>
+            <span>Goal Tracking</span>
+          </div>
+
         </div>
 
         {/* RIGHT SIDE: Floating Ambient Auth Stack */}
         <div className="flex flex-col items-center justify-start lg:pt-[28vh] px-6 sm:px-12 w-full">
           
+          {/* Mobile Fallback Hero */}
           <div className="block lg:hidden w-full max-w-[420px] mb-8 text-center sm:text-left mt-2">
             <h2 className="text-[36px] font-semibold tracking-[-0.04em] leading-tight">
-              Welcome back.
+              Personal<br/>Execution OS
             </h2>
             <p className={`mt-2.5 text-[15px] ${isDarkMode ? "text-zinc-400" : "text-zinc-500"}`}>
-              Continue where you left off.
+              A single system for thinking, planning, focusing, executing and growing.
             </p>
           </div>
 
           <div className="w-full max-w-[420px] relative transition-all duration-500 lg:mt-[10vh]">
             
             <div className="mb-6 text-center lg:text-left flex flex-col items-center lg:items-start">
-              <h3 className={`text-[16px] font-medium tracking-tight ${isDarkMode ? "text-zinc-300" : "text-zinc-700"}`}>
-                Continue to NexSpace with your preferred account.
+              <h3 className={`text-[18px] sm:text-[20px] font-semibold tracking-tight ${isDarkMode ? "text-zinc-200" : "text-zinc-800"}`}>
+                Sign in to NexSpace
               </h3>
-              <p className={`text-[13px] mt-1 ${isDarkMode ? "text-zinc-500" : "text-zinc-400"}`}>
-                Restore your tasks, focus sessions and planning history.
+              <p className={`text-[14px] mt-1.5 ${isDarkMode ? "text-zinc-400" : "text-zinc-500"}`}>
+                Access your personal execution system from any device and continue building momentum.
               </p>
             </div>
 
@@ -354,62 +388,63 @@ export default function LoginPage() {
             <span>•</span>
             <span>Cross-device sync</span>
           </div>
-        <footer
-  className={`py-8 lg:py-12 text-center border-t ${
-    isDarkMode ? "border-white/[0.04]" : "border-zinc-200"
-  }`}
->
-  <div className="flex flex-col items-center gap-4">
 
-    <p
-      className={`text-[11px] lg:text-[12px] font-semibold tracking-widest uppercase ${
-        isDarkMode ? "text-zinc-600" : "text-zinc-400"
-      }`}
-    >
-      Harder to open. Harder to quit.
-    </p>
+          <footer
+            className={`py-8 lg:py-12 text-center border-t w-full mt-auto ${
+              isDarkMode ? "border-white/[0.04]" : "border-zinc-200"
+            }`}
+          >
+            <div className="flex flex-col items-center gap-4">
 
-    <div
-      className={`flex flex-wrap items-center justify-center gap-3 sm:gap-5 text-[12px] lg:text-[13px] ${
-        isDarkMode ? "text-zinc-500" : "text-zinc-500"
-      }`}
-    >
-      <a
-        href="/privacy"
-        className="hover:text-orange-500 transition-colors"
-      >
-        Privacy Policy
-      </a>
+              <p
+                className={`text-[11px] lg:text-[12px] font-semibold tracking-widest uppercase ${
+                  isDarkMode ? "text-zinc-600" : "text-zinc-400"
+                }`}
+              >
+                Built for people who take execution seriously.
+              </p>
 
-      <span className="opacity-40">•</span>
+              <div
+                className={`flex flex-wrap items-center justify-center gap-3 sm:gap-5 text-[12px] lg:text-[13px] ${
+                  isDarkMode ? "text-zinc-500" : "text-zinc-500"
+                }`}
+              >
+                <a
+                  href="/privacy"
+                  className="hover:text-orange-500 transition-colors"
+                >
+                  Privacy Policy
+                </a>
 
-      <a
-        href="/terms"
-        className="hover:text-orange-500 transition-colors"
-      >
-        Terms & Conditions
-      </a>
+                <span className="opacity-40">•</span>
 
-      <span className="opacity-40">•</span>
+                <a
+                  href="/terms"
+                  className="hover:text-orange-500 transition-colors"
+                >
+                  Terms & Conditions
+                </a>
 
-      <a
-        href="/contact"
-        className="hover:text-orange-500 transition-colors"
-      >
-        Contact
-      </a>
-    </div>
+                <span className="opacity-40">•</span>
 
-    <p
-      className={`text-[11px] ${
-        isDarkMode ? "text-zinc-700" : "text-zinc-400"
-      }`}
-    >
-      © {new Date().getFullYear()} NexSpace. All rights reserved.
-    </p>
+                <a
+                  href="/contact"
+                  className="hover:text-orange-500 transition-colors"
+                >
+                  Contact
+                </a>
+              </div>
 
-  </div>
-</footer>
+              <p
+                className={`text-[11px] ${
+                  isDarkMode ? "text-zinc-700" : "text-zinc-400"
+                }`}
+              >
+                © {new Date().getFullYear()} NexSpace. All rights reserved.
+              </p>
+
+            </div>
+          </footer>
 
         </div>
       </section>
