@@ -18,27 +18,91 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
 };
-
 export const metadata: Metadata = {
+  metadataBase: new URL("https://nexspace.space"),
+
   title: {
-    template: "%s | NexSpace",
     default: "NexSpace",
+    template: "%s | NexSpace",
   },
-  description: "Execution system for focus, tasks and planning",
+
+  description:
+    "NexSpace OS — Focus, Tasks, Diary, Planning, Workspace and Personal Growth in one unified execution system.",
+
+  keywords: [
+    "NexSpace",
+    "NexSpace OS",
+    "Personal Dashboard",
+    "Productivity",
+    "Focus",
+    "Task Management",
+    "Planning",
+    "Diary",
+    "Workspace",
+    "Goal Tracking",
+    "Personal Growth",
+    "Execution System",
+    "NexUP",
+    "Productivity OS",
+  ],
+
+  applicationName: "NexSpace",
+
+  authors: [
+    {
+      name: "Jothish Gandham",
+    },
+  ],
+
+  creator: "Jothish Gandham",
+  publisher: "NexSpace",
+
   manifest: "/manifest.json",
+
   icons: {
     icon: "/favicon.ico",
     apple: "/favicon.ico",
   },
+
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "NexSpace",
   },
-  applicationName: "NexSpace",
+
   formatDetection: {
     telephone: false,
   },
+
+  openGraph: {
+    type: "website",
+    url: "https://nexspace.space",
+    title: "NexSpace",
+    description:
+      "Focus, Tasks, Diary, Planning, Workspace and Personal Growth in one unified execution system.",
+    siteName: "NexSpace",
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "NexSpace",
+    description:
+      "Focus, Tasks, Diary, Planning, Workspace and Personal Growth in one unified execution system.",
+  },
+
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+
+  category: "Productivity",
 };
 
 export default function RootLayout({

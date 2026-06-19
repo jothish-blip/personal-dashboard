@@ -1,44 +1,39 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/theme/ThemeProvider";
-import { Loader2, ArrowRight, ArrowLeft, CheckCircle2, BrainCircuit, Target, CalendarDays, BookOpen } from "lucide-react";
-
-type OnboardingData = {
-  full_name: string;
-  phone: string;
-  age: string;
-  bio: string;
-  discovery_source: string;
-  usage_reason: string[];
-  work_style: string;
-  planning_style: string;
-};
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Loader2, 
+  X, 
+  Target, 
+  BrainCircuit, 
+  CalendarDays, 
+  BookOpen, 
+  LayoutPanelLeft, 
+  Sparkles, 
+  ArrowRight 
+} from "lucide-react";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { isDarkMode } = useTheme();
 
-  const [step, setStep] = useState(1);
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
-  const [formData, setFormData] = useState<OnboardingData>({
-    full_name: "",
-    phone: "",
-    age: "",
-    bio: "",
-    discovery_source: "",
-    usage_reason: [],
-    work_style: "",
-    planning_style: "",
-  });
+  const [ninetyDayGoal, setNinetyDayGoal] = useState("");
 
-  // Fetch initial user data to auto-populate
+  // ─── FETCH USER & VERIFY STATUS ───
   useEffect(() => {
+    setMounted(true);
+
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -48,387 +43,262 @@ export default function OnboardingPage() {
       
       setUserId(session.user.id);
 
-      // Cast to any to prevent 'never' TS errors on new DB columns
       const { data: profile } = await (supabase as any)
         .from("profiles")
-        .select("*")
+        .select("onboarding_completed, welcome_modal_seen")
         .eq("id", session.user.id)
         .maybeSingle();
 
-      if (profile) {
-        // If they already completed it, kick them back to home
-        if (profile.onboarding_completed) {
-          sessionStorage.removeItem("nexspace_session_loaded");
-          router.replace("/");
-          return;
-        }
-
-        setFormData(prev => ({
-          ...prev,
-          full_name: profile.full_name || session.user.user_metadata?.full_name || "",
-          phone: profile.phone || "",
-          age: profile.age ? String(profile.age) : "",
-          bio: profile.bio || "",
-          discovery_source: profile.discovery_source || "",
-          usage_reason: profile.usage_reason || [],
-          work_style: profile.work_style || "",
-          planning_style: profile.planning_style || "",
-        }));
+      if (profile && (profile.onboarding_completed || profile.welcome_modal_seen)) {
+        router.replace("/");
+        return;
       }
+
       setLoading(false);
+      setShowModal(true);
     };
 
     fetchUser();
   }, [router]);
 
-  const handleNext = () => setStep(prev => Math.min(prev + 1, 4));
-  const handleBack = () => setStep(prev => Math.max(prev - 1, 1));
+  // ─── SCROLL LOCK & ESCAPE KEY (HEADER MODAL PATTERN) ───
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showModal) {
+        handleSkip();
+      }
+    };
 
-  const toggleUsageReason = (reason: string) => {
-    setFormData(prev => ({
-      ...prev,
-      usage_reason: prev.usage_reason.includes(reason)
-        ? prev.usage_reason.filter(r => r !== reason)
-        : [...prev.usage_reason, reason]
-    }));
-  };
+    if (showModal) {
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      document.documentElement.style.overflow = "hidden";
+      window.addEventListener('keydown', handleKeyDown);
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+      document.documentElement.style.overflow = "";
+    }
+    
+    return () => { 
+      document.body.style.overflow = ""; 
+      document.body.style.touchAction = "";
+      document.documentElement.style.overflow = "";
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showModal]);
 
-  const completeOnboarding = async () => {
+  // ─── ACTIONS ───
+  const completeOnboarding = async (goal: string) => {
     if (!userId) return;
-    setSaving(true);
-
+    
     try {
       const updatePayload: any = {
-        full_name: formData.full_name,
-        phone: formData.phone || null,
-        age: formData.age ? parseInt(formData.age) : null,
-        bio: formData.bio || null,
-        discovery_source: formData.discovery_source || null,
-        usage_reason: formData.usage_reason,
-        work_style: formData.work_style || null,
-        planning_style: formData.planning_style || null,
         onboarding_completed: true,
+        welcome_modal_seen: true,
         onboarding_completed_at: new Date().toISOString(),
       };
 
-      const { error } = await (supabase as any)
+      if (goal.trim()) {
+        updatePayload.ninety_day_goal = goal.trim();
+      }
+
+      await (supabase as any)
         .from("profiles")
         .update(updatePayload)
         .eq("id", userId);
-
-      if (error) throw error;
-      
-      // Force reload the session flag and route to home
-      sessionStorage.removeItem("nexspace_session_loaded");
-      router.replace("/");
-      
+        
     } catch (error) {
       console.error("Error completing onboarding:", error);
-      setSaving(false);
     }
   };
 
-  if (loading) {
+  const handleContinue = async () => {
+    setSaving(true);
+    await completeOnboarding(ninetyDayGoal);
+    setShowModal(false);
+    router.replace("/");
+  };
+
+  const handleSkip = () => {
+    // Optimistic close and route, complete in background
+    completeOnboarding("");
+    setShowModal(false);
+    router.replace("/");
+  };
+
+  if (loading || !mounted) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-[#050505]" : "bg-[#FAFAFA]"}`}>
+      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-[var(--background)]" : "bg-[#FAFAFA]"}`}>
         <Loader2 className={`w-6 h-6 animate-spin ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
       </div>
     );
   }
 
-  // --- SUBCOMPONENTS FOR STEPS ---
+  const modalSurfaceClass = isDarkMode 
+    ? "bg-[#0A0A0A] border border-white/[0.08] shadow-2xl" 
+    : "bg-white border border-black/[0.05] shadow-xl";
 
-  const StepIndicator = () => (
-    <div className="flex items-center gap-2 mb-10">
-      {[1, 2, 3, 4].map(i => (
-        <React.Fragment key={i}>
-          <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
-            step >= i 
-              ? "bg-orange-500" 
-              : isDarkMode ? "bg-white/[0.06]" : "bg-black/[0.06]"
-          }`} />
-        </React.Fragment>
-      ))}
-    </div>
-  );
+  const modalVariants = {
+    hidden: { opacity: 0, scale: 0.96, y: 10 },
+    visible: { opacity: 1, scale: 1, y: 0 },
+    exit: { opacity: 0, scale: 0.96, y: 10 }
+  };
+
+  const overlayVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1 },
+    exit: { opacity: 0 }
+  };
 
   return (
-    <div className={`min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 transition-colors duration-500 ${
-      isDarkMode ? "bg-[#050505] text-white" : "bg-[#FAFAFA] text-[#111827]"
-    }`}>
+    <div className={`min-h-screen transition-colors duration-500 ${isDarkMode ? "bg-[var(--background)] text-white" : "bg-[#FAFAFA] text-[#111827]"}`}>
       
-      <div className="w-full max-w-[560px] animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-both">
-        <StepIndicator />
+      {createPortal(
+        <AnimatePresence>
+          {showModal && (
+            <motion.div 
+              variants={overlayVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              transition={{ duration: 0.3 }}
+              onClick={handleSkip}
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm"
+            >
+              <motion.div 
+                variants={modalVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                transition={{ duration: 0.3, type: "spring", stiffness: 400, damping: 30 }}
+                onClick={(e) => e.stopPropagation()}
+                className={`rounded-3xl p-6 sm:p-8 max-w-[720px] w-full max-h-[90vh] overflow-y-auto ${modalSurfaceClass}`}
+              >
+                {/* Header Section */}
+                <div className="flex justify-between items-start mb-6">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-sm ${
+                      isDarkMode ? "bg-[#111111] border-white/10" : "bg-zinc-50 border-zinc-200"
+                    }`}>
+                      <img src="/favicon.ico" alt="NexSpace" className="w-6 h-6 object-contain" />
+                    </div>
+                    <div>
+                      <h1 className={`text-2xl sm:text-3xl font-bold tracking-tight ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                        Welcome to NexSpace
+                      </h1>
+                      <p className={`text-sm mt-1 font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-500"}`}>
+                        Your personal operating system for intentional consistency.
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleSkip} 
+                    className={`p-2 rounded-xl transition-colors ${
+                      isDarkMode ? "text-zinc-400 hover:text-white hover:bg-white/10" : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
+                    }`}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
 
-        {/* STEP 1: IDENTITY */}
-        {step === 1 && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight mb-2">Personalize your space</h1>
-              <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                Let's set up your system with your identity.
-              </p>
-            </div>
-
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <label className={`text-[11px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Full Name</label>
-                <input
-                  type="text"
-                  value={formData.full_name}
-                  onChange={e => setFormData({ ...formData, full_name: e.target.value })}
-                  className={`w-full h-[52px] px-4 rounded-2xl text-sm font-medium outline-none transition-all border ${
-                    isDarkMode 
-                      ? "bg-[#111111] border-white/[0.06] text-white focus:border-orange-500" 
-                      : "bg-white border-black/[0.08] text-gray-900 focus:border-black"
-                  }`}
-                  placeholder="Your name"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className={`text-[11px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Phone (Optional)</label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                    className={`w-full h-[52px] px-4 rounded-2xl text-sm font-medium outline-none transition-all border ${
+                {/* 90-Day Goal Input */}
+                <div className="mb-8">
+                  <label className={`block text-xs font-bold uppercase tracking-widest mb-3 ${isDarkMode ? "text-zinc-500" : "text-zinc-400"}`}>
+                    What are you trying to achieve in the next 90 days?
+                  </label>
+                  <textarea
+                    value={ninetyDayGoal}
+                    onChange={e => setNinetyDayGoal(e.target.value)}
+                    className={`w-full h-[80px] p-4 rounded-2xl text-sm font-medium outline-none transition-all border resize-none ${
                       isDarkMode 
                         ? "bg-[#111111] border-white/[0.06] text-white focus:border-orange-500" 
-                        : "bg-white border-black/[0.08] text-gray-900 focus:border-black"
+                        : "bg-zinc-50 border-zinc-200 text-zinc-900 focus:border-orange-500"
                     }`}
-                    placeholder="+1 234 567 890"
+                    placeholder="E.g., Launch my startup, get certified, build a consistent workout habit..."
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className={`text-[11px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Age</label>
-                  <input
-                    type="number"
-                    value={formData.age}
-                    onChange={e => setFormData({ ...formData, age: e.target.value })}
-                    className={`w-full h-[52px] px-4 rounded-2xl text-sm font-medium outline-none transition-all border ${
-                      isDarkMode 
-                        ? "bg-[#111111] border-white/[0.06] text-white focus:border-orange-500" 
-                        : "bg-white border-black/[0.08] text-gray-900 focus:border-black"
+
+                {/* Ecosystem Cards */}
+                <div className="mb-8">
+                  <label className={`block text-xs font-bold uppercase tracking-widest mb-3 ${isDarkMode ? "text-zinc-500" : "text-zinc-400"}`}>
+                    The Ecosystem
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    
+                    <div className={`p-4 rounded-2xl border transition-colors ${isDarkMode ? "bg-[#111111] border-white/[0.06]" : "bg-white border-zinc-200"}`}>
+                      <Target className="w-5 h-5 text-orange-500 mb-3" />
+                      <h3 className={`font-bold text-sm mb-1 ${isDarkMode ? "text-zinc-100" : "text-zinc-900"}`}>Tasks</h3>
+                      <p className={`text-xs font-medium ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>Execute meaningful work.</p>
+                    </div>
+                    
+                    <div className={`p-4 rounded-2xl border transition-colors ${isDarkMode ? "bg-[#111111] border-white/[0.06]" : "bg-white border-zinc-200"}`}>
+                      <BrainCircuit className="w-5 h-5 text-emerald-500 mb-3" />
+                      <h3 className={`font-bold text-sm mb-1 ${isDarkMode ? "text-zinc-100" : "text-zinc-900"}`}>Focus</h3>
+                      <p className={`text-xs font-medium ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>Deep work sessions.</p>
+                    </div>
+                    
+                    <div className={`p-4 rounded-2xl border transition-colors ${isDarkMode ? "bg-[#111111] border-white/[0.06]" : "bg-white border-zinc-200"}`}>
+                      <CalendarDays className="w-5 h-5 text-blue-500 mb-3" />
+                      <h3 className={`font-bold text-sm mb-1 ${isDarkMode ? "text-zinc-100" : "text-zinc-900"}`}>Planner</h3>
+                      <p className={`text-xs font-medium ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>Time and deadlines.</p>
+                    </div>
+                    
+                    <div className={`p-4 rounded-2xl border transition-colors ${isDarkMode ? "bg-[#111111] border-white/[0.06]" : "bg-white border-zinc-200"}`}>
+                      <BookOpen className="w-5 h-5 text-purple-500 mb-3" />
+                      <h3 className={`font-bold text-sm mb-1 ${isDarkMode ? "text-zinc-100" : "text-zinc-900"}`}>Diary</h3>
+                      <p className={`text-xs font-medium ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>Reflection and growth.</p>
+                    </div>
+
+                    <div className={`p-4 rounded-2xl border transition-colors ${isDarkMode ? "bg-[#111111] border-white/[0.06]" : "bg-white border-zinc-200"}`}>
+                      <LayoutPanelLeft className="w-5 h-5 text-indigo-500 mb-3" />
+                      <h3 className={`font-bold text-sm mb-1 ${isDarkMode ? "text-zinc-100" : "text-zinc-900"}`}>Workspace</h3>
+                      <p className={`text-xs font-medium ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>Your command center.</p>
+                    </div>
+
+                    <div className={`p-4 rounded-2xl border transition-colors ${isDarkMode ? "bg-[#111111] border-white/[0.06]" : "bg-white border-zinc-200"}`}>
+                      <Sparkles className="w-5 h-5 text-amber-400 mb-3" />
+                      <h3 className={`font-bold text-sm mb-1 ${isDarkMode ? "text-zinc-100" : "text-zinc-900"}`}>NexUP</h3>
+                      <p className={`text-xs font-medium ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>Future ecosystem.</p>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* Bottom Actions */}
+                <div className="flex items-center justify-between pt-6 border-t border-zinc-200 dark:border-white/[0.06]">
+                  <button
+                    onClick={handleSkip}
+                    disabled={saving}
+                    className={`font-semibold text-sm transition-colors ${
+                      isDarkMode ? "text-zinc-500 hover:text-zinc-300" : "text-zinc-500 hover:text-zinc-800"
                     }`}
-                    placeholder="25"
-                  />
+                  >
+                    Skip for now
+                  </button>
+                  
+                  <button
+                    onClick={handleContinue}
+                    disabled={saving}
+                    className={`flex items-center justify-center gap-2 h-12 px-8 rounded-xl font-bold text-sm transition-all active:scale-95 ${
+                      saving 
+                        ? "bg-orange-500/70 text-white cursor-not-allowed" 
+                        : "bg-orange-500 text-white hover:bg-orange-600 shadow-[0_4px_20px_rgba(249,115,22,0.25)]"
+                    }`}
+                  >
+                    {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                      <>
+                        Continue <ArrowRight size={16} />
+                      </>
+                    )}
+                  </button>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className={`text-[11px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Short Bio</label>
-                <textarea
-                  value={formData.bio}
-                  onChange={e => setFormData({ ...formData, bio: e.target.value })}
-                  className={`w-full h-[100px] p-4 rounded-2xl text-sm font-medium outline-none transition-all border resize-none ${
-                    isDarkMode 
-                      ? "bg-[#111111] border-white/[0.06] text-white focus:border-orange-500" 
-                      : "bg-white border-black/[0.08] text-gray-900 focus:border-black"
-                  }`}
-                  placeholder="What are you currently building or studying?"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 2: DISCOVERY */}
-        {step === 2 && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight mb-2">Intentions</h1>
-              <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                What brings you to NexSpace?
-              </p>
-            </div>
-
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <label className={`text-[11px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>How did you find us?</label>
-                <div className="flex flex-wrap gap-2">
-                  {["Google", "Friend", "Instagram", "YouTube", "GitHub", "Discord", "Other"].map(source => (
-                    <button
-                      key={source}
-                      onClick={() => setFormData({ ...formData, discovery_source: source })}
-                      className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
-                        formData.discovery_source === source
-                          ? "bg-orange-500 text-white border-orange-500"
-                          : isDarkMode 
-                            ? "bg-[#111111] border-white/[0.06] text-gray-400 hover:text-white" 
-                            : "bg-white border-black/[0.08] text-gray-600 hover:text-black"
-                      }`}
-                    >
-                      {source}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <label className={`text-[11px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Why are you here? (Select multiple)</label>
-                <div className="flex flex-wrap gap-2">
-                  {["Focus", "Study", "Consistency", "Deep Work", "Task Management", "Planning", "Life Organization", "Career"].map(reason => {
-                    const isSelected = formData.usage_reason.includes(reason);
-                    return (
-                      <button
-                        key={reason}
-                        onClick={() => toggleUsageReason(reason)}
-                        className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border flex items-center gap-2 ${
-                          isSelected
-                            ? isDarkMode ? "bg-orange-500/10 border-orange-500/50 text-orange-500" : "bg-orange-50 border-orange-200 text-orange-600"
-                            : isDarkMode ? "bg-[#111111] border-white/[0.06] text-gray-400 hover:text-white" : "bg-white border-black/[0.08] text-gray-600 hover:text-black"
-                        }`}
-                      >
-                        {isSelected && <CheckCircle2 size={14} />}
-                        {reason}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3: WORK STYLE */}
-        {step === 3 && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight mb-2">Work Style</h1>
-              <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                Help us understand how you execute.
-              </p>
-            </div>
-
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <label className={`text-[11px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>How do you usually work?</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {["I need structure", "I struggle with consistency", "I already have systems", "Still figuring things out"].map(style => (
-                    <button
-                      key={style}
-                      onClick={() => setFormData({ ...formData, work_style: style })}
-                      className={`p-4 rounded-2xl text-sm font-semibold text-left transition-all border ${
-                        formData.work_style === style
-                          ? "bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20"
-                          : isDarkMode 
-                            ? "bg-[#111111] border-white/[0.06] text-gray-400 hover:text-white" 
-                            : "bg-white border-black/[0.08] text-gray-600 hover:text-black"
-                      }`}
-                    >
-                      {style}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <label className={`text-[11px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>How do you currently plan?</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {["No planning", "Mental planning", "Calendar", "Todo app", "Structured system"].map(style => (
-                    <button
-                      key={style}
-                      onClick={() => setFormData({ ...formData, planning_style: style })}
-                      className={`p-4 rounded-2xl text-sm font-semibold text-left transition-all border ${
-                        formData.planning_style === style
-                          ? "bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20"
-                          : isDarkMode 
-                            ? "bg-[#111111] border-white/[0.06] text-gray-400 hover:text-white" 
-                            : "bg-white border-black/[0.08] text-gray-600 hover:text-black"
-                      }`}
-                    >
-                      {style}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 4: NEXSPACE INTRO */}
-        {step === 4 && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-[#111111] border border-white/10 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
-                <img src="/favicon.ico" alt="NexSpace" className="w-8 h-8 object-contain" />
-              </div>
-              <h1 className="text-3xl font-bold tracking-tight mb-2">Your system is ready.</h1>
-              <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                Four modules built for uncompromised execution.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className={`p-4 rounded-2xl border ${isDarkMode ? "bg-[#111111] border-white/[0.06]" : "bg-white border-black/[0.08]"}`}>
-                <Target className="w-5 h-5 text-orange-500 mb-3" />
-                <h3 className="font-bold text-sm mb-1">Tasks</h3>
-                <p className={`text-xs font-medium ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>Meaningful execution.</p>
-              </div>
-              <div className={`p-4 rounded-2xl border ${isDarkMode ? "bg-[#111111] border-white/[0.06]" : "bg-white border-black/[0.08]"}`}>
-                <BrainCircuit className="w-5 h-5 text-emerald-500 mb-3" />
-                <h3 className="font-bold text-sm mb-1">Focus</h3>
-                <p className={`text-xs font-medium ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>Deep sessions.</p>
-              </div>
-              <div className={`p-4 rounded-2xl border ${isDarkMode ? "bg-[#111111] border-white/[0.06]" : "bg-white border-black/[0.08]"}`}>
-                <CalendarDays className="w-5 h-5 text-blue-500 mb-3" />
-                <h3 className="font-bold text-sm mb-1">Planner</h3>
-                <p className={`text-xs font-medium ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>Deadlines & planning.</p>
-              </div>
-              <div className={`p-4 rounded-2xl border ${isDarkMode ? "bg-[#111111] border-white/[0.06]" : "bg-white border-black/[0.08]"}`}>
-                <BookOpen className="w-5 h-5 text-purple-500 mb-3" />
-                <h3 className="font-bold text-sm mb-1">Diary</h3>
-                <p className={`text-xs font-medium ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>Reflection & growth.</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* BOTTOM NAVIGATION */}
-        <div className="mt-12 flex items-center justify-between pt-6 border-t border-white/[0.06]">
-          {step > 1 ? (
-            <button
-              onClick={handleBack}
-              disabled={saving}
-              className={`flex items-center gap-2 font-semibold text-sm transition-colors ${
-                isDarkMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-black"
-              }`}
-            >
-              <ArrowLeft size={16} /> Back
-            </button>
-          ) : (
-            <div /> // Empty div to keep 'Next' button on the right
+              </motion.div>
+            </motion.div>
           )}
-
-          {step < 4 ? (
-            <button
-              onClick={handleNext}
-              className={`flex items-center gap-2 h-12 px-6 rounded-xl font-bold text-sm transition-all active:scale-95 ${
-                isDarkMode 
-                  ? "bg-white text-black hover:bg-gray-200" 
-                  : "bg-black text-white hover:bg-gray-800"
-              }`}
-            >
-              Next <ArrowRight size={16} />
-            </button>
-          ) : (
-            <button
-              onClick={completeOnboarding}
-              disabled={saving}
-              className={`flex items-center justify-center gap-2 h-12 px-8 rounded-xl font-bold text-sm transition-all active:scale-95 ${
-                saving 
-                  ? "bg-orange-500/70 text-white cursor-not-allowed" 
-                  : "bg-orange-500 text-white hover:bg-orange-600 shadow-[0_4px_20px_rgba(249,115,22,0.25)]"
-              }`}
-            >
-              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : "Enter Workspace"}
-            </button>
-          )}
-        </div>
-
-      </div>
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

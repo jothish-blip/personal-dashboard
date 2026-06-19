@@ -49,6 +49,50 @@ export default function Home() {
     setHasSessionLoaded(sessionStorage.getItem("nexspace_session_loaded") === "true");
   }, []);
 
+  // ─── INSTANT SESSION ENFORCEMENT ───
+  useEffect(() => {
+    const checkAuth = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        sessionStorage.clear();
+        setIsAuthenticated(false);
+        router.replace("/login");
+        return;
+      }
+    };
+
+    // 1. Verify session on Home mount
+    checkAuth();
+
+    // 2. Listen to onAuthStateChange()
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        sessionStorage.clear();
+        setIsAuthenticated(false);
+        router.replace("/login");
+      }
+    });
+
+    // 3. Re-check auth when tab becomes visible
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        checkAuth();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [router]);
+
   // ─── PRELOAD TABS FOR ZERO-LATENCY SWITCHING ───
   useEffect(() => {
     import("@/modules/tasks/analytics/AnalyticsView");
@@ -75,13 +119,12 @@ export default function Home() {
     isLoaded: isFocusLoaded,
   } = useFocusSystem();
 
-  // ─── AUTH + FEEDBACK ───
+  // ─── AUTH STATE + FEEDBACK ───
   useEffect(() => {
     if (!isFocusLoaded) return;
 
     if (!currentUser) {
       setIsAuthenticated(false);
-      router.replace("/login");
       return;
     }
 
@@ -135,7 +178,7 @@ export default function Home() {
     };
 
     runFeedbackCheck();
-  }, [currentUser, isFocusLoaded, router]);
+  }, [currentUser, isFocusLoaded]);
 
   // ─── LOCAL TAB MEMORY ───
   useEffect(() => {

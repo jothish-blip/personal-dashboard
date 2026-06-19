@@ -23,6 +23,7 @@ export default function LoginPage() {
 
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [oauthStarted, setOauthStarted] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -33,18 +34,59 @@ export default function LoginPage() {
         setCheckingSession(false);
       }
     };
+
+    // 1. Check session on mount
     checkSession();
+
+    // 2. Listen to auth state changes (catches logins happening in other tabs/popups)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        router.replace("/");
+      }
+    });
+
+    // 3. Re-verify session when the tab becomes visible
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        checkSession();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [router]);
 
   const handleLogin = async (provider: "google" | "github" | "discord") => {
-    if (loadingProvider) return;
+    // Prevent OAuth button spam
+    if (oauthStarted || loadingProvider) return;
+    
+    setOauthStarted(true);
     setLoadingProvider(provider);
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+
+    // Callback timeout protection (15s) to prevent infinite loading state
+    const timeout = setTimeout(() => {
+      setOauthStarted(false);
+      setLoadingProvider(null);
+    }, 15000);
+
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+    } catch (error) {
+      clearTimeout(timeout);
+      setOauthStarted(false);
+      setLoadingProvider(null);
+    }
   };
 
   if (checkingSession) {
@@ -213,7 +255,7 @@ export default function LoginPage() {
               {/* Google - Primary Weight */}
               <button
                 onClick={() => handleLogin("google")}
-                disabled={!!loadingProvider}
+                disabled={oauthStarted}
                 className={`w-full h-[62px] sm:h-[68px] px-6 rounded-[24px] border flex items-center justify-center gap-3.5 font-medium text-[15px] transition-all duration-500 group ${
                   isDarkMode
                     ? "bg-white/[0.04] border-white/[0.08] text-white hover:bg-white/[0.06] hover:shadow-[0_8px_30px_rgba(255,255,255,0.05)] disabled:opacity-50"
@@ -233,7 +275,7 @@ export default function LoginPage() {
               {/* GitHub - Secondary Weight */}
               <button
                 onClick={() => handleLogin("github")}
-                disabled={!!loadingProvider}
+                disabled={oauthStarted}
                 className={`w-full h-[62px] sm:h-[68px] px-6 rounded-[24px] border flex items-center justify-center gap-3.5 font-medium text-[15px] transition-all duration-500 group ${
                   isDarkMode
                     ? "bg-white/[0.015] border-white/[0.03] text-zinc-300 hover:bg-white/[0.04] hover:text-white hover:border-white/[0.06] hover:shadow-[0_8px_30px_rgba(255,255,255,0.02)] disabled:opacity-50"
@@ -253,7 +295,7 @@ export default function LoginPage() {
               {/* Discord - Secondary Weight */}
               <button
                 onClick={() => handleLogin("discord")}
-                disabled={!!loadingProvider}
+                disabled={oauthStarted}
                 className={`w-full h-[62px] sm:h-[68px] px-6 rounded-[24px] border flex items-center justify-center gap-3.5 font-medium text-[15px] transition-all duration-500 group ${
                   isDarkMode
                     ? "bg-white/[0.015] border-white/[0.03] text-zinc-300 hover:bg-white/[0.04] hover:text-white hover:border-white/[0.06] hover:shadow-[0_8px_30px_rgba(255,255,255,0.02)] disabled:opacity-50"
