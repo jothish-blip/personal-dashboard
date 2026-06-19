@@ -19,91 +19,99 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 export const metadata: Metadata = {
-  metadataBase: new URL("https://nexspace.space"),
+metadataBase: new URL("https://nexspace.space"),
 
-  title: {
-    default: "NexSpace",
-    template: "%s | NexSpace",
-  },
+title: {
+default: "NexSpace — Personal Execution OS",
+template: "%s | NexSpace",
+},
 
-  description:
-    "NexSpace OS — Focus, Tasks, Diary, Planning, Workspace and Personal Growth in one unified execution system.",
+description:
+"NexSpace is a personal execution operating system that unifies Focus, Tasks, Planning, Diary, Goals, Sessions, Workspace, and Personal Growth into one structured environment for deep work and life management.",
 
-  keywords: [
-    "NexSpace",
-    "NexSpace OS",
-    "Personal Dashboard",
-    "Productivity",
-    "Focus",
-    "Task Management",
-    "Planning",
-    "Diary",
-    "Workspace",
-    "Goal Tracking",
-    "Personal Growth",
-    "Execution System",
-    "NexUP",
-    "Productivity OS",
-  ],
+keywords: [
+"NexSpace",
+"Personal Execution OS",
+"Productivity OS",
+"Focus Management",
+"Deep Work",
+"Task Management",
+"Goal Tracking",
+"Planning System",
+"Digital Workspace",
+"Daily Planning",
+"Personal Growth",
+"Focus Sessions",
+"Life Management",
+"Execution System",
+"Second Brain",
+"Personal Dashboard",
+],
 
-  applicationName: "NexSpace",
+applicationName: "NexSpace",
 
-  authors: [
-    {
-      name: "Jothish Gandham",
-    },
-  ],
+authors: [
+{
+name: "Jothish Gandham",
+},
+],
 
-  creator: "Jothish Gandham",
-  publisher: "NexSpace",
+creator: "Jothish Gandham",
+publisher: "NexSpace",
 
-  manifest: "/manifest.json",
+manifest: "/manifest.json",
 
-  icons: {
-    icon: "/favicon.ico",
-    apple: "/favicon.ico",
-  },
+icons: {
+icon: [
+{ url: "/favicon.ico" },
+{ url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+{ url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+],
+apple: "/icon-192.png",
+},
 
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "NexSpace",
-  },
+appleWebApp: {
+capable: true,
+statusBarStyle: "default",
+title: "NexSpace",
+},
 
-  formatDetection: {
-    telephone: false,
-  },
+formatDetection: {
+telephone: false,
+},
 
-  openGraph: {
-    type: "website",
-    url: "https://nexspace.space",
-    title: "NexSpace",
-    description:
-      "Focus, Tasks, Diary, Planning, Workspace and Personal Growth in one unified execution system.",
-    siteName: "NexSpace",
-  },
+openGraph: {
+type: "website",
+url: "https://nexspace.space",
+title: "NexSpace — Personal Execution OS",
+description:
+"Focus, Tasks, Planning, Goals, Diary, Sessions, Workspace, and Personal Growth unified in one execution system.",
+siteName: "NexSpace",
+locale: "en_US",
+},
 
-  twitter: {
-    card: "summary_large_image",
-    title: "NexSpace",
-    description:
-      "Focus, Tasks, Diary, Planning, Workspace and Personal Growth in one unified execution system.",
-  },
+twitter: {
+card: "summary_large_image",
+title: "NexSpace — Personal Execution OS",
+description:
+"A unified operating system for focus, planning, execution, productivity, and personal growth.",
+},
 
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-    },
-  },
+robots: {
+index: true,
+follow: true,
+googleBot: {
+index: true,
+follow: true,
+"max-video-preview": -1,
+"max-image-preview": "large",
+"max-snippet": -1,
+},
+},
 
-  category: "Productivity",
+category: "Productivity Software",
 };
+
 
 export default function RootLayout({
   children,
