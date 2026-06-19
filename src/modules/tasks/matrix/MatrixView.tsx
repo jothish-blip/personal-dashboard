@@ -551,6 +551,34 @@ export default function MatrixView({
           </div>
         )}
       </div>
+      <footer className="mt-auto border-t border-[var(--border)] py-4 px-6">
+  <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-[var(--muted)]">
+    <a
+      href="/settings/account-management/privacy"
+      className="hover:text-[var(--foreground)]"
+    >
+      Privacy Policy
+    </a>
+
+    <span>•</span>
+
+    <a
+      href="/settings/account-management/terms"
+      className="hover:text-[var(--foreground)]"
+    >
+      Terms & Conditions
+    </a>
+
+    <span>•</span>
+
+    <a
+      href="/settings/contact"
+      className="hover:text-[var(--foreground)]"
+    >
+      Contact
+    </a>
+  </div>
+</footer>
 
     </div>
   );

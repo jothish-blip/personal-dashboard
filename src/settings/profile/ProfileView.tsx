@@ -492,7 +492,7 @@ export default function ProfilePage() {
 
           </div>
 
-          {/* Footer actions (🔥 FIX: Strict Hex Codes for guaranteed contrast in both modes) */}
+          {/* Footer actions */}
           <div className={`pt-6 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
             isDarkMode ? "border-gray-800" : "border-gray-100"
           }`}>

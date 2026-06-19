@@ -2668,12 +2668,65 @@ function LandingExperience() {
       {/* ========================================================= */}
       {/* 7. FOOTER */}
       {/* ========================================================= */}
-      <footer className={`py-8 lg:py-12 text-center border-t ${isDarkMode ? "border-white/[0.04]" : "border-zinc-200"}`}>
-        <p className={`text-[11px] lg:text-[12px] font-semibold tracking-widest uppercase ${isDarkMode ? "text-zinc-600" : "text-zinc-400"}`}>
-          Harder to open. Harder to quit.
-        </p>
-      </footer>
+    {/* ========================================================= */}
+{/* 7. FOOTER */}
+{/* ========================================================= */}
+<footer
+  className={`py-8 lg:py-12 text-center border-t ${
+    isDarkMode ? "border-white/[0.04]" : "border-zinc-200"
+  }`}
+>
+  <div className="flex flex-col items-center gap-4">
 
+    <p
+      className={`text-[11px] lg:text-[12px] font-semibold tracking-widest uppercase ${
+        isDarkMode ? "text-zinc-600" : "text-zinc-400"
+      }`}
+    >
+      Harder to open. Harder to quit.
+    </p>
+
+    <div
+      className={`flex flex-wrap items-center justify-center gap-3 sm:gap-5 text-[12px] lg:text-[13px] ${
+        isDarkMode ? "text-zinc-500" : "text-zinc-500"
+      }`}
+    >
+      <a
+        href="/privacy"
+        className="hover:text-orange-500 transition-colors"
+      >
+        Privacy Policy
+      </a>
+
+      <span className="opacity-40">•</span>
+
+      <a
+        href="/terms"
+        className="hover:text-orange-500 transition-colors"
+      >
+        Terms & Conditions
+      </a>
+
+      <span className="opacity-40">•</span>
+
+      <a
+        href="/contact"
+        className="hover:text-orange-500 transition-colors"
+      >
+        Contact
+      </a>
+    </div>
+
+    <p
+      className={`text-[11px] ${
+        isDarkMode ? "text-zinc-700" : "text-zinc-400"
+      }`}
+    >
+      © {new Date().getFullYear()} NexSpace. All rights reserved.
+    </p>
+
+  </div>
+</footer>
     </div>
   );
 }

@@ -1,13 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ChevronRight, ShieldCheck, Database, AlertTriangle } from "lucide-react";
+import { ChevronRight, ShieldCheck, Database, AlertTriangle, ArrowLeft } from "lucide-react";
 import { useEffect } from "react";
-import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Import the theme provider
+import { useTheme } from "@/theme/ThemeProvider";
 
 export default function PrivacyPage() {
   const router = useRouter();
-  const { isDarkMode } = useTheme(); // 🔥 Consume theme state
+  const { isDarkMode } = useTheme();
 
   useEffect(() => {
     document.documentElement.style.scrollBehavior = "smooth";
@@ -17,22 +17,22 @@ export default function PrivacyPage() {
   }, []);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-24 relative">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-24 relative pt-8">
       
       {/* 🔹 STICKY HEADER */}
       <div className={`sticky top-4 z-10 backdrop-blur rounded-xl pt-3 pb-5 border shadow-[0_4px_20px_-15px_rgba(0,0,0,0.15)] -mx-4 sm:-mx-6 px-4 sm:px-6 transition-colors duration-300 ${
         isDarkMode ? "bg-[#0a0a0a]/80 border-gray-800" : "bg-[#FAFAFA]/90 border-gray-200/60 supports-[backdrop-filter]:bg-white/70"
       }`}>
         
-        {/* Breadcrumb */}
+        {/* Breadcrumb / Back Button */}
         <div className={`flex items-center text-sm mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-          <span onClick={() => router.push("/settings")} className={`cursor-pointer transition-colors ${isDarkMode ? "hover:text-white" : "hover:text-black"}`}>
-            Settings
-          </span>
-          <ChevronRight size={14} className="mx-2" />
-          <span onClick={() => router.push("/settings/account-management")} className={`cursor-pointer transition-colors ${isDarkMode ? "hover:text-white" : "hover:text-black"}`}>
-            Account Management
-          </span>
+          <button 
+            onClick={() => router.back()} 
+            className={`flex items-center gap-1 cursor-pointer transition-colors ${isDarkMode ? "hover:text-white" : "hover:text-black"}`}
+          >
+            <ArrowLeft size={14} />
+            Back to previous page
+          </button>
           <ChevronRight size={14} className="mx-2" />
           <span className={`font-medium ${isDarkMode ? "text-white" : "text-black"}`}>Privacy Policy</span>
         </div>
@@ -49,7 +49,7 @@ export default function PrivacyPage() {
           <div>
             <span className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>Version:</span>{" "}
             <span className={`font-mono px-1.5 py-0.5 rounded ${isDarkMode ? "bg-gray-800 text-gray-300" : "bg-gray-200 text-gray-700"}`}>
-              privacy_v1
+              privacy_v1.1
             </span>
           </div>
           <div>
@@ -97,7 +97,7 @@ export default function PrivacyPage() {
         <section className={`pb-6 border-b last:border-none ${isDarkMode ? "border-gray-800" : "border-gray-100"}`}>
           <div className={`space-y-4 p-6 rounded-xl border ${isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-200"}`}>
             <h2 className={`text-base font-semibold ${isDarkMode ? "text-gray-200" : "text-black"}`}>4. Third-Party Authentication & OAuth</h2>
-            <p>You may sign in using Google, GitHub, or Facebook.</p>
+            <p>You may sign in using Google, GitHub, or Discord.</p>
             
             <p className={`mt-2 font-medium ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>When using third-party authentication:</p>
             <ul className="list-disc ml-5 space-y-2">
@@ -199,19 +199,6 @@ export default function PrivacyPage() {
             <li>Your profile information (name, email, avatar) will be purged from our systems.</li>
             <li><strong>This action is completely irreversible.</strong></li>
           </ul>
-
-          <p className={`mt-4 font-medium ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>Data Retention Limits:</p>
-          <ul className="list-disc ml-5 space-y-2">
-            <li>Some minimal system logs (strictly for security/legal purposes) may be retained temporarily.</li>
-            <li>Offline backup systems may retain encrypted fragments for up to 30 days before complete automatic deletion.</li>
-          </ul>
-
-          <div className={`mt-6 p-4 rounded-lg border ${isDarkMode ? "bg-[#111111] border-gray-800" : "bg-gray-50 border-gray-200"}`}>
-            <p className={`font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}>How to delete your account:</p>
-            <p className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
-              Navigate to <span className={`font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-900"}`}>Settings → Account Management → Delete Account</span>. Alternatively, you can initiate a deletion request through our Contact page.
-            </p>
-          </div>
         </section>
 
         {/* 11 */}
@@ -236,7 +223,7 @@ export default function PrivacyPage() {
           
           <div className="mt-4 pt-2">
             <a
-              href="/settings/account-management/terms"
+              href="/terms"
               className={`hover:underline font-medium ${isDarkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-800"}`}
             >
               View Terms & Conditions
@@ -252,7 +239,7 @@ export default function PrivacyPage() {
           </p>
           <div className="mt-4 flex flex-col space-y-3">
             <p className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-              Email:{" "}
+              Support Email:{" "}
               <a 
                 href="mailto:support@nexspace.space" 
                 className={`hover:underline ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}
@@ -262,7 +249,7 @@ export default function PrivacyPage() {
             </p>
             <div>
               <a
-                href="/settings/contact"
+                href="/contact"
                 className={`hover:underline cursor-pointer font-medium inline-flex items-center gap-1 ${isDarkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-800"}`}
               >
                 Contact Support <ChevronRight size={14} />

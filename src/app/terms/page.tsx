@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ChevronRight, ExternalLink, AlertTriangle, ShieldCheck, Database } from "lucide-react";
+import { ChevronRight, ExternalLink, AlertTriangle, ShieldCheck, Database, ArrowLeft } from "lucide-react";
 import { useEffect } from "react";
 import { useTheme } from "@/theme/ThemeProvider";
 
@@ -17,23 +17,22 @@ export default function TermsPage() {
     };
   }, []);
 
-
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-24 relative">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-24 relative pt-8">
       
       {/* 🚀 STICKY HEADER & ANCHOR NAVIGATION */}
-      <div className={`sticky top-6 z-10 backdrop-blur rounded-xl pt-3 pb-5 border shadow-[0_4px_20px_-15px_rgba(0,0,0,0.15)] -mx-4 sm:-mx-6 px-4 sm:px-6 transition-colors duration-300 ${
+      <div className={`sticky top-4 z-10 backdrop-blur rounded-xl pt-3 pb-5 border shadow-[0_4px_20px_-15px_rgba(0,0,0,0.15)] -mx-4 sm:-mx-6 px-4 sm:px-6 transition-colors duration-300 ${
         isDarkMode ? "bg-[#0a0a0a]/80 border-gray-800" : "bg-[#FAFAFA]/80 border-gray-200/60 supports-[backdrop-filter]:bg-white/70"
       }`}>
-        {/* Breadcrumb Navigation */}
+        {/* Breadcrumb / Back Button */}
         <div className={`flex items-center text-sm mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-          <span onClick={() => router.push("/settings")} className={`cursor-pointer transition-colors ${isDarkMode ? "hover:text-white" : "hover:text-black"}`}>
-            Settings
-          </span>
-          <ChevronRight size={14} className="mx-2" />
-          <span onClick={() => router.push("/settings/account-management")} className={`cursor-pointer transition-colors ${isDarkMode ? "hover:text-white" : "hover:text-black"}`}>
-            Account Management
-          </span>
+          <button 
+            onClick={() => router.back()} 
+            className={`flex items-center gap-1 cursor-pointer transition-colors ${isDarkMode ? "hover:text-white" : "hover:text-black"}`}
+          >
+            <ArrowLeft size={14} />
+            Back to previous page
+          </button>
           <ChevronRight size={14} className="mx-2" />
           <span className={`font-medium ${isDarkMode ? "text-white" : "text-black"}`}>Terms</span>
         </div>
@@ -118,11 +117,11 @@ export default function TermsPage() {
             <h2 className={`text-base font-semibold mb-2 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-black"}`}>
               5. Third-Party Authentication
             </h2>
-            <p>Our platform allows login via Google, GitHub, and Facebook. By using these services:</p>
+            <p>Our platform allows login via Google, GitHub, and Discord. By using these services:</p>
             <ul className="list-disc ml-5 space-y-2 mt-2">
               <li>You authorize us to access basic profile info (name, email, avatar).</li>
               <li>We do <strong>NOT</strong> store your passwords. Authentication is handled securely by the provider.</li>
-              <li><strong>Deleting your NexSpace account does not automatically delete your account with Google, GitHub, or Facebook.</strong></li>
+              <li><strong>Deleting your NexSpace account does not automatically delete your account with Google, GitHub, or Discord.</strong></li>
             </ul>
             
             <p className={`mt-4 font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>Your use of these services is also governed by their respective policies:</p>
@@ -133,8 +132,8 @@ export default function TermsPage() {
               <a href="https://docs.github.com/en/site-policy/github-terms/github-terms-of-service" target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1 hover:underline ${isDarkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-800"}`}>
                 GitHub Terms <ExternalLink size={12} />
               </a>
-              <a href="https://www.facebook.com/legal/terms" target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1 hover:underline ${isDarkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-800"}`}>
-                Facebook Terms <ExternalLink size={12} />
+              <a href="https://discord.com/terms" target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1 hover:underline ${isDarkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-800"}`}>
+                Discord Terms <ExternalLink size={12} />
               </a>
             </div>
             
@@ -143,7 +142,7 @@ export default function TermsPage() {
             </p>
             
             <p className={`mt-2 text-xs italic leading-snug ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
-              If you delete your NexSpace account, your connection with Google, GitHub, or Facebook will be removed. 
+              If you delete your NexSpace account, your connection with Google, GitHub, or Discord will be removed. 
               However, you may need to manage or revoke access permissions directly from your respective provider account settings.
             </p>
           </div>
@@ -195,9 +194,9 @@ export default function TermsPage() {
               <li>Data handling is explained in full detail in our Privacy Policy.</li>
             </ul>
             <div className="mt-4">
-              <span onClick={() => router.push("/settings/account-management/privacy")} className={`hover:underline cursor-pointer font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+              <a href="/privacy" className={`hover:underline cursor-pointer font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
                 View Privacy Policy
-              </span>
+              </a>
             </div>
           </div>
         </section>
@@ -288,7 +287,7 @@ export default function TermsPage() {
           <h2 className={`text-base font-semibold mb-2 ${isDarkMode ? "text-gray-200" : "text-black"}`}>18. Contact</h2>
           <p>For support, legal inquiries, or data-related requests, you can reach us via:</p>
           <ul className="list-disc ml-5 space-y-2">
-            <li>The dedicated <span onClick={() => router.push("/settings/contact")} className={`hover:underline cursor-pointer font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>Contact Page</span> in your settings.</li>
+            <li>The dedicated <a href="/contact" className={`hover:underline cursor-pointer font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>Contact Page</a>.</li>
             <li>The "Provide Feedback" module located in the app sidebar.</li>
             <li>Support Email: <a href="mailto:support@nexspace.space" className={`hover:underline font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>support@nexspace.space</a></li>
           </ul>
@@ -337,12 +336,12 @@ export default function TermsPage() {
             <li>Settings → Account Management → Delete Account</li>
             <li>
               Or by contacting support through the{" "}
-              <span
-                onClick={() => router.push("/settings/contact")}
+              <a
+                href="/contact"
                 className={`hover:underline cursor-pointer font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}
               >
                 Contact Page
-              </span>
+              </a>
             </li>
           </ul>
         </section>

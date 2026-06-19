@@ -1,7 +1,17 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function SettingsHome() {
-  // Instantly redirect users to the Profile page 
-  // when they try to access the root /settings route.
-  redirect("/settings/profile");
+  const router = useRouter();
+
+  useEffect(() => {
+    // Safely perform the redirect after the component mounts
+    // This prevents the Next.js internal hook counter from crashing
+    router.replace("/settings/profile");
+  }, [router]);
+
+  // Return null so nothing renders while the redirect happens
+  return null;
 }

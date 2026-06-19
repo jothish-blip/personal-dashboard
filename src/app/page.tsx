@@ -227,7 +227,7 @@ export default function Home() {
       />
 
       {!isMini ? (
-        <div className="flex-1 w-full flex flex-col">
+        <div className="flex-1 w-full flex flex-col pb-20">
           <div className="max-w-[1600px] w-full mx-auto px-4 pt-6">
             <Tabs
               activeTab={activeTab}
