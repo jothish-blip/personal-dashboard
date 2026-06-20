@@ -57,13 +57,6 @@ const Grid = ({
   const isSwiping = useRef(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      todayRef.current?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [actualToday, todayRef]);
-
-  useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedGroups = localStorage.getItem("matrix_collapsed_groups");
       if (savedGroups) {
