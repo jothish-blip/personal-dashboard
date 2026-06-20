@@ -35,6 +35,46 @@ const NAV_ITEMS = [
   { label: "Workspace", icon: LayoutPanelLeft, path: "/Workspace", key: "isMini" },
 ];
 
+const MODULE_BRANDS = {
+  tasks: {
+    light: "/modules/tasks/task-light.png",
+    dark: "/modules/tasks/task-dark.png",
+    name: "TASKS",
+    height: 56,
+  },
+  focus: {
+    light: "/modules/focus/focus-light.png",
+    dark: "/modules/focus/focus-dark.png",
+    name: "FOCUS",
+    height: 54,
+  },
+  planner: {
+    light: "/modules/planner/planner-light.png",
+    dark: "/modules/planner/planner-dark.png",
+    name: "PLANNER",
+    height: 58,
+  },
+  diary: {
+    light: "/modules/journal/journal-light.png",
+    dark: "/modules/journal/journal-dark.png",
+    name: "JOURNAL",
+    height: 56,
+  },
+  workspace: {
+    light: "/modules/workspace/workspace-light.png",
+    dark: "/modules/workspace/workspace-dark.png",
+    name: "WORKSPACE",
+    height: 56,
+  },
+  // Master brand for the root/home page
+  master: {
+    light: "/logo-light.svg",
+    dark: "/logo-dark.svg",
+    name: null,
+    height: 56,
+  }
+};
+
 const getInitials = (name?: string) => {
   if (!name) return "NX";
   const parts = name.trim().split(" ");
@@ -125,6 +165,21 @@ export default function MobileNav(props: MobileNavProps) {
     };
   }, [isNavExpanded, isProfileMenuOpen]);
 
+  // Determine Current Brand based purely on the URL route
+  const getBrandContext = () => {
+    const lowerPath = pathname?.toLowerCase() || "/";
+
+    if (lowerPath.startsWith("/tasks")) return MODULE_BRANDS.tasks;
+    if (lowerPath.startsWith("/focus")) return MODULE_BRANDS.focus;
+    if (lowerPath.startsWith("/planner")) return MODULE_BRANDS.planner;
+    if (lowerPath.startsWith("/diary")) return MODULE_BRANDS.diary;
+    if (lowerPath.startsWith("/workspace")) return MODULE_BRANDS.workspace;
+
+    return MODULE_BRANDS.master;
+  };
+
+  const currentBrand = getBrandContext();
+
   if (!mounted) return null;
 
   return (
@@ -143,13 +198,24 @@ export default function MobileNav(props: MobileNavProps) {
           {isDarkMode && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] bg-orange-500/[0.08] blur-[30px] rounded-full pointer-events-none transition-opacity duration-500 group-hover:opacity-100 opacity-60" />
           )}
+          
           <Image
-            src={isDarkMode ? "/logo-dark.png" : "/logo-light.png"}
-            alt="NexSpace"
-            width={280}
-            height={80}
-            className="relative z-10 h-[64px] sm:h-[72px] w-auto object-contain object-left transition-transform duration-300 group-hover:scale-105"
+            src={isDarkMode ? currentBrand.dark : currentBrand.light}
+            alt={currentBrand.name ? `NexSpace ${currentBrand.name}` : "NexSpace"}
+            width={1000}
+            height={300}
             priority
+            style={{ height: `${currentBrand.height}px` }}
+            className="
+              relative z-10
+              w-auto
+              object-contain
+              object-left
+              bg-transparent
+              transition-transform
+              duration-300
+              group-hover:scale-105
+            "
           />
         </div>
 
@@ -210,7 +276,6 @@ export default function MobileNav(props: MobileNavProps) {
 
                     <div className="space-y-1">
                       
-                      {/* RESTORED THEME TOGGLE */}
                       <div className={`flex items-center justify-between px-4 py-3.5 rounded-2xl mb-1 ${isDarkMode ? "bg-white/[0.03]" : "bg-black/5"}`}>
                         <span className="text-[13px] font-medium tracking-wide">Theme</span>
                         <div 

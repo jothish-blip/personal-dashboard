@@ -98,11 +98,6 @@ export default function MatrixView({
   const todayRef = useRef<HTMLTableCellElement | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => { scrollToToday(); }, 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
     if (typeof window !== 'undefined' && !localStorage.getItem('matrix_help_seen_v2')) {
       setShowHelp(true);
       localStorage.setItem('matrix_help_seen_v2', 'true');

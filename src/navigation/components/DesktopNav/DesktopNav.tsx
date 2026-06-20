@@ -16,7 +16,6 @@ import ThemeToggle from "@/theme/ThemeToggle";
 import { useTheme } from "@/theme/ThemeProvider";
 
 interface DesktopNavProps {
-  activePaths?: Record<string, boolean> | null;
   handleNav?: (path: string) => void;
   handleLogout?: () => Promise<void>;
   userProfile?: {
@@ -35,16 +34,55 @@ const DEFAULT_NAV_ITEMS = [
   { label: "Workspace", path: "/Workspace", key: "isMini" },
 ];
 
+const MODULE_BRANDS = {
+  tasks: {
+    light: "/modules/tasks/task-light.png",
+    dark: "/modules/tasks/task-dark.png",
+    name: "TASKS",
+    height: 56,
+  },
+  focus: {
+    light: "/modules/focus/focus-light.png",
+    dark: "/modules/focus/focus-dark.png",
+    name: "FOCUS",
+    height: 54,
+  },
+  planner: {
+    light: "/modules/planner/planner-light.png",
+    dark: "/modules/planner/planner-dark.png",
+    name: "PLANNER",
+    height: 58,
+  },
+  diary: {
+    light: "/modules/journal/journal-light.png",
+    dark: "/modules/journal/journal-dark.png",
+    name: "JOURNAL",
+    height: 56,
+  },
+  workspace: {
+    light: "/modules/workspace/workspace-light.png",
+    dark: "/modules/workspace/workspace-dark.png",
+    name: "WORKSPACE",
+    height: 56,
+  },
+  // Master brand for the root/home page
+  master: {
+    light: "/logo-light.svg",
+    dark: "/logo-dark.svg",
+    name: null,
+    height: 56,
+  }
+};
+
 export default function DesktopNav(props: DesktopNavProps) {
   const {
-    activePaths = {},
     handleLogout,
     userProfile = null,
   } = props;
 
-  const safePaths = activePaths || {};
   const { isDarkMode } = useTheme();
   const router = useRouter();
+  const pathname = usePathname() || "/";
   
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -110,6 +148,21 @@ export default function DesktopNav(props: DesktopNavProps) {
     };
   }, [isProfileOpen]);
 
+  // Determine Current Brand based purely on the URL route
+  const getBrandContext = () => {
+    const lowerPath = pathname.toLowerCase();
+    
+    if (lowerPath.startsWith("/tasks")) return MODULE_BRANDS.tasks;
+    if (lowerPath.startsWith("/focus")) return MODULE_BRANDS.focus;
+    if (lowerPath.startsWith("/planner")) return MODULE_BRANDS.planner;
+    if (lowerPath.startsWith("/diary")) return MODULE_BRANDS.diary;
+    if (lowerPath.startsWith("/workspace")) return MODULE_BRANDS.workspace;
+    
+    return MODULE_BRANDS.master;
+  };
+
+  const currentBrand = getBrandContext();
+
   return (
     <>
       <div className="hidden md:block w-full px-4 lg:px-6 mt-4 relative z-[1000] select-none">
@@ -120,7 +173,6 @@ export default function DesktopNav(props: DesktopNavProps) {
               : "bg-white border border-zinc-200/80 shadow-[0_8px_24px_rgba(0,0,0,0.01)]"
           }`}
         >
-          {/* Reduced height for a denser, more professional feel */}
           <div className="relative h-[74px] px-6 flex items-center justify-between">
             
             <div className="flex items-center flex-shrink-0">
@@ -131,20 +183,23 @@ export default function DesktopNav(props: DesktopNavProps) {
                 {isDarkMode && (
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[130%] h-[130%] bg-orange-500/[0.03] blur-[32px] rounded-full pointer-events-none transition-opacity duration-500 group-hover:opacity-100 opacity-50" />
                 )}
+                
                 <Image
-                  src={isDarkMode ? "/logo-dark.svg" : "/logo-light.svg"}
-                  alt="NexSpace"
-                  width={280}
-                  height={70}
-                  className="relative z-10 h-[70px] w-auto object-contain object-left"
+                  src={isDarkMode ? currentBrand.dark : currentBrand.light}
+                  alt={currentBrand.name ? `NexSpace ${currentBrand.name}` : "NexSpace"}
+                  width={1000}
+                  height={300}
                   priority
+                  className="relative z-10 w-auto object-contain object-left transition-all duration-300"
+                  style={{ height: `${currentBrand.height}px` }}
                 />
               </div>
             </div>
 
             <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1">
               {DEFAULT_NAV_ITEMS.map((item) => {
-                const isActive = Boolean(safePaths[item.key]);
+                // Dynamically calculate active state based on the current pathname
+                const isActive = pathname.toLowerCase().startsWith(item.path.toLowerCase());
 
                 return (
                   <button
@@ -158,7 +213,6 @@ export default function DesktopNav(props: DesktopNavProps) {
                   >
                     <span className="relative z-10">{item.label}</span>
 
-                    {/* Active Pill only - orange dot removed for cleanliness */}
                     {isActive && (
                       <motion.div
                         layoutId="desktop-active-pill"
