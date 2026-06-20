@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion, useMotionValue, Variants } from "framer-motion";
+import { AnimatePresence, motion, useMotionValue, Variants, animate } from "framer-motion";
 import { useModuleSwipe } from "./useModuleSwipe";
 
 export default function ModuleContainer({ children }: { children: React.ReactNode }) {
@@ -14,8 +14,10 @@ export default function ModuleContainer({ children }: { children: React.ReactNod
   const [navOpen, setNavOpen] = useState(false);
   
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  const x = useMotionValue(0);
 
-  // FIX 1: Hydration Sync
+  // Hydration Sync
   useEffect(() => {
     setMounted(true);
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -24,8 +26,7 @@ export default function ModuleContainer({ children }: { children: React.ReactNod
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // FIX 7: Removed MutationObserver. Checking state gracefully on interaction instead.
-  // Ideally, MobileNav should dispatch a custom event, but this passive listener bridges the gap without repaints.
+  // Check Nav State gracefully on interaction
   useEffect(() => {
     const checkNav = () => setNavOpen(document.body.dataset.navOpen === "true");
     document.addEventListener("touchstart", checkNav, { passive: true });
@@ -36,14 +37,13 @@ export default function ModuleContainer({ children }: { children: React.ReactNod
     };
   }, []);
 
-  // Reset scroll to top on route change since scroll container is persistent
+  // Reset scroll to top and explicitly reset horizontal translation on route change
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
-  }, [pathname]);
+    x.set(0);
+  }, [pathname, x]);
 
-  const x = useMotionValue(0);
-
-  // FIX 5, 8 & 9: Ultra-minimal fast transitions without bounces
+  // Ultra-minimal fast transitions
   const mobileVariants: Variants = {
     enter: (direction: number) => ({ x: direction > 0 ? "5%" : "-5%" }),
     center: { x: 0 },
@@ -58,7 +58,7 @@ export default function ModuleContainer({ children }: { children: React.ReactNod
 
   const isSupportedRoute = currentIndex !== -1;
 
-  // FIX 1: Return static shell during SSR to prevent hydration jump
+  // Return static shell during SSR to prevent hydration jump
   if (!mounted) {
     return (
       <div className="w-full h-[100dvh] bg-[var(--background)]">
@@ -70,10 +70,9 @@ export default function ModuleContainer({ children }: { children: React.ReactNod
   return (
     <div className="relative w-full h-[100dvh] bg-[var(--background)] overflow-hidden module-container">
       
-      {/* FIX 4: Scroll container sits OUTSIDE the animated element */}
+      {/* Scroll container sits OUTSIDE the animated element */}
       <div ref={scrollRef} className="absolute inset-0 overflow-y-auto z-10">
         
-        {/* FIX 2: initial={false} and mode="wait" to prevent mount/layout jumping */}
         <AnimatePresence initial={false} custom={direction} mode="wait">
           <motion.div
             key={pathname}
@@ -83,7 +82,6 @@ export default function ModuleContainer({ children }: { children: React.ReactNod
             animate="center"
             exit="exit"
             
-            // FIX 3: Replaced spring with a tight, fast easing curve
             transition={{
               duration: 0.18,
               ease: [0.22, 1, 0.36, 1],
@@ -96,14 +94,24 @@ export default function ModuleContainer({ children }: { children: React.ReactNod
             dragListener={!navOpen}
             dragPropagation={false}
             
-            // FIX 5: Scale only applies actively during touch
+            // Scale only applies actively during touch
             whileDrag={isMobile ? { scale: 0.98 } : undefined}
             
             // Strictly just tracking X to prevent layout thrashing
             style={isMobile && isSupportedRoute ? { x } : undefined}
-            onDragEnd={handleDragEnd}
             
-            className="w-full min-h-full origin-center animated-page"
+            onDragEnd={(e, info) => {
+              handleDragEnd(e, info);
+
+              // Force the page back to center if threshold wasn't met
+              animate(x, 0, {
+                duration: 0.2,
+                ease: "easeOut",
+              });
+            }}
+            
+            // Added max-w-full, overflow-x-hidden, and touch-pan-y
+            className="w-full min-h-full max-w-full overflow-x-hidden origin-center animated-page touch-pan-y"
           >
             {children}
           </motion.div>
@@ -120,6 +128,7 @@ export default function ModuleContainer({ children }: { children: React.ReactNod
             will-change: transform, opacity;
             transform: translate3d(0, 0, 0);
             backface-visibility: hidden;
+            touch-action: pan-y;
           }
         `
       }} />

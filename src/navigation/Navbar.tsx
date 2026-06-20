@@ -127,9 +127,9 @@ export default function Navbar({
   const activePaths = useMemo(() => ({
     isTasks: pathname === "/",
     isFocus: pathname.startsWith("/focus"),
-    isCalendar: pathname.startsWith("/Planner"),
+    isCalendar: pathname.startsWith("/planner"),
     isDiary: pathname.startsWith("/diary"),
-    isMini: pathname.startsWith("/Workspace"),
+    isMini: pathname.startsWith("/workspace"),
   }), [pathname]);
 
   const navProps = useMemo(() => ({
