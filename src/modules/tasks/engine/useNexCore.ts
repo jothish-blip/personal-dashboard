@@ -41,7 +41,7 @@ export function useNexCore() {
     tasks: [],
     logs: [],
     meta: {
-      currentMonth: new Date().toISOString().slice(0, 7),
+      currentMonth: getTodayLocal().slice(0, 7),
       isFocus: false,
       theme: 'dark',
       lockedDates: [],
@@ -65,12 +65,14 @@ export function useNexCore() {
   }, []);
 
   const debouncedSave = (key: string, data: any) => {
-    if (!debounceRef.current) {
-      debounceRef.current = setTimeout(() => {
+    if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+    }
+
+    debounceRef.current = setTimeout(() => {
         localStorage.setItem(key, JSON.stringify(data));
         debounceRef.current = null;
-      }, 1000);
-    }
+    }, 500);
   };
 
   const logAction = async (action: string, name: string, detail: string) => {
@@ -289,9 +291,17 @@ export function useNexCore() {
       if (saved) {
         try {
           const parsed = JSON.parse(saved) as NexState;
+          const todayMonth = getTodayLocal().slice(0, 7);
+          
           setState(prev => ({
             ...prev,
-            meta: { ...parsed.meta, currentMonth: parsed.meta?.currentMonth || getTodayLocal().slice(0, 7) },
+            meta: {
+              ...parsed.meta,
+              currentMonth:
+                parsed.meta?.currentMonth !== todayMonth
+                  ? todayMonth
+                  : parsed.meta.currentMonth,
+            },
             logs: parsed.logs || [],
             tasks: prev.tasks.length === 0 ? (parsed.tasks || []) : prev.tasks
           }));
@@ -325,6 +335,37 @@ export function useNexCore() {
     };
   }, []);
 
+  // Auto-sync month to catch date roll-overs if the user leaves the tab open
+  useEffect(() => {
+    const syncMonth = () => {
+      const todayMonth = getTodayLocal().slice(0, 7);
+
+      setState(prev => {
+        if (prev.meta.currentMonth === todayMonth) {
+          return prev;
+        }
+
+        const next = {
+          ...prev,
+          meta: {
+            ...prev.meta,
+            currentMonth: todayMonth,
+          },
+        };
+
+        debouncedSave(KEY, next);
+        return next;
+      });
+    };
+
+    syncMonth();
+    window.addEventListener("focus", syncMonth);
+
+    return () => {
+      window.removeEventListener("focus", syncMonth);
+    };
+  }, []);
+
   useEffect(() => {
     const handleSilentRefresh = async () => {
       await fetchTasksFromDB();
@@ -352,23 +393,28 @@ export function useNexCore() {
     if (state.tasks.length === 0) return 0;
     
     let streak = 0;
-    const todayStr = getTodayLocal();
-    const d = new Date(todayStr);
+    let currentDateStr = getTodayLocal();
 
     const isDayActive = (dateStr: string) => state.tasks.some(t => t.history?.[dateStr]);
 
-    let currentDateStr = todayStr;
-    
+    // Local-only date decrement to avoid UTC timezone offset issues
+    const getPreviousDayStr = (dateStr: string) => {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const date = new Date(y, m - 1, d - 1); // Native local time subtraction
+      const yy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      return `${yy}-${mm}-${dd}`;
+    };
+
     if (!isDayActive(currentDateStr)) {
-      d.setDate(d.getDate() - 1);
-      currentDateStr = d.toISOString().split('T')[0];
+      currentDateStr = getPreviousDayStr(currentDateStr);
       if (!isDayActive(currentDateStr)) return 0;
     }
 
     while (isDayActive(currentDateStr)) {
       streak++;
-      d.setDate(d.getDate() - 1);
-      currentDateStr = d.toISOString().split('T')[0];
+      currentDateStr = getPreviousDayStr(currentDateStr);
     }
 
     return streak;
@@ -588,9 +634,20 @@ export function useNexCore() {
 
   const setMonthYear = (value: string) => {
     setState(prev => {
-      const newState = { ...prev, meta: { ...prev.meta, currentMonth: value } };
-      debouncedSave(KEY, newState);
-      return newState;
+      if (prev.meta.currentMonth === value) {
+        return prev;
+      }
+
+      const next = {
+        ...prev,
+        meta: {
+          ...prev.meta,
+          currentMonth: value,
+        },
+      };
+
+      debouncedSave(KEY, next);
+      return next;
     });
   };
 
@@ -608,7 +665,7 @@ export function useNexCore() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `nex-backup-${new Date().toISOString().slice(0,10)}.json`;
+    anchor.download = `nex-backup-${getTodayLocal()}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
     
