@@ -9,6 +9,7 @@ import MobileNav from "@/navigation/components/MobileNav/MobileNav";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useFocusSystem } from "@/modules/focus/engine/useFocusSystem";
 import { useNexCore } from "@/modules/tasks/engine/useNexCore";
+import { logoutUser } from "@/lib/auth";
 
 export interface NavbarProps {
   meta?: any;
@@ -35,20 +36,7 @@ export default function Navbar({
 
   const mergedProfile = userProfile || currentUser;
 
-  // ─── AUTH STATE LISTENER (REAL-TIME LOGOUT DETECTION) ───
-  useEffect(() => {
-    if (!supabase) return;
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_, session) => {
-      if (!session) {
-        router.replace("/login");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase, router]);
 
   // ─── CACHE & PROFILE CONTAINER LOADING ───
   useEffect(() => {
@@ -92,22 +80,12 @@ export default function Navbar({
     logoutRef.current = true;
 
     try {
-      if (!supabase) return;
-      
-      if (currentUser?.id) {
-        localStorage.removeItem(`nexspace_profile_${currentUser.id}`);
-      }
-
-      sessionStorage.clear();
-
-      router.replace("/login");
-
-      await supabase.auth.signOut();
+      await logoutUser(router);
     } catch (error) {
       console.error("Logout runtime error:", error);
-      logoutRef.current = false; // unlock on error so user can try again
+      logoutRef.current = false;
     }
-  }, [supabase, currentUser, router]);
+  }, [router]);
 
   // ─── SYSTEM-LEVEL NAVIGATION ROUTER GUARD ───
   const handleNav = useCallback((path: string) => {
@@ -129,7 +107,7 @@ export default function Navbar({
     isFocus: pathname.startsWith("/focus"),
     isCalendar: pathname.startsWith("/Planner"),
     isDiary: pathname.startsWith("/diary"),
-    isMini: pathname.startsWith("/workspace"),
+    isMini: pathname.startsWith("/Workspace") || pathname.toLowerCase().startsWith("/workspace"),
   }), [pathname]);
 
   const navProps = useMemo(() => ({

@@ -79,7 +79,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     setTimeout(() => {
       document.documentElement.classList.remove("theme-transition");
-    }, 350);
+    }, 280);
   };
 
   const toggleTheme = () => {
@@ -97,7 +97,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     setTimeout(() => {
       document.documentElement.classList.remove("theme-transition");
-    }, 350);
+    }, 280);
   };
 
   const value = useMemo(

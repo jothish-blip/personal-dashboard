@@ -90,19 +90,9 @@ export default function MatrixView({
     localStorage.setItem('matrix_focus_mode', String(isFocusMode));
   }, [isFocusMode]);
 
-  const [showHelp, setShowHelp] = useState(false);
-  
   const [hiddenTasks, setHiddenTasks] = useState<Set<string>>(new Set());
   const [undoToasts, setUndoToasts] = useState<{id: string, name: string, completions: number, timerId: NodeJS.Timeout}[]>([]);
-  
   const todayRef = useRef<HTMLTableCellElement | null>(null);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !localStorage.getItem('matrix_help_seen_v2')) {
-      setShowHelp(true);
-      localStorage.setItem('matrix_help_seen_v2', 'true');
-    }
-  }, []);
 
   const showError = useCallback((msg: string, type: ErrorType = 'system') => { 
     const now = Date.now();
@@ -352,27 +342,6 @@ export default function MatrixView({
   return (
     <div className={`flex-1 flex flex-col min-h-screen bg-[var(--background)] text-[var(--foreground)] pb-24 relative pt-0 overscroll-y-contain transition-colors duration-500`}>
       
-      {/* Help Modal */}
-      {showHelp && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-in fade-in" onClick={() => setShowHelp(false)}>
-          <div className="bg-[var(--surface)] rounded-2xl p-8 max-w-md w-full space-y-6 shadow-2xl animate-in zoom-in-95 duration-200 border border-[var(--border)]" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3 text-indigo-500 mb-2">
-              <div className="p-2 bg-indigo-500/10 rounded-xl"><Target size={24} /></div>
-              <h2 className="font-bold text-2xl text-[var(--foreground)]">System Basics</h2>
-            </div>
-            <ul className="text-sm text-[var(--muted)] space-y-4">
-              <li className="flex gap-3"><Check size={18} className="text-green-500 shrink-0"/> <span><strong>Row = Objective:</strong> Track what matters.</span></li>
-              <li className="flex gap-3"><Check size={18} className="text-green-500 shrink-0"/> <span><strong>Column = Day:</strong> Click a cell to log completion.</span></li>
-              <li className="flex gap-3"><Check size={18} className="text-green-500 shrink-0"/> <span><strong>Flames = Streaks:</strong> Build unbroken chains. Green (4+ days), Orange (7+ days).</span></li>
-              <li className="flex gap-3"><Check size={18} className="text-green-500 shrink-0"/> <span><strong>Locks = Accountability:</strong> Past days lock automatically unless you use a rollback token.</span></li>
-              <li className="flex gap-3"><Plus size={18} className="text-indigo-500 shrink-0"/> <span><strong>Quick Add:</strong> Use `#` to assign a group (e.g. `Read #Learning`).</span></li>
-            </ul>
-            <button onClick={() => setShowHelp(false)} className="w-full py-3 bg-[var(--foreground)] text-[var(--background)] rounded-xl font-bold hover:bg-indigo-500 active:scale-95 transition-all duration-200">
-              Got it, let's go
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Undo Delete Toasts */}
       <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 flex flex-col gap-2 z-[100] pointer-events-auto">

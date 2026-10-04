@@ -40,13 +40,13 @@ export default function ServiceWorkerRegister() {
     if (!userId) return;
 
     // 3. START INACTIVITY ENGINE & TRACKER
-    initActivityTracker();
-    startInactivityEngine(addNotification); 
+    const cleanupActivityTracker = initActivityTracker();
+    const cleanupInactivityEngine = startInactivityEngine(addNotification, userId); 
 
     // 4. START PLANNER ENGINE
     const plannerTimer = setInterval(() => {
       try {
-        const raw = localStorage.getItem("taskflow_planner_v1");
+        const raw = localStorage.getItem(`taskflow_planner_v1_${userId}`);
         if (!raw) return;
 
         const payload = JSON.parse(raw);
@@ -60,13 +60,13 @@ export default function ServiceWorkerRegister() {
           const diff = eventTime - now;
 
           if (diff <= 3600000 && diff > 2400000) {
-            handlePlannerEvent(addNotification, event, "1h");
+            handlePlannerEvent(addNotification, event, "1h", userId);
           }
           else if (diff <= 600000 && diff > 300000) {
-            handlePlannerEvent(addNotification, event, "10m");
+            handlePlannerEvent(addNotification, event, "10m", userId);
           }
           else if (diff <= 60000 && diff > -300000) {
-            handlePlannerEvent(addNotification, event, "now");
+            handlePlannerEvent(addNotification, event, "now", userId);
           }
         });
       } catch (e) {
@@ -74,7 +74,11 @@ export default function ServiceWorkerRegister() {
       }
     }, 60000);
 
-    return () => clearInterval(plannerTimer);
+    return () => {
+      clearInterval(plannerTimer);
+      if (cleanupActivityTracker) cleanupActivityTracker();
+      if (cleanupInactivityEngine) cleanupInactivityEngine();
+    };
   }, [userId, addNotification]);
 
   return null;

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
 import { Loader2, Shield, LogOut } from "lucide-react";
 import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Updated Import Path
+import { logoutUser } from "@/lib/auth";
 
 export default function SecurityPage() {
   const router = useRouter();
@@ -63,10 +64,7 @@ export default function SecurityPage() {
   }, [supabase]);
 
   const handleLogoutAll = async () => {
-    if (!supabase) return;
-    
-    await supabase.auth.signOut();
-    router.replace("/login"); // Safer client-side redirect
+    await logoutUser(router);
   };
 
   if (loading) {

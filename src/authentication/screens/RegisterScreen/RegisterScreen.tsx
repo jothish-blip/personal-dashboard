@@ -14,6 +14,7 @@ import {
   ArrowUp
 } from "lucide-react";
 import { useTheme } from "@/theme/ThemeProvider";
+import { getLastLoggedInAccount, LastLoggedInAccount } from "@/lib/auth";
 
 // ============================================================================
 // ICONS & ASSETS
@@ -80,14 +81,17 @@ const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, isDa
 function LandingExperience() {
   const router = useRouter();
   const { isDarkMode } = useTheme(); 
+  const topRef = useRef<HTMLDivElement>(null);
   
   const [checkingSession, setCheckingSession] = useState(true);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const [oauthStarted, setOauthStarted] = useState(false);
   const [error, setError] = useState("");
+  const [lastAccount, setLastAccount] = useState<LastLoggedInAccount | null>(null);
 
   // 1. Initial Session Check
   useEffect(() => {
+    setLastAccount(getLastLoggedInAccount());
     const checkUser = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session?.user) {
@@ -113,8 +117,13 @@ function LandingExperience() {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  // 3. Page Visibility Detection
+  // 3. Page Visibility & Lifecycle Detection (BFCache, Tab Return, Back Navigation)
   useEffect(() => {
+    const resetLoading = () => {
+      setOauthStarted(false);
+      setLoadingProvider(null);
+    };
+
     const handleVisibility = async () => {
       if (document.visibilityState !== "visible") return;
 
@@ -124,11 +133,35 @@ function LandingExperience() {
 
       if (session?.user) {
         router.replace("/");
+      } else {
+        resetLoading();
       }
     };
 
+    const handlePageShow = () => {
+      resetLoading();
+    };
+
+    const handleWindowFocus = () => {
+      setTimeout(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          resetLoading();
+        }
+      }, 300);
+    };
+
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("focus", handleWindowFocus);
+    window.addEventListener("popstate", handlePageShow);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("popstate", handlePageShow);
+    };
   }, [router]);
 
   // Handle Social Login Execution
@@ -144,7 +177,7 @@ function LandingExperience() {
       setLoadingProvider(null);
       setOauthStarted(false);
       setError("Connection timed out. Please try again.");
-    }, 15000);
+    }, 12000);
     
     try {
       const { error: authError } = await supabase.auth.signInWithOAuth({ 
@@ -183,6 +216,8 @@ function LandingExperience() {
     <div className={`min-h-screen relative overflow-x-hidden transition-colors duration-500 selection:bg-orange-500/20 ${
       isDarkMode ? "bg-[#000000] text-zinc-200" : "bg-[#FAFAFA] text-zinc-800"
     }`}>
+      {/* Scroll to top anchor target */}
+      <div ref={topRef} id="page-top" className="absolute top-0 left-0 w-full h-px pointer-events-none" />
       
       {/* Subtle Grain */}
       <div className="fixed inset-0 z-0 pointer-events-none" style={{ 
@@ -367,6 +402,37 @@ function LandingExperience() {
     {/* AUTH BLOCK */}
     {/* ========================================================= */}
     <div id="hero-auth" className="w-full max-w-[520px]">
+
+      {lastAccount && (
+        <div className={`mb-3 p-3 rounded-2xl border flex items-center justify-between text-xs transition-colors ${
+          isDarkMode ? "bg-white/[0.03] border-white/[0.08]" : "bg-white border-zinc-200 shadow-sm"
+        }`}>
+          <div className="flex items-center gap-2.5 truncate">
+            {lastAccount.avatar_url ? (
+              <div className="w-7 h-7 rounded-lg overflow-hidden border border-orange-500/20 shrink-0 bg-zinc-100 dark:bg-zinc-800">
+                <img
+                  src={lastAccount.avatar_url}
+                  alt={lastAccount.name || "Previous account"}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="w-7 h-7 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-bold shrink-0">
+                {lastAccount.name ? lastAccount.name.charAt(0).toUpperCase() : "U"}
+              </div>
+            )}
+            <span className={`truncate font-medium ${isDarkMode ? "text-zinc-300" : "text-zinc-700"}`}>
+              Previous account: <strong className="text-orange-500">{lastAccount.name || lastAccount.email}</strong>
+            </span>
+          </div>
+          <button
+            onClick={() => router.push("/login")}
+            className="text-orange-500 hover:underline font-semibold ml-2 shrink-0"
+          >
+            Sign in →
+          </button>
+        </div>
+      )}
 
      <div
   className={`p-2.5 rounded-[30px] border mb-4 overflow-hidden ${premiumGlass}`}
@@ -2611,29 +2677,61 @@ function LandingExperience() {
             </div>
           </div>
 
+          {/* Legal & Policies */}
+          <div>
+            <h4
+              className={`text-[13px] lg:text-[14px] font-semibold mb-4 lg:mb-5 ${
+                isDarkMode ? "text-zinc-200" : "text-zinc-900"
+              }`}
+            >
+              Legal & Support
+            </h4>
+
+            <div className="space-y-3 lg:space-y-4 text-[13px] lg:text-[14px]">
+              {[
+                { label: "Privacy Policy", path: "/privacy" },
+                { label: "Terms & Conditions", path: "/terms" },
+                { label: "Contact Us", path: "/contact" },
+                { label: "Help & Guide", path: "/help" },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  onClick={() => router.push(item.path)}
+                  className={`block text-left transition-colors ${
+                    isDarkMode
+                      ? "text-zinc-500 hover:text-white"
+                      : "text-zinc-600 hover:text-zinc-900"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Back to top */}
           <div className="flex lg:justify-end items-start mt-4 sm:mt-0">
-
             <button
-              onClick={() =>
-                window.scrollTo({
-                  top: 0,
-                  behavior: "smooth",
-                })
-              }
-              className={`group flex items-center justify-center gap-3 w-full lg:w-auto px-5 py-3 lg:py-4 rounded-2xl border transition-all ${
+              onClick={() => {
+                if (topRef.current) {
+                  topRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+                } else {
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                  document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+                  document.body.scrollTo({ top: 0, behavior: "smooth" });
+                }
+              }}
+              className={`group flex items-center justify-center gap-3 w-full lg:w-auto px-5 py-3 lg:py-4 rounded-2xl border transition-all active:scale-95 ${
                 isDarkMode
                   ? "bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.05]"
                   : "bg-white border-zinc-200 hover:bg-zinc-50"
               }`}
             >
-              <ArrowUp size={16} />
+              <ArrowUp size={16} className="group-hover:-translate-y-0.5 transition-transform" />
 
               <span
                 className={`text-[13px] lg:text-[14px] font-medium ${
-                  isDarkMode
-                    ? "text-zinc-300"
-                    : "text-zinc-700"
+                  isDarkMode ? "text-zinc-300" : "text-zinc-700"
                 }`}
               >
                 Back to top
@@ -2666,67 +2764,73 @@ function LandingExperience() {
       </main>
 
       {/* ========================================================= */}
-      {/* 7. FOOTER */}
+      {/* FOOTER */}
       {/* ========================================================= */}
-    {/* ========================================================= */}
-{/* 7. FOOTER */}
-{/* ========================================================= */}
-<footer
-  className={`py-8 lg:py-12 text-center border-t ${
-    isDarkMode ? "border-white/[0.04]" : "border-zinc-200"
-  }`}
->
-  <div className="flex flex-col items-center gap-4">
-
-    <p
-      className={`text-[11px] lg:text-[12px] font-semibold tracking-widest uppercase ${
-        isDarkMode ? "text-zinc-600" : "text-zinc-400"
-      }`}
-    >
-      Harder to open. Harder to quit.
-    </p>
-
-    <div
-      className={`flex flex-wrap items-center justify-center gap-3 sm:gap-5 text-[12px] lg:text-[13px] ${
-        isDarkMode ? "text-zinc-500" : "text-zinc-500"
-      }`}
-    >
-      <a
-        href="/privacy"
-        className="hover:text-orange-500 transition-colors"
+      <footer
+        className={`py-8 lg:py-12 text-center border-t ${
+          isDarkMode ? "border-white/[0.04]" : "border-zinc-200"
+        }`}
       >
-        Privacy Policy
-      </a>
+        <div className="flex flex-col items-center gap-4">
 
-      <span className="opacity-40">•</span>
+          <p
+            className={`text-[11px] lg:text-[12px] font-semibold tracking-widest uppercase ${
+              isDarkMode ? "text-zinc-600" : "text-zinc-400"
+            }`}
+          >
+            Harder to open. Harder to quit.
+          </p>
 
-      <a
-        href="/terms"
-        className="hover:text-orange-500 transition-colors"
-      >
-        Terms & Conditions
-      </a>
+          <div
+            className={`flex flex-wrap items-center justify-center gap-3 sm:gap-5 text-[12px] lg:text-[13px] ${
+              isDarkMode ? "text-zinc-500" : "text-zinc-500"
+            }`}
+          >
+            <button
+              onClick={() => router.push("/privacy")}
+              className="hover:text-orange-500 transition-colors"
+            >
+              Privacy Policy
+            </button>
 
-      <span className="opacity-40">•</span>
+            <span className="opacity-40">•</span>
 
-      <a
-        href="/contact"
-        className="hover:text-orange-500 transition-colors"
-      >
-        Contact
-      </a>
-    </div>
+            <button
+              onClick={() => router.push("/terms")}
+              className="hover:text-orange-500 transition-colors"
+            >
+              Terms & Conditions
+            </button>
 
-    <p
-      className={`text-[11px] ${
-        isDarkMode ? "text-zinc-700" : "text-zinc-400"
-      }`}
-    >
-      © {new Date().getFullYear()} NexSpace. All rights reserved.
-    </p>
+            <span className="opacity-40">•</span>
 
-  </div>
-</footer>
+            <button
+              onClick={() => router.push("/contact")}
+              className="hover:text-orange-500 transition-colors"
+            >
+              Contact
+            </button>
+
+            <span className="opacity-40">•</span>
+
+            <button
+              onClick={() => router.push("/help")}
+              className="hover:text-orange-500 transition-colors"
+            >
+              Help & Guide
+            </button>
+          </div>
+
+          <p
+            className={`text-[11px] ${
+              isDarkMode ? "text-zinc-700" : "text-zinc-400"
+            }`}
+          >
+            © {new Date().getFullYear()} NexSpace. All rights reserved.
+          </p>
+
+        </div>
+      </footer>
     </div>
   );
 }

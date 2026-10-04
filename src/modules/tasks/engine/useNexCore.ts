@@ -1,19 +1,20 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js'; 
 import { Task, Log, Meta, NexState } from '../types';
 import { useNotificationSystem } from '@/notifications/engine/useNotificationSystem'; 
 import { handleTaskUpdate, handleGlobalState } from '@/notifications/engine/nexNotificationBrain';
 import { getSupabaseClient } from "@/lib/supabase";
 
-const KEY = 'NEXSPACE_V12_PRO_FINAL';
-const OFFLINE_QUEUE_KEY = "nex_offline_queue";
+export const getTasksCacheKey = (userId: string) => `NEXSPACE_TASKS_CACHE_${userId}`;
+export const getOfflineQueueKey = (userId: string) => `nex_offline_queue_${userId}`;
 
 type QueueAction =
   | { type: "ADD"; payload: any; retryCount?: number }
   | { type: "UPDATE"; id: string; payload: any; retryCount?: number }
-  | { type: "DELETE"; id: string; retryCount?: number };
+  | { type: "DELETE"; id: string; retryCount?: number }
+  | { type: "LOG"; payload: any; retryCount?: number };
 
 const getTodayLocal = () => {
   const d = new Date();
@@ -33,21 +34,41 @@ const checkMomentum = (tasks: Task[], dateStr: string) => {
   return null;
 };
 
+const getInitialMeta = (): Meta => ({
+  currentMonth: getTodayLocal().slice(0, 7),
+  isFocus: false,
+  theme: 'dark',
+  lockedDates: [],
+  rollbackUsedDates: [],
+});
+
+let globalNexState: NexState = {
+  tasks: [],
+  logs: [],
+  meta: getInitialMeta(),
+};
+const globalNexSubscribers = new Set<React.Dispatch<React.SetStateAction<NexState>>>();
+let globalRealtimeChannel: any = null;
+let isProcessingQueue = false;
+let globalMomentumInterval: NodeJS.Timeout | null = null;
+let globalCurrentUserId: string | null = null;
+
+const setGlobalState = (action: React.SetStateAction<NexState>) => {
+  const nextState = typeof action === "function" ? (action as any)(globalNexState) : action;
+  globalNexState = nextState;
+  globalNexSubscribers.forEach(set => set(nextState));
+};
+
 export function useNexCore() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const { addNotification } = useNotificationSystem(currentUser?.id);
 
-  const [state, setState] = useState<NexState>({
-    tasks: [],
-    logs: [],
-    meta: {
-      currentMonth: getTodayLocal().slice(0, 7),
-      isFocus: false,
-      theme: 'dark',
-      lockedDates: [],
-      rollbackUsedDates: [],
-    },
-  });
+  const [state, setState] = useState<NexState>(globalNexState);
+  
+  useEffect(() => {
+    globalNexSubscribers.add(setState);
+    return () => { globalNexSubscribers.delete(setState); };
+  }, []);
   
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -57,6 +78,7 @@ export function useNexCore() {
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const userRef = useRef<User | null>(null); 
 
+  // Cleanup timers & channels on unmount
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -64,54 +86,70 @@ export function useNexCore() {
     };
   }, []);
 
-  const debouncedSave = (key: string, data: any) => {
+  // Debounced cache saving scoped to authenticated user
+  const debouncedSave = useCallback((key: string, data: any) => {
     if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
+      clearTimeout(debounceRef.current);
     }
 
     debounceRef.current = setTimeout(() => {
-        localStorage.setItem(key, JSON.stringify(data));
-        debounceRef.current = null;
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(key, JSON.stringify(data));
+        } catch (e) {
+          console.error("Local cache save failed:", e);
+        }
+      }
+      debounceRef.current = null;
     }, 500);
-  };
+  }, []);
 
+  // Save audit log to Supabase & local state
   const logAction = async (action: string, name: string, detail: string) => {
     const user = userRef.current;
+    if (!user) return;
+
     const supabase = getSupabaseClient();
     const id = crypto.randomUUID();
     const time = new Date().toISOString();
 
-    const newLog = { id, action, name, detail, time };
+    const newLog: Log = { id, action, name, detail, time };
 
-    setState(prev => {
+    setGlobalState(prev => {
       const newState = {
         ...prev,
         logs: [newLog, ...prev.logs].slice(0, 100)
       };
-      debouncedSave(KEY, newState);
+      debouncedSave(getTasksCacheKey(user.id), newState);
       return newState;
     });
 
-    if (!user || !supabase) return;
+    const record = { id, user_id: user.id, action, name, detail, time };
+
+    if (!navigator.onLine || !supabase) {
+      addToQueue(user.id, { type: "LOG", payload: record });
+      return;
+    }
 
     const { error } = await (supabase as any)
       .from("audit_logs")
-      .insert({ id, user_id: user.id, action, name, detail, time });
+      .insert(record);
 
-    if (error) console.error("Audit log sync error:", error.message || error);
+    if (error) {
+      console.error("Audit log sync error:", error.message || error);
+      addToQueue(user.id, { type: "LOG", payload: record });
+    }
   };
 
-  const fetchLogsFromDB = async () => {
-    const user = userRef.current;
-    if (!user) return;
-
+  // Fetch audit logs and authoritative lock dates from Supabase
+  const fetchLogsAndMetaFromDB = async (userId: string) => {
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
     const { data, error } = await (supabase as any)
       .from("audit_logs")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order("time", { ascending: false })
       .limit(100);
 
@@ -120,28 +158,88 @@ export function useNexCore() {
       return;
     }
 
-    setState(prev => {
-      const newState = { ...prev, logs: data || [] };
-      debouncedSave(KEY, newState);
+    const allLogs = (data as any[] || []);
+    
+    // Derive user-specific daily locks and rollback state from audit_logs
+    const systemLogs = allLogs.filter((l: any) => l.action === "SYSTEM");
+    const lockedSet = new Set<string>();
+    const rollbackSet = new Set<string>();
+
+    const chronological = [...systemLogs].sort(
+      (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime()
+    );
+
+    for (const log of chronological) {
+      const dateStr = log.detail?.trim();
+      if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+
+      if (log.name === "Daily Lock") {
+        lockedSet.add(dateStr);
+      } else if (log.name === "Unlock") {
+        lockedSet.delete(dateStr);
+        rollbackSet.add(dateStr);
+      }
+    }
+
+    // Keep user-facing logs (non-SYSTEM or all)
+    const userFacingLogs: Log[] = allLogs
+      .filter((l: any) => l.action !== "SYSTEM")
+      .map(l => ({ id: l.id, action: l.action, name: l.name, detail: l.detail, time: l.time }));
+
+    setGlobalState(prev => {
+      const newState: NexState = {
+        ...prev,
+        logs: userFacingLogs,
+        meta: {
+          ...prev.meta,
+          lockedDates: Array.from(lockedSet),
+          rollbackUsedDates: Array.from(rollbackSet),
+        }
+      };
+      debouncedSave(getTasksCacheKey(userId), newState);
       return newState;
     });
   };
 
-  const addToQueue = (action: QueueAction) => {
-    const queue: QueueAction[] = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]");
-    queue.push({ ...action, retryCount: 0 });
-    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+  // Add mutation to user-scoped offline queue
+  const addToQueue = (userId: string, action: QueueAction) => {
+    if (typeof window === "undefined") return;
+    const queueKey = getOfflineQueueKey(userId);
+    try {
+      const queue: QueueAction[] = JSON.parse(localStorage.getItem(queueKey) || "[]");
+      queue.push({ ...action, retryCount: 0 });
+      localStorage.setItem(queueKey, JSON.stringify(queue));
+    } catch (e) {
+      console.error("Failed to add to offline queue:", e);
+    }
   };
 
-  const processQueue = async () => {
-    const queue: QueueAction[] = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]");
-    if (queue.length === 0) return;
+  // Process only this authenticated user's offline queue
+  const processQueue = async (userId: string) => {
+    if (typeof window === "undefined" || isProcessingQueue) return;
+    isProcessingQueue = true;
+    const queueKey = getOfflineQueueKey(userId);
+    let queue: QueueAction[] = [];
+    try {
+      queue = JSON.parse(localStorage.getItem(queueKey) || "[]");
+    } catch (e) {
+      isProcessingQueue = false;
+      return;
+    }
+
+    if (queue.length === 0) {
+      isProcessingQueue = false;
+      return;
+    }
 
     const supabase = getSupabaseClient();
-    if (!supabase) return;
+    if (!supabase) {
+      isProcessingQueue = false;
+      return;
+    }
 
     setIsSyncing(true);
-    let remainingQueue: QueueAction[] = [];
+    const remainingQueue: QueueAction[] = [];
 
     for (let i = 0; i < queue.length; i++) {
       const action = queue[i];
@@ -150,105 +248,127 @@ export function useNexCore() {
       if (action.retryCount > 3) continue;
 
       try {
-        const table = ((supabase as any).from("tasks"));
         if (action.type === "ADD") {
+          const table = (supabase as any).from("tasks");
           const { data: exists } = await table.select("id").eq("id", action.payload.id).maybeSingle();
           if (!exists) {
-            const { error } = await table.insert(action.payload);
+            const { error } = await table.insert({ ...action.payload, user_id: userId });
             if (error) throw error;
           }
         } else if (action.type === "UPDATE") {
-          const { error } = await table.update(action.payload).eq("id", action.id);
+          const { error } = await (supabase as any)
+            .from("tasks")
+            .update(action.payload)
+            .eq("id", action.id)
+            .eq("user_id", userId);
           if (error) throw error;
         } else if (action.type === "DELETE") {
-          const { error } = await table.delete().eq("id", action.id);
+          const { error } = await (supabase as any)
+            .from("tasks")
+            .delete()
+            .eq("id", action.id)
+            .eq("user_id", userId);
+          if (error) throw error;
+        } else if (action.type === "LOG") {
+          const { error } = await (supabase as any)
+            .from("audit_logs")
+            .insert({ ...action.payload, user_id: userId });
           if (error) throw error;
         }
       } catch (e) {
         remainingQueue.push(action);
-        continue; 
       }
     }
 
     if (remainingQueue.length === 0) {
-      localStorage.removeItem(OFFLINE_QUEUE_KEY);
+      localStorage.removeItem(queueKey);
       addNotification("system", "Sync Complete", "Offline actions have been synced to the cloud.", "medium");
     } else {
-      localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remainingQueue));
+      localStorage.setItem(queueKey, JSON.stringify(remainingQueue));
     }
     setIsSyncing(false);
+    isProcessingQueue = false;
   };
 
-  const fetchTasksFromDB = async () => {
-    const user = userRef.current;
-    if (!user) return;
-
+  // Authoritative task fetch from Supabase
+  const fetchTasksFromDB = async (userId: string) => {
     const supabase = getSupabaseClient();
     if (!supabase) return; 
 
-    const { data, error } = await ((supabase as any).from("tasks")).select("*").eq("user_id", user.id);
+    const { data, error } = await (supabase as any)
+      .from("tasks")
+      .select("*")
+      .eq("user_id", userId);
     
     if (error) {
-      console.error("Fetch error:", error.message || error);
+      console.error("Fetch tasks error:", error.message || error);
       addNotification("system", "Sync Error", "Failed to fetch tasks", "high");
       return;
     }
 
-    const newTasks = (data as any[] || []).map(t => ({
+    const newTasks: Task[] = (data as any[] || []).map(t => ({
       id: t.id,
       name: t.name,
       group: t.group_name,
       history: t.history || {}
     }));
 
-    setState(prev => {
+    setGlobalState(prev => {
       const newState = { ...prev, tasks: newTasks };
-      debouncedSave(KEY, newState);
+      debouncedSave(getTasksCacheKey(userId), newState);
       return newState;
     });
   };
 
-  const setupRealtime = () => {
-    const user = userRef.current;
-    if (!user) return null; 
-
+  // Realtime subscription scoped to authenticated user ID
+  const setupRealtime = (userId: string) => {
     const supabase = getSupabaseClient();
     if (!supabase) return null; 
     
-    if (cleanupRef.current) cleanupRef.current();
+    if (globalRealtimeChannel && globalCurrentUserId === userId) return;
+    if (globalRealtimeChannel) {
+      supabase.removeChannel(globalRealtimeChannel);
+      globalRealtimeChannel = null;
+    }
 
-    const channelName = `realtime-${user.id}`;
-    
-    const existingChannels = supabase.getChannels();
-    existingChannels.forEach((c) => {
-      if (c.topic === `realtime:${channelName}`) {
-        supabase.removeChannel(c);
-      }
-    });
-
+    const channelName = `realtime-${userId}`;
     const channel = supabase.channel(channelName);
+    
+    globalRealtimeChannel = channel;
+    globalCurrentUserId = userId;
 
-    channel.on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` }, () => {
-      fetchTasksFromDB();
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${userId}` }, () => {
+      fetchTasksFromDB(userId);
     });
 
-    channel.on("postgres_changes", { event: "*", schema: "public", table: "audit_logs", filter: `user_id=eq.${user.id}` }, () => {
-      fetchLogsFromDB();
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "audit_logs", filter: `user_id=eq.${userId}` }, () => {
+      fetchLogsAndMetaFromDB(userId);
     });
 
     channel.subscribe();
 
     const cleanup = () => {
-      supabase.removeChannel(channel);
+      // We don't remove the channel here because other components might still be using the hook.
+      // We only clean it up in Auth change or globally if needed.
     };
 
     cleanupRef.current = cleanup;
     return cleanup;
-  };
 
+  };
+  // AUTH STATE ORCHESTRATION: strictly avoid race conditions
   useEffect(() => {
     const supabase = getSupabaseClient();
     if (!supabase) return; 
+
+    // Purge any legacy global keys discovered in the app
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem('NEXSPACE_V12_PRO_FINAL');
+        localStorage.removeItem('nex_offline_queue');
+        localStorage.removeItem('nexspace_tasks');
+      } catch (e) {}
+    }
 
     const handleAuthChange = async (session: Session | null) => {
       const newUser = session?.user ?? null;
@@ -258,69 +378,103 @@ export function useNexCore() {
         setCurrentUser(newUser); 
         
         if (newUser) {
-          await fetchTasksFromDB();
-          await fetchLogsFromDB();
-          setupRealtime(); 
+          // 1. Try loading user-specific cache for instant UI responsiveness
+          const userCacheKey = getTasksCacheKey(newUser.id);
+          const cached = typeof window !== "undefined" ? localStorage.getItem(userCacheKey) : null;
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached) as NexState;
+              const todayMonth = getTodayLocal().slice(0, 7);
+              setGlobalState({
+                tasks: parsed.tasks || [],
+                logs: parsed.logs || [],
+                meta: {
+                  ...getInitialMeta(),
+                  ...(parsed.meta || {}),
+                  currentMonth: todayMonth,
+                },
+              });
+            } catch (e) {
+              console.error("Cache parse error:", e);
+            }
+          } else {
+            // Fresh state for new user
+            setGlobalState({
+              tasks: [],
+              logs: [],
+              meta: getInitialMeta(),
+            });
+          }
+
+          setLoading(false);
+          setMounted(true);
+
+          // 2. Fetch authoritative data from database
+          await Promise.all([
+            fetchTasksFromDB(newUser.id),
+            fetchLogsAndMetaFromDB(newUser.id),
+          ]);
+
+          // 3. Setup realtime and process offline queue
+          setupRealtime(newUser.id);
+          if (navigator.onLine) {
+            processQueue(newUser.id);
+          }
         } else {
+          // User signed out: zero out in-memory state immediately
           if (cleanupRef.current) cleanupRef.current();
-          setState(prev => ({ ...prev, tasks: [], logs: [] })); 
+          setGlobalState({
+            tasks: [],
+            logs: [],
+            meta: getInitialMeta(),
+          });
+          setLoading(false);
+          setMounted(true);
         }
       }
     };
 
+    // Initial session retrieval
     supabase.auth.getSession().then((res: { data: { session: Session | null } }) => {
       handleAuthChange(res.data.session);
     });
 
+    // Realtime auth listener
     const { data: listener } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       handleAuthChange(session);
     });
 
+    // Listen for custom logout event
+    const handleLogoutEvent = () => {
+      if (cleanupRef.current) cleanupRef.current();
+      userRef.current = null;
+      setCurrentUser(null);
+      setGlobalState({
+        tasks: [],
+        logs: [],
+        meta: getInitialMeta(),
+      });
+    };
+
+    window.addEventListener("nexspace-logout", handleLogoutEvent);
+
     return () => {
       listener?.subscription?.unsubscribe();
+      window.removeEventListener("nexspace-logout", handleLogoutEvent);
       if (cleanupRef.current) cleanupRef.current();
     };
   }, []);
 
+  // Online / offline listeners
   useEffect(() => {
-    const init = async () => {
-      if (typeof window === "undefined") return;
-      setLoading(true);
-      
-      const saved = localStorage.getItem(KEY);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved) as NexState;
-          const todayMonth = getTodayLocal().slice(0, 7);
-          
-          setState(prev => ({
-            ...prev,
-            meta: {
-              ...parsed.meta,
-              currentMonth:
-                parsed.meta?.currentMonth !== todayMonth
-                  ? todayMonth
-                  : parsed.meta.currentMonth,
-            },
-            logs: parsed.logs || [],
-            tasks: prev.tasks.length === 0 ? (parsed.tasks || []) : prev.tasks
-          }));
-        } catch (e) { console.error(e); }
-      }
-
-      setMounted(true);
-      setLoading(false);
-      
-      if (navigator.onLine) processQueue();
-    };
-
-    init();
-
     const handleOnline = () => {
       addNotification("system", "Back Online", "Connection restored. Syncing data...", "low");
-      processQueue();
-      fetchTasksFromDB();
-      fetchLogsFromDB();
+      const user = userRef.current;
+      if (user) {
+        processQueue(user.id);
+        fetchTasksFromDB(user.id);
+        fetchLogsAndMetaFromDB(user.id);
+      }
     };
     
     const handleOffline = () => addNotification("system", "Offline", "No internet connection. Actions will be queued.", "high");
@@ -329,22 +483,19 @@ export function useNexCore() {
     window.addEventListener("offline", handleOffline);
 
     return () => {
-      cleanupRef.current?.(); 
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, []);
+  }, [addNotification]);
 
-  // Auto-sync month to catch date roll-overs if the user leaves the tab open
+  // Auto-sync month on rollover
   useEffect(() => {
     const syncMonth = () => {
       const todayMonth = getTodayLocal().slice(0, 7);
+      const user = userRef.current;
 
-      setState(prev => {
-        if (prev.meta.currentMonth === todayMonth) {
-          return prev;
-        }
-
+      setGlobalState(prev => {
+        if (prev.meta.currentMonth === todayMonth) return prev;
         const next = {
           ...prev,
           meta: {
@@ -352,43 +503,33 @@ export function useNexCore() {
             currentMonth: todayMonth,
           },
         };
-
-        debouncedSave(KEY, next);
+        if (user) debouncedSave(getTasksCacheKey(user.id), next);
         return next;
       });
     };
 
     syncMonth();
     window.addEventListener("focus", syncMonth);
+    return () => window.removeEventListener("focus", syncMonth);
+  }, [debouncedSave]);
 
-    return () => {
-      window.removeEventListener("focus", syncMonth);
-    };
-  }, []);
-
+  // Silent refresh listener
   useEffect(() => {
     const handleSilentRefresh = async () => {
-      await fetchTasksFromDB();
-      await fetchLogsFromDB();
+      const user = userRef.current;
+      if (user) {
+        await Promise.all([
+          fetchTasksFromDB(user.id),
+          fetchLogsAndMetaFromDB(user.id),
+        ]);
+      }
     };
 
     window.addEventListener("nexspace-refresh", handleSilentRefresh);
-
-    return () => {
-      window.removeEventListener("nexspace-refresh", handleSilentRefresh);
-    };
+    return () => window.removeEventListener("nexspace-refresh", handleSilentRefresh);
   }, []);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (navigator.onLine && userRef.current) {
-        handleGlobalState(addNotification, state.tasks, []);
-      }
-    }, 30000); 
-
-    return () => clearInterval(interval);
-  }, [state.tasks, addNotification]);
-
+  // Streak calculation strictly derived from user's tasks
   const currentStreak = useMemo(() => {
     if (state.tasks.length === 0) return 0;
     
@@ -397,10 +538,9 @@ export function useNexCore() {
 
     const isDayActive = (dateStr: string) => state.tasks.some(t => t.history?.[dateStr]);
 
-    // Local-only date decrement to avoid UTC timezone offset issues
     const getPreviousDayStr = (dateStr: string) => {
       const [y, m, d] = dateStr.split('-').map(Number);
-      const date = new Date(y, m - 1, d - 1); // Native local time subtraction
+      const date = new Date(y, m - 1, d - 1);
       const yy = date.getFullYear();
       const mm = String(date.getMonth() + 1).padStart(2, '0');
       const dd = String(date.getDate()).padStart(2, '0');
@@ -420,6 +560,21 @@ export function useNexCore() {
     return streak;
   }, [state.tasks]);
 
+  // Periodic momentum checks
+  useEffect(() => {
+    if (!globalMomentumInterval) {
+      globalMomentumInterval = setInterval(() => {
+        if (navigator.onLine && globalCurrentUserId) {
+          handleGlobalState(addNotification, globalNexState.tasks, [], globalCurrentUserId);
+        }
+      }, 30000); 
+    }
+    return () => {
+      // Intentionally leaving interval alive across component unmounts until total app unmount
+    };
+  }, [addNotification]);
+
+  // Task Mutations
   const addTask = async (name: string, group: string) => {
     if (!name.trim()) return;
     
@@ -433,13 +588,13 @@ export function useNexCore() {
     const groupName = (group.trim() || "GENERAL").toUpperCase();
     const newTaskDB = { id: newId, name: name.trim(), group_name: groupName, history: {}, user_id: user.id };
 
-    setState(prev => {
+    setGlobalState(prev => {
       if (prev.tasks.some(t => t.id === newId)) return prev;
       const newState = {
         ...prev,
         tasks: [...prev.tasks, { id: newId, name: name.trim(), group: groupName, history: {} }]
       };
-      debouncedSave(KEY, newState);
+      debouncedSave(getTasksCacheKey(user.id), newState);
       return newState;
     });
 
@@ -448,13 +603,13 @@ export function useNexCore() {
     const supabase = getSupabaseClient();
     
     if (!navigator.onLine || !supabase) { 
-      addToQueue({ type: "ADD", payload: newTaskDB });
+      addToQueue(user.id, { type: "ADD", payload: newTaskDB });
       return;
     }
 
     const { error } = await ((supabase as any).from("tasks")).insert(newTaskDB);
     if (error) {
-      addToQueue({ type: "ADD", payload: newTaskDB });
+      addToQueue(user.id, { type: "ADD", payload: newTaskDB });
     }
   };
 
@@ -464,10 +619,10 @@ export function useNexCore() {
     const user = userRef.current;
     if (!user) return;
 
-    setState(prev => {
+    setGlobalState(prev => {
       const updatedTasks = prev.tasks.map(t => t.id === id ? { ...t, name: newName.trim() } : t);
       const newState = { ...prev, tasks: updatedTasks };
-      debouncedSave(KEY, newState);
+      debouncedSave(getTasksCacheKey(user.id), newState);
       return newState;
     });
 
@@ -475,12 +630,16 @@ export function useNexCore() {
 
     const supabase = getSupabaseClient();
     if (!navigator.onLine || !supabase) {
-      addToQueue({ type: "UPDATE", id, payload: { name: newName.trim() } });
+      addToQueue(user.id, { type: "UPDATE", id, payload: { name: newName.trim() } });
       return;
     }
 
-    const { error } = await ((supabase as any).from("tasks")).update({ name: newName.trim() }).eq("id", id);
-    if (error) addToQueue({ type: "UPDATE", id, payload: { name: newName.trim() } });
+    const { error } = await ((supabase as any).from("tasks"))
+      .update({ name: newName.trim() })
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    if (error) addToQueue(user.id, { type: "UPDATE", id, payload: { name: newName.trim() } });
   };
 
   const renameGroup = async (oldGroup: string, newGroup: string) => {
@@ -489,10 +648,10 @@ export function useNexCore() {
     const user = userRef.current;
     if (!user) return;
 
-    setState(prev => {
+    setGlobalState(prev => {
       const updatedTasks = prev.tasks.map(t => t.group === oldGroup ? { ...t, group: newGroup.trim() } : t);
       const newState = { ...prev, tasks: updatedTasks };
-      debouncedSave(KEY, newState);
+      debouncedSave(getTasksCacheKey(user.id), newState);
       return newState;
     });
 
@@ -501,7 +660,7 @@ export function useNexCore() {
     const supabase = getSupabaseClient();
     if (!navigator.onLine || !supabase) {
       state.tasks.filter(t => t.group === oldGroup).forEach(t => {
-        addToQueue({ type: "UPDATE", id: t.id, payload: { group_name: newGroup.trim() } });
+        addToQueue(user.id, { type: "UPDATE", id: t.id, payload: { group_name: newGroup.trim() } });
       });
       return;
     }
@@ -513,7 +672,7 @@ export function useNexCore() {
 
     if (error) {
       state.tasks.filter(t => t.group === oldGroup).forEach(t => {
-        addToQueue({ type: "UPDATE", id: t.id, payload: { group_name: newGroup.trim() } });
+        addToQueue(user.id, { type: "UPDATE", id: t.id, payload: { group_name: newGroup.trim() } });
       });
     }
   };
@@ -537,9 +696,9 @@ export function useNexCore() {
     const updatedHistory = { ...task.history, [dateStr]: status };
     const updatedTasksArray = state.tasks.map(t => t.id === id ? { ...t, history: updatedHistory } : t);
 
-    setState(prev => {
+    setGlobalState(prev => {
       const newState = { ...prev, tasks: updatedTasksArray };
-      debouncedSave(KEY, newState);
+      debouncedSave(getTasksCacheKey(user.id), newState);
       return newState;
     });
 
@@ -549,17 +708,21 @@ export function useNexCore() {
       window.dispatchEvent(new Event("nexspace-live-update"));
     });
     
-    if (status) handleTaskUpdate(addNotification, updatedTasksArray, dateStr); 
+    if (status && userRef.current) handleTaskUpdate(addNotification, updatedTasksArray, dateStr, userRef.current.id); 
 
     const supabase = getSupabaseClient();
 
     if (!navigator.onLine || !supabase) { 
-      addToQueue({ type: "UPDATE", id, payload: { history: updatedHistory } });
+      addToQueue(user.id, { type: "UPDATE", id, payload: { history: updatedHistory } });
       return;
     }
 
-    const { error } = await ((supabase as any).from("tasks")).update({ history: updatedHistory }).eq("id", id);
-    if (error) addToQueue({ type: "UPDATE", id, payload: { history: updatedHistory } });
+    const { error } = await ((supabase as any).from("tasks"))
+      .update({ history: updatedHistory })
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    if (error) addToQueue(user.id, { type: "UPDATE", id, payload: { history: updatedHistory } });
   };
 
   const deleteTask = async (id: string) => {
@@ -568,9 +731,9 @@ export function useNexCore() {
 
     const taskToDelete = state.tasks.find(t => t.id === id);
 
-    setState(prev => {
+    setGlobalState(prev => {
       const newState = { ...prev, tasks: prev.tasks.filter(t => t.id !== id) };
-      debouncedSave(KEY, newState);
+      debouncedSave(getTasksCacheKey(user.id), newState);
       return newState;
     });
 
@@ -580,81 +743,88 @@ export function useNexCore() {
 
     const supabase = getSupabaseClient();
     if (!navigator.onLine || !supabase) { 
-      addToQueue({ type: "DELETE", id });
+      addToQueue(user.id, { type: "DELETE", id });
       return;
     }
 
-    const { error } = await ((supabase as any).from("tasks")).delete().eq("id", id);
-    if (error) addToQueue({ type: "DELETE", id });
+    const { error } = await ((supabase as any).from("tasks"))
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    if (error) addToQueue(user.id, { type: "DELETE", id });
   };
 
+  // Lock Today: updates local state, user cache, and persists to Supabase audit_logs
   const lockToday = async () => {
+    const user = userRef.current;
+    if (!user) return;
+
     const today = getTodayLocal();
     let alreadyLocked = false;
 
-    setState(prev => {
+    setGlobalState(prev => {
       if (prev.meta.lockedDates.includes(today)) {
         alreadyLocked = true;
         return prev;
       }
-      const newState = { 
-        ...prev, 
-        meta: { ...prev.meta, lockedDates: [...new Set([...prev.meta.lockedDates, today])] }
+      const updatedMeta = { 
+        ...prev.meta, 
+        lockedDates: [...new Set([...prev.meta.lockedDates, today])] 
       };
-      debouncedSave(KEY, newState);
+      const newState = { ...prev, meta: updatedMeta };
+      debouncedSave(getTasksCacheKey(user.id), newState);
       return newState;
     });
 
     if (!alreadyLocked) {
-      await logAction("SYSTEM", "Daily Lock", `Locked execution data for ${today}`);
+      await logAction("SYSTEM", "Daily Lock", today);
     }
   };
 
+  // Unlock Date: uses rollback token, updates local state, user cache, and persists to Supabase audit_logs
   const unlockDate = async (dateStr: string) => {
+    const user = userRef.current;
+    if (!user) return;
+
     const today = getTodayLocal();
     let requiresUnlock = true;
 
-    setState(prev => {
+    setGlobalState(prev => {
       if (dateStr !== today || prev.meta.rollbackUsedDates?.includes(dateStr) || !prev.meta.lockedDates.includes(dateStr)) {
         requiresUnlock = false;
         return prev;
       }
-      const newState = { 
-        ...prev, 
-        meta: { ...prev.meta, lockedDates: prev.meta.lockedDates.filter(d => d !== dateStr), rollbackUsedDates: [...(prev.meta.rollbackUsedDates || []), dateStr] }
+      const updatedMeta = { 
+        ...prev.meta, 
+        lockedDates: prev.meta.lockedDates.filter(d => d !== dateStr), 
+        rollbackUsedDates: [...(prev.meta.rollbackUsedDates || []), dateStr] 
       };
-      debouncedSave(KEY, newState);
+      const newState = { ...prev, meta: updatedMeta };
+      debouncedSave(getTasksCacheKey(user.id), newState);
       return newState;
     });
 
     if (requiresUnlock) {
-      await logAction("SYSTEM", "Unlock", `Rollback utilized for ${dateStr}`);
+      await logAction("SYSTEM", "Unlock", dateStr);
     }
   };
 
   const setMonthYear = (value: string) => {
-    setState(prev => {
-      if (prev.meta.currentMonth === value) {
-        return prev;
-      }
-
-      const next = {
-        ...prev,
-        meta: {
-          ...prev.meta,
-          currentMonth: value,
-        },
-      };
-
-      debouncedSave(KEY, next);
+    const user = userRef.current;
+    setGlobalState(prev => {
+      if (prev.meta.currentMonth === value) return prev;
+      const next = { ...prev, meta: { ...prev.meta, currentMonth: value } };
+      if (user) debouncedSave(getTasksCacheKey(user.id), next);
       return next;
     });
   };
 
   const setFocus = (value: boolean) => {
-    setState(prev => {
+    const user = userRef.current;
+    setGlobalState(prev => {
       const newState = { ...prev, meta: { ...prev.meta, isFocus: value } };
-      debouncedSave(KEY, newState);
+      if (user) debouncedSave(getTasksCacheKey(user.id), newState);
       return newState;
     });
   };
@@ -676,35 +846,46 @@ export function useNexCore() {
     await logAction(action, name, detail);
   };
 
+  // Clears user-facing logs without deleting SYSTEM lock records
   const clearAllLogs = async () => {
+    const user = userRef.current;
+    if (!user) return;
+
     if (!window.confirm("Delete all audit logs? This action cannot be undone.")) return;
     
-    setState(prev => {
+    setGlobalState(prev => {
       const newState = { ...prev, logs: [] };
-      debouncedSave(KEY, newState);
+      debouncedSave(getTasksCacheKey(user.id), newState);
       return newState;
     });
 
-    const user = userRef.current;
     const supabase = getSupabaseClient();
-    
-    if (user && supabase && navigator.onLine) {
-      await (supabase as any).from("audit_logs").delete().eq("user_id", user.id);
+    if (supabase && navigator.onLine) {
+      await (supabase as any)
+        .from("audit_logs")
+        .delete()
+        .eq("user_id", user.id)
+        .neq("action", "SYSTEM");
     }
   };
 
   const deleteLog = async (id: string | number) => {
-    setState(prev => {
+    const user = userRef.current;
+    if (!user) return;
+
+    setGlobalState(prev => {
       const newState = { ...prev, logs: prev.logs.filter(l => l.id !== id) };
-      debouncedSave(KEY, newState);
+      debouncedSave(getTasksCacheKey(user.id), newState);
       return newState;
     });
 
-    const user = userRef.current;
     const supabase = getSupabaseClient();
-    
-    if (user && supabase && navigator.onLine) {
-      await (supabase as any).from("audit_logs").delete().eq("id", id).eq("user_id", user.id);
+    if (supabase && navigator.onLine) {
+      await (supabase as any)
+        .from("audit_logs")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", user.id);
     }
   };
 

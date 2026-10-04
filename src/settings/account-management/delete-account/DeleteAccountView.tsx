@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useTheme } from "@/theme/ThemeProvider"; // 🔥 Import Theme Provider
+import { logoutUser } from "@/lib/auth";
 import { 
   AlertTriangle, 
   Trash2, 
@@ -69,8 +70,7 @@ export default function DeleteAccountPage() {
       setMessage("Your account and all associated data have been deleted.");
 
       setTimeout(async () => {
-        await supabase.auth.signOut();
-        router.replace("/login");
+        await logoutUser(router);
       }, 2500);
 
     } catch (err: any) {

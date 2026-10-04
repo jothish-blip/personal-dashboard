@@ -10,6 +10,7 @@ import { useFocusSystem } from "@/modules/focus/engine/useFocusSystem";
 import ThemeToggle from "@/theme/ThemeToggle";
 import { useTheme } from "@/theme/ThemeProvider";
 import { useNexCore } from "@/modules/tasks/engine/useNexCore";
+import { logoutUser } from "@/lib/auth";
 import {
   LayoutGrid,
   Brain,
@@ -506,7 +507,7 @@ useEffect(() => {
                       <Settings size={14} />
                     </button>
                     <Tooltip text="Logout">
-                      <button onClick={async () => { setOpen(false); if (supabase) { await supabase.auth.signOut(); window.location.href = "/login"; } }} className={`p-1.5 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center ${isDarkMode ? "hover:bg-red-500/20 text-red-400" : "hover:bg-red-50 text-red-500"}`}>
+                      <button onClick={async () => { setOpen(false); await logoutUser(router); }} className={`p-1.5 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center ${isDarkMode ? "hover:bg-red-500/20 text-red-400" : "hover:bg-red-50 text-red-500"}`}>
                         <LogOut size={14} />
                       </button>
                     </Tooltip>
