@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/theme/ThemeProvider";
 import nextDynamic from "next/dynamic";
@@ -49,49 +49,7 @@ export default function Home() {
     setHasSessionLoaded(sessionStorage.getItem("nexspace_session_loaded") === "true");
   }, []);
 
-  // ─── INSTANT SESSION ENFORCEMENT ───
-  useEffect(() => {
-    const checkAuth = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
 
-      if (!session) {
-        sessionStorage.clear();
-        setIsAuthenticated(false);
-        router.replace("/login");
-        return;
-      }
-    };
-
-    // 1. Verify session on Home mount
-    checkAuth();
-
-    // 2. Listen to onAuthStateChange()
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        sessionStorage.clear();
-        setIsAuthenticated(false);
-        router.replace("/login");
-      }
-    });
-
-    // 3. Re-check auth when tab becomes visible
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        checkAuth();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibility);
-
-    return () => {
-      subscription.unsubscribe();
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, [router]);
 
   // ─── PRELOAD TABS FOR ZERO-LATENCY SWITCHING ───
   useEffect(() => {
@@ -199,12 +157,16 @@ export default function Home() {
     sessionStorage.setItem("nexengine_active_tab", tab);
   };
 
+  const hasRenderedRef = useRef(false);
+
   const shouldBlockRender =
-    isAuthenticated === null ||
-    isAuthenticated === false ||
-    !mounted ||
-    !isStateLoaded ||
-    !isFocusLoaded;
+    !hasRenderedRef.current && (
+      isAuthenticated === null ||
+      isAuthenticated === false ||
+      !mounted ||
+      !isStateLoaded ||
+      !isFocusLoaded
+    );
 
   if (shouldBlockRender) {
     if (!hasSessionLoaded) {
@@ -216,6 +178,8 @@ export default function Home() {
     }
     return null;
   }
+
+  hasRenderedRef.current = true;
 
   return (
     <>

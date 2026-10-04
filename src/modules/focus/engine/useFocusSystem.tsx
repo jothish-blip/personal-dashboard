@@ -157,6 +157,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isFetchingRef = useRef(false);
+  const initialFetchDoneRef = useRef(false);
   const alarmTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fetchSessionsRef = useRef<() => Promise<boolean>>(async () => false);
 
@@ -272,10 +273,15 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   const fetchSessionsFromDB = useCallback(async (): Promise<boolean> => {
     if (isFetchingRef.current) return false;
     isFetchingRef.current = true;
-    setIsLoaded(false);
+    
+    // Only flip isLoaded to false on initial fetch to avoid blank flash on tab switch revalidations
+    if (!initialFetchDoneRef.current) {
+      setIsLoaded(false);
+    }
 
     try {
       if (!currentUser?.id) {
+        initialFetchDoneRef.current = true;
         setIsLoaded(true);
         return false;
       }
@@ -323,6 +329,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
         setExtraTime(0);
       }
 
+      initialFetchDoneRef.current = true;
       setIsLoaded(true);
       return !!activeData?.session;
     } finally {
@@ -389,6 +396,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
       setIsSessionComplete(false);
       setExtraTime(0);
       setIsLoaded(true);
+      initialFetchDoneRef.current = false;
     }
   }, [currentUser, authInitialized, fetchSessionsFromDB]);
 

@@ -38,9 +38,7 @@
 
 /* GPU Smoothness & Scrolling */
 html {
-  will-change: background-color, color;
   scroll-behavior: smooth;
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 html, body {
@@ -57,11 +55,14 @@ body {
   transform: translateZ(0);
 }
 
-/* GLOBAL SMOOTH THEME TRANSITION */
-body, main, aside, nav, header, .theme-transition {
-  transition-property: background-color, color, border-color;
-  transition-duration: 300ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+/* GLOBAL SMOOTH THEME TRANSITION - PREVENTS LAYOUT SHIFTS & JUMPS */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition-property: background-color, border-color, color, fill, stroke !important;
+  transition-duration: 250ms !important;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 /* 2. Global Dark Mode Overrides */

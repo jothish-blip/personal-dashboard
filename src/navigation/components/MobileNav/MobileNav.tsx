@@ -13,6 +13,7 @@ import {
   CalendarDays,
   Settings,
   LogOut,
+  User,
 } from "lucide-react";
 
 import ThemeToggle from "@/theme/ThemeToggle";
@@ -201,7 +202,13 @@ export default function MobileNav({
                         : "bg-white border-black/5 shadow-black/10"
                     }`}
                   >
-                    <div className="flex flex-col items-center text-center pb-5 mb-4 border-b border-zinc-500/10">
+                    <div
+                      onClick={() => {
+                        closeAllMenus();
+                        router.push("/settings/profile");
+                      }}
+                      className="flex flex-col items-center text-center pb-5 mb-4 border-b border-zinc-500/10 cursor-pointer hover:opacity-80 transition-opacity"
+                    >
                       <div className="w-14 h-14 rounded-full bg-zinc-200 dark:bg-black flex items-center justify-center overflow-hidden mb-3">
                         {userProfile?.avatar_url ? (
                           <img
@@ -224,6 +231,27 @@ export default function MobileNav({
                     </div>
 
                     <div className="space-y-1">
+                      {/* Profile Button */}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          closeAllMenus();
+                          setTimeout(() => {
+                            router.push("/settings/profile");
+                          }, 150);
+                        }}
+                        style={{ touchAction: "manipulation" }}
+                        className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl font-medium text-[13px] transition-colors ${
+                          isDarkMode
+                            ? "hover:bg-white/[0.03] text-zinc-300"
+                            : "hover:bg-black/5 text-zinc-700"
+                        }`}
+                      >
+                        <User size={18} />
+                        <span>Profile</span>
+                      </button>
+
                       {/* Theme Toggle */}
                       <div
                         className={`flex items-center justify-between px-4 py-3.5 rounded-2xl mb-1 ${

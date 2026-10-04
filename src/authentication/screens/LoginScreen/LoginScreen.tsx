@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/theme/ThemeProvider";
 import { Moon, Sun, Loader2 } from "lucide-react";
 import { FaGithub, FaDiscord } from "react-icons/fa";
 import Image from "next/image";
+import { getLastLoggedInAccount, clearLastLoggedInAccount, LastLoggedInAccount } from "@/lib/auth";
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 48 48">
@@ -19,11 +20,57 @@ const GoogleIcon = () => (
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isDarkMode, toggleTheme } = useTheme();
 
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [oauthStarted, setOauthStarted] = useState(false);
+  const [lastAccount, setLastAccount] = useState<LastLoggedInAccount | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isSwitching, setIsSwitching] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setLastAccount(getLastLoggedInAccount());
+    const err = searchParams.get("error");
+    if (err) {
+      setAuthError(decodeURIComponent(err));
+      setOauthStarted(false);
+      setLoadingProvider(null);
+    }
+  }, [searchParams]);
+
+  // Lifecycle listeners to unlock stuck loading states (e.g. Back button, BFCache, abandoned OAuth)
+  useEffect(() => {
+    const resetLoadingState = () => {
+      setOauthStarted(false);
+      setLoadingProvider(null);
+    };
+
+    const handlePageShow = () => {
+      resetLoadingState();
+    };
+
+    const handleWindowFocus = () => {
+      setTimeout(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          resetLoadingState();
+        }
+      }, 300);
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("focus", handleWindowFocus);
+    window.addEventListener("popstate", handlePageShow);
+
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("popstate", handlePageShow);
+    };
+  }, []);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -51,6 +98,13 @@ export default function LoginPage() {
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
         checkSession();
+        setTimeout(async () => {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            setOauthStarted(false);
+            setLoadingProvider(null);
+          }
+        }, 200);
       }
     };
 
@@ -69,17 +123,28 @@ export default function LoginPage() {
     setOauthStarted(true);
     setLoadingProvider(provider);
 
-    // Callback timeout protection (15s) to prevent infinite loading state
+    // If switching account, ensure provider shows account selection
+    const queryParams: Record<string, string> = {};
+    if (isSwitching || !lastAccount || lastAccount.provider?.toLowerCase() !== provider) {
+      if (provider === "google") {
+        queryParams.prompt = "select_account";
+      } else if (provider === "github" || provider === "discord") {
+        queryParams.prompt = "consent";
+      }
+    }
+
+    // Callback timeout protection (12s) to prevent infinite loading state
     const timeout = setTimeout(() => {
       setOauthStarted(false);
       setLoadingProvider(null);
-    }, 15000);
+    }, 12000);
 
     try {
       await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: Object.keys(queryParams).length > 0 ? queryParams : undefined,
         },
       });
     } catch (error) {
@@ -87,6 +152,12 @@ export default function LoginPage() {
       setOauthStarted(false);
       setLoadingProvider(null);
     }
+  };
+
+  const handleSwitchAccount = () => {
+    clearLastLoggedInAccount();
+    setLastAccount(null);
+    setIsSwitching(true);
   };
 
   if (checkingSession) {
@@ -283,25 +354,101 @@ export default function LoginPage() {
 
             <div className="absolute top-[60px] left-1/2 -translate-x-1/2 w-[320px] h-[320px] bg-orange-500/[0.03] blur-[80px] rounded-full pointer-events-none" />
 
-            {/* Adjusted Button Hierarchy */}
+            {/* Error Banner */}
+            {authError && (
+              <div className="relative z-10 mb-4 p-3 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-xs font-medium flex items-center justify-between animate-in fade-in">
+                <span>{authError}</span>
+                <button
+                  onClick={() => setAuthError(null)}
+                  className="text-red-400 hover:text-red-300 ml-2 text-xs font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Last Logged In Recognition Card (Account-recognition UI Hint) */}
+            {lastAccount && (
+              <div className={`relative z-10 mb-5 p-3.5 rounded-2xl border flex items-center justify-between transition-colors ${
+                isDarkMode ? "bg-white/[0.03] border-white/[0.08]" : "bg-white border-zinc-200 shadow-sm"
+              }`}>
+                <div className="flex items-center gap-3 min-w-0">
+                  {lastAccount.avatar_url && !imgError ? (
+                    <div className="w-10 h-10 rounded-xl overflow-hidden border border-orange-500/20 shrink-0 bg-zinc-100 dark:bg-zinc-800">
+                      <img
+                        src={lastAccount.avatar_url}
+                        alt={lastAccount.name || "Previous account"}
+                        className="w-full h-full object-cover"
+                        onError={() => setImgError(true)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-bold text-sm shrink-0">
+                      {lastAccount.name
+                        ? lastAccount.name.charAt(0).toUpperCase()
+                        : (lastAccount.email ? lastAccount.email.charAt(0).toUpperCase() : "U")}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-orange-500 font-bold uppercase tracking-wider">
+                      Previous account
+                    </div>
+                    <div className={`text-xs font-semibold truncate ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                      {lastAccount.name || lastAccount.email}
+                    </div>
+                    {lastAccount.provider && (
+                      <div className={`text-[11px] truncate ${isDarkMode ? "text-zinc-500" : "text-zinc-400"}`}>
+                        Used {lastAccount.provider.charAt(0).toUpperCase() + lastAccount.provider.slice(1)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={handleSwitchAccount}
+                  className={`text-[11px] font-medium px-3 py-1.5 rounded-lg border transition-colors shrink-0 ml-2 ${
+                    isDarkMode
+                      ? "border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 active:scale-95"
+                      : "border-zinc-200 text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 active:scale-95"
+                  }`}
+                >
+                  Switch
+                </button>
+              </div>
+            )}
+
+            {/* Stable Button Hierarchy */}
             <div className="relative z-10 space-y-3.5">
               
               {/* Google - Primary Weight */}
               <button
                 onClick={() => handleLogin("google")}
                 disabled={oauthStarted}
-                className={`w-full h-[62px] sm:h-[68px] px-6 rounded-[24px] border flex items-center justify-center gap-3.5 font-medium text-[15px] transition-all duration-500 group ${
+                className={`w-full h-[62px] sm:h-[68px] px-5 sm:px-6 rounded-[24px] border grid grid-cols-[32px_1fr_auto] items-center text-[15px] font-medium transition-all duration-300 group ${
                   isDarkMode
                     ? "bg-white/[0.04] border-white/[0.08] text-white hover:bg-white/[0.06] hover:shadow-[0_8px_30px_rgba(255,255,255,0.05)] disabled:opacity-50"
                     : "bg-white/90 border-black/10 text-zinc-900 hover:bg-white hover:border-black/[0.15] hover:shadow-md disabled:opacity-50"
                 }`}
               >
                 {loadingProvider === "google" ? (
-                  <><Loader2 className="animate-spin w-4 h-4 text-orange-500" /> Authenticating with Google...</>
+                  <div className="col-span-3 flex items-center justify-center gap-2">
+                    <Loader2 className="animate-spin w-4 h-4 text-orange-500" />
+                    <span>Authenticating with Google...</span>
+                  </div>
                 ) : (
                   <>
-                    <div className="group-hover:scale-105 transition-transform duration-500 ease-out"><GoogleIcon /></div>
-                    Continue with Google
+                    <div className="flex items-center justify-start group-hover:scale-105 transition-transform duration-300">
+                      <GoogleIcon />
+                    </div>
+                    <span className="text-center font-medium">Continue with Google</span>
+                    <div className="min-w-[70px] flex items-center justify-end">
+                      {lastAccount?.provider?.toLowerCase() === "google" ? (
+                        <span className="text-[11px] font-semibold text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/20 whitespace-nowrap">
+                          Last used
+                        </span>
+                      ) : (
+                        <div className="w-[70px] invisible" />
+                      )}
+                    </div>
                   </>
                 )}
               </button>
@@ -310,18 +457,32 @@ export default function LoginPage() {
               <button
                 onClick={() => handleLogin("github")}
                 disabled={oauthStarted}
-                className={`w-full h-[62px] sm:h-[68px] px-6 rounded-[24px] border flex items-center justify-center gap-3.5 font-medium text-[15px] transition-all duration-500 group ${
+                className={`w-full h-[62px] sm:h-[68px] px-5 sm:px-6 rounded-[24px] border grid grid-cols-[32px_1fr_auto] items-center text-[15px] font-medium transition-all duration-300 group ${
                   isDarkMode
                     ? "bg-white/[0.015] border-white/[0.03] text-zinc-300 hover:bg-white/[0.04] hover:text-white hover:border-white/[0.06] hover:shadow-[0_8px_30px_rgba(255,255,255,0.02)] disabled:opacity-50"
                     : "bg-white/50 border-black/[0.04] text-zinc-700 hover:bg-white/80 hover:border-black/[0.08] hover:shadow-sm disabled:opacity-50"
                 }`}
               >
                 {loadingProvider === "github" ? (
-                  <><Loader2 className="animate-spin w-4 h-4 text-orange-500" /> Authenticating with GitHub...</>
+                  <div className="col-span-3 flex items-center justify-center gap-2">
+                    <Loader2 className="animate-spin w-4 h-4 text-orange-500" />
+                    <span>Authenticating with GitHub...</span>
+                  </div>
                 ) : (
                   <>
-                    <FaGithub size={18} className="opacity-95 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500 ease-out" />
-                    Continue with GitHub
+                    <div className="flex items-center justify-start group-hover:scale-105 transition-transform duration-300">
+                      <FaGithub size={18} className="opacity-95 group-hover:opacity-100" />
+                    </div>
+                    <span className="text-center font-medium">Continue with GitHub</span>
+                    <div className="min-w-[70px] flex items-center justify-end">
+                      {lastAccount?.provider?.toLowerCase() === "github" ? (
+                        <span className="text-[11px] font-semibold text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/20 whitespace-nowrap">
+                          Last used
+                        </span>
+                      ) : (
+                        <div className="w-[70px] invisible" />
+                      )}
+                    </div>
                   </>
                 )}
               </button>
@@ -330,18 +491,32 @@ export default function LoginPage() {
               <button
                 onClick={() => handleLogin("discord")}
                 disabled={oauthStarted}
-                className={`w-full h-[62px] sm:h-[68px] px-6 rounded-[24px] border flex items-center justify-center gap-3.5 font-medium text-[15px] transition-all duration-500 group ${
+                className={`w-full h-[62px] sm:h-[68px] px-5 sm:px-6 rounded-[24px] border grid grid-cols-[32px_1fr_auto] items-center text-[15px] font-medium transition-all duration-300 group ${
                   isDarkMode
                     ? "bg-white/[0.015] border-white/[0.03] text-zinc-300 hover:bg-white/[0.04] hover:text-white hover:border-white/[0.06] hover:shadow-[0_8px_30px_rgba(255,255,255,0.02)] disabled:opacity-50"
                     : "bg-white/50 border-black/[0.04] text-zinc-700 hover:bg-white/80 hover:border-black/[0.08] hover:shadow-sm disabled:opacity-50"
                 }`}
               >
                 {loadingProvider === "discord" ? (
-                  <><Loader2 className="animate-spin w-4 h-4 text-orange-500" /> Authenticating with Discord...</>
+                  <div className="col-span-3 flex items-center justify-center gap-2">
+                    <Loader2 className="animate-spin w-4 h-4 text-orange-500" />
+                    <span>Authenticating with Discord...</span>
+                  </div>
                 ) : (
                   <>
-                    <FaDiscord size={18} className="text-[#5865F2]/80 group-hover:text-[#5865F2] group-hover:scale-105 transition-all duration-500 ease-out" />
-                    Continue with Discord
+                    <div className="flex items-center justify-start group-hover:scale-105 transition-transform duration-300">
+                      <FaDiscord size={18} className="text-[#5865F2]/80 group-hover:text-[#5865F2]" />
+                    </div>
+                    <span className="text-center font-medium">Continue with Discord</span>
+                    <div className="min-w-[70px] flex items-center justify-end">
+                      {lastAccount?.provider?.toLowerCase() === "discord" ? (
+                        <span className="text-[11px] font-semibold text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/20 whitespace-nowrap">
+                          Last used
+                        </span>
+                      ) : (
+                        <div className="w-[70px] invisible" />
+                      )}
+                    </div>
                   </>
                 )}
               </button>

@@ -554,8 +554,8 @@ export function useDiarySystem() {
     isInitializing.current = currentUser.id;
 
     const initDiary = async () => {
-      const storedTasks = safeParse(localStorage.getItem("nexspace_tasks"));
-      if (storedTasks) setTasks(storedTasks);
+      const storedTasksCache = safeParse(localStorage.getItem(`NEXSPACE_TASKS_CACHE_${currentUser.id}`));
+      if (storedTasksCache?.tasks) setTasks(storedTasksCache.tasks);
 
       let entriesMap: Record<string, DiaryEntry> = {};
       let oldestDate = actualToday;
@@ -635,7 +635,7 @@ export function useDiarySystem() {
           syncEntryToDB(dStr, missedEntry).catch(() => {});
 
           newMissedCount++;
-          handleDiary(notifyWrapper, "missed", dStr);
+          if (currentUser?.id) handleDiary(notifyWrapper, "missed", dStr, currentUser.id);
         }
 
         currDate.setDate(currDate.getDate() + 1);

@@ -167,8 +167,8 @@ export function useWorkspaceSystem() {
   const activeDocument = useMemo(() => activeDocuments.find(d => d.id === activeDocId), [activeDocuments, activeDocId]);
 
   useEffect(() => {
-    if (activeWorkspaceId && firstLoadDone.current) {
-      localStorage.setItem("activeWorkspace", activeWorkspaceId);
+    if (activeWorkspaceId && firstLoadDone.current && currentUser?.id) {
+      localStorage.setItem("activeWorkspace_" + currentUser.id, activeWorkspaceId);
       setActiveDocId(null);
       setActiveFolderId(null);
       setOpenTabs([]);
@@ -614,7 +614,7 @@ export function useWorkspaceSystem() {
       lastHistorySave.current = nowMs;
       newHistoryList = [...newHistoryList, { content, timestamp: nowMs, title: target.title }].slice(-20); 
       addLog(id, "edited"); 
-      if (newHistoryList.length === 15) handleWorkspaceAction(addNotification, 'deepWork');
+      if (newHistoryList.length === 15 && currentUser?.id) handleWorkspaceAction(addNotification, 'deepWork', currentUser.id);
     }
 
     updateDocument(id, {
@@ -733,7 +733,17 @@ export function useWorkspaceSystem() {
     }
 
     const initWorkspace = async () => {
-      if (!currentUser?.id || !supabase) return;
+      if (!currentUser?.id || !supabase) {
+        setWorkspaces([]);
+        setDocuments([]);
+        setFolders([]);
+        setMedia([]);
+        setActiveWorkspaceId("");
+        setActiveDocId(null);
+        setOpenTabs([]);
+        firstLoadDone.current = false;
+        return;
+      }
 
       // 🔥 FIX: Cast to any
       const { data: wsData } = await (supabase as any).from('workspaces').select('*').eq('user_id', currentUser.id);
@@ -752,7 +762,7 @@ export function useWorkspaceSystem() {
       
       setWorkspaces(loadedWorkspaces);
 
-      const savedWsId = localStorage.getItem("activeWorkspace");
+      const savedWsId = localStorage.getItem("activeWorkspace_" + currentUser.id);
       const initialWsId = loadedWorkspaces.find((w: any) => w.id === savedWsId)?.id || loadedWorkspaces[0].id;
       setActiveWorkspaceId(initialWsId);
 
@@ -806,8 +816,22 @@ useEffect(() => {
       table: "workspace_documents",
       filter: `user_id=eq.${currentUser.id}`,
     },
-    (payload) => {
-      // document logic
+    (payload: any) => {
+      if (payload.eventType === "INSERT") {
+        setDocuments(prev => {
+          if (prev.some(d => d.id === payload.new.id)) return prev;
+          return [...prev, mapDoc(payload.new)];
+        });
+      } else if (payload.eventType === "UPDATE") {
+        setDocuments(prev => prev.map(d => {
+          if (d.id !== payload.new.id) return d;
+          if (editingDocRef.current === d.id) return d; // Protect active edit buffer
+          const dbDoc = mapDoc(payload.new);
+          return dbDoc.version > (d.version ?? 0) ? dbDoc : d;
+        }));
+      } else if (payload.eventType === "DELETE") {
+        setDocuments(prev => prev.filter(d => d.id !== payload.old.id));
+      }
     }
   );
 
@@ -819,8 +843,17 @@ useEffect(() => {
       table: "workspace_folders",
       filter: `user_id=eq.${currentUser.id}`,
     },
-    (payload) => {
-      // folder logic
+    (payload: any) => {
+      if (payload.eventType === "INSERT") {
+        setFolders(prev => {
+          if (prev.some(f => f.id === payload.new.id)) return prev;
+          return [...prev, mapFolder(payload.new)];
+        });
+      } else if (payload.eventType === "UPDATE") {
+        setFolders(prev => prev.map(f => f.id === payload.new.id ? mapFolder(payload.new) : f));
+      } else if (payload.eventType === "DELETE") {
+        setFolders(prev => prev.filter(f => f.id !== payload.old.id));
+      }
     }
   );
 
@@ -832,8 +865,17 @@ useEffect(() => {
       table: "workspace_media",
       filter: `user_id=eq.${currentUser.id}`,
     },
-    (payload) => {
-      // media logic
+    (payload: any) => {
+      if (payload.eventType === "INSERT") {
+        setMedia(prev => {
+          if (prev.some(m => m.id === payload.new.id)) return prev;
+          return [...prev, mapMedia(payload.new)];
+        });
+      } else if (payload.eventType === "UPDATE") {
+        setMedia(prev => prev.map(m => m.id === payload.new.id ? mapMedia(payload.new) : m));
+      } else if (payload.eventType === "DELETE") {
+        setMedia(prev => prev.filter(m => m.id !== payload.old.id));
+      }
     }
   );
 
@@ -845,38 +887,6 @@ useEffect(() => {
 }, [currentUser?.id]);
 
   useEffect(() => {
-    const interval = setInterval(async () => {
-      if (!navigator.onLine || !userRef.current || !supabase) return;
-      const user = userRef.current;
-      // 🔥 FIX: Cast all promises to any
-      const [docs, foldersRes, mediaRes] = await Promise.all([
-        (supabase as any).from("workspace_documents").select("*").eq("user_id", user.id),
-        (supabase as any).from("workspace_folders").select("*").eq("user_id", user.id),
-        (supabase as any).from("workspace_media").select("*").eq("user_id", user.id),
-      ]);
-      
-      if (docs.data) {
-        setDocuments(prev => {
-          const incoming: Document[] = docs.data.map(mapDoc);
-          const prevIds = new Set(prev.map(d => d.id));
-          const newDocs = incoming.filter(d => !prevIds.has(d.id));
-          return [
-            ...prev.map(localDoc => {
-              const dbDoc = incoming.find(d => d.id === localDoc.id);
-              if (!dbDoc || editingDocRef.current === localDoc.id) return localDoc;
-              return dbDoc.version > (localDoc.version ?? 0) ? dbDoc : localDoc;
-            }),
-            ...newDocs 
-          ];
-        });
-      }
-      if (foldersRes.data) setFolders(foldersRes.data.map(mapFolder)); 
-      if (mediaRes.data) setMedia(mediaRes.data.map(mapMedia)); 
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [supabase]);
-
-  useEffect(() => {
     if (!firstLoadDone.current || activeDocuments.length === 0 || !userRef.current) return;
     
     const timer = setTimeout(() => {
@@ -884,7 +894,7 @@ useEffect(() => {
       const mediaKey = `nexspace-${userRef.current.id}-media`;
       localStorage.setItem(storageKey, JSON.stringify({ documents: activeDocuments, folders: activeFolders }));
       localStorage.setItem(mediaKey, JSON.stringify(activeMedia));
-      handleWorkspaceAction(addNotification, 'save');
+      if (userRef.current) handleWorkspaceAction(addNotification, 'save', userRef.current.id);
     }, 1000);
     return () => clearTimeout(timer);
   }, [activeDocuments, activeFolders, activeMedia, addNotification]);
